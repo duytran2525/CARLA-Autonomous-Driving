@@ -1,0 +1,7 @@
+# Preserve the byte-identical 1b baseline used by recorded implementation hashes.
+experiments/ego_intent_response/** -text
+configs/ego_intent_response_town03.yaml -text
+configs/ego_intent_response_town03_scenes.yaml -text
+scripts/run_ego_intent_response.py -text
+tests/test_ego_intent_response.py -text
+tests/test_ego_intent_response_carla.py -text
