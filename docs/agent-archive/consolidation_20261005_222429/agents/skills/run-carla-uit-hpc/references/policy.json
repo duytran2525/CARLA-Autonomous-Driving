@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "account": "uit",
+  "time_hours_max": 72,
+  "queued_jobs_max": 50,
+  "home_conservative_gb_max": 10,
+  "home_quota_conflict_unresolved": true,
+  "read_only_roots": ["/shared", "/h200node01", "/h200node02"],
+  "profiles": {
+    "small": {"gres": "gpu:1g.18gb:1", "gpu_mode": "mig", "cpu_max": 12, "ram_gb_max": 40},
+    "normal": {"gres": "gpu:2g.35gb:1", "gpu_mode": "mig", "cpu_max": 16, "ram_gb_max": 72},
+    "large": {"gres": "gpu:3g.71gb:1", "gpu_mode": "mig", "cpu_max": 24, "ram_gb_max": 112}
+  }
+}

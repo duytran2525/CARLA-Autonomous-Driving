@@ -1,0 +1,58 @@
+{
+  "archive": "docs/agent-archive/20261005_214213",
+  "original_agent_files": 468,
+  "retained_adapted_skills": [
+    "agent-engineering",
+    "code-review-4eyes",
+    "documentation",
+    "consulting",
+    "problem-solving",
+    "soft-skills",
+    "docs-seeker",
+    "debugging"
+  ],
+  "new_skill": "run-carla-uit-hpc",
+  "excluded_skills": [
+    "ai-engineering",
+    "architecture",
+    "backend-development",
+    "brainstorm",
+    "claude-agent-guide",
+    "cnma-cap-backend",
+    "cnma-cap-frontend",
+    "cnma-devops-init-btp-cf",
+    "code-review",
+    "code-review-react",
+    "devop-init-artifact-cfg",
+    "devops",
+    "frontend-development",
+    "frontend-react-development",
+    "hybrid-testing",
+    "markdown-to-pdf",
+    "node-verify-import",
+    "quality-engineering",
+    "security",
+    "sequential-thinking",
+    "solid-backend-nodejs",
+    "testing"
+  ],
+  "excluded_roles": [
+    "lead-cap-architect",
+    "lead-frontend-engineer",
+    "lead-react-frontend-engineer"
+  ],
+  "adapted_roles": [
+    "code-reviewer",
+    "dev-ops-platform-engineer",
+    "documentation-manager",
+    "lead-qa-automation-engineer",
+    "principal-agent-architect",
+    "security-consultant",
+    "solution-architect"
+  ],
+  "original_rules_archived": true,
+  "original_workflows_and_docs_archived": true,
+  "canonical_location": ".agents/skills",
+  "compatibility_location": ".agent/skills",
+  "notes": "Originals preserved byte-for-byte in original-agent and inactive directories. Legacy scripts/scratch preserved in inactive-scripts/inactive-scratch; new local hpc_tests remain active. No remote operations or experiment modification authorized."
+}

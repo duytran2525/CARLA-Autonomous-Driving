@@ -1,0 +1,18 @@
+{
+  "source_filename": "Huong_Dan_Su_Dung_Tai_Nguyen_HPC.docx",
+  "original_local_path": "D:\\Dowload\\Huong_Dan_Su_Dung_Tai_Nguyen_HPC.docx",
+  "sha256": "7f6946bc2aeef7fac34e6679c154a00b88286f836e5332ffb150495d50884858",
+  "size_bytes": 2818706,
+  "modified_local": "2026-09-25T21:26:30.776594",
+  "review_date": "2026-10-05",
+  "transcript_sha256": "b43df533c1f694c4bf507616a6514f442f88bab9465747f80cedc5d06762d901",
+  "image_sha256": {
+    "image1.png": "3170413ea9fe8288dd51de970d921900e023305d1fc3538b4063b3375327182e",
+    "image2.png": "2d1dd092cfa93d8c6969ac4a3bab651793ffbe8bebc1c699b0ffac7881e88c85",
+    "image3.png": "995c6bc799e7af4f290bafc4db2b5d674a8e52642ffc0aed0175083827a70b82",
+    "image4.png": "dcec477a99f093db846688c5775f7f5f37de12b3ac78d262267ee2c07504c508",
+    "image5.png": "bf70ea166fcdaeb1e4a9dd97a451ce207403f39d1866271b7df3ffce177164a8",
+    "image6.png": "64fe76e450b7c2eaae9fff6a495fe739fe23e84f451d905edd448eab9a45fb59"
+  },
+  "notes": "Original DOCX remains at its local source path; portable extracted transcript and all six images included. Verify updates with administrator; source path is provenance, not a Linux dependency."
+}

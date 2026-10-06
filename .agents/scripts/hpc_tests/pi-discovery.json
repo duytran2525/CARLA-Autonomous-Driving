@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "loader": "installed Pi DefaultResourceLoader",
+  "results": [
+    {
+      "label": "legacy-baseline",
+      "trusted": true,
+      "canonical_names": [],
+      "root_context_loaded": false,
+      "relevant_diagnostics": []
+    },
+    {
+      "label": "trusted-root",
+      "trusted": true,
+      "canonical_names": [
+        "agent-engineering",
+        "code-review-4eyes",
+        "consulting",
+        "debugging",
+        "docs-seeker",
+        "documentation",
+        "problem-solving",
+        "run-carla-uit-hpc",
+        "soft-skills"
+      ],
+      "root_context_loaded": true,
+      "relevant_diagnostics": []
+    },
+    {
+      "label": "trusted-nested",
+      "trusted": true,
+      "canonical_names": [
+        "agent-engineering",
+        "code-review-4eyes",
+        "consulting",
+        "debugging",
+        "docs-seeker",
+        "documentation",
+        "problem-solving",
+        "run-carla-uit-hpc",
+        "soft-skills"
+      ],
+      "root_context_loaded": true,
+      "relevant_diagnostics": []
+    },
+    {
+      "label": "untrusted-root",
+      "trusted": false,
+      "canonical_names": [],
+      "root_context_loaded": true,
+      "relevant_diagnostics": []
+    }
+  ]
+}

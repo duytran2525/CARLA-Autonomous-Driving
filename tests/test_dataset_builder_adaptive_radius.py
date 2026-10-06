@@ -124,8 +124,8 @@ class DatasetBuilderAdaptiveRadiusTests(unittest.TestCase):
         config = WindowBuildConfig()
         
         self.assertFalse(config.adaptive_radius_enabled)
-        self.assertEqual(config.radius_base, 20.0)
-        self.assertEqual(config.radius_alpha, 0.5)
+        self.assertEqual(config.radius_base, 40.0)
+        self.assertEqual(config.radius_alpha, 1.0)
 
     def test_build_samples_with_adaptive_radius(self) -> None:
         """Test building samples with adaptive radius enabled.

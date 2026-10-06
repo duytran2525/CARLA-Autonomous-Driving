@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "original_agent_files_checked": 468,
+  "protected_project_files_checked": 99,
+  "active_skill_count": 9,
+  "excluded_skill_count": 22,
+  "local_links_checked": 119,
+  "markdown_files_checked": 44,
+  "source_images_checked": 6,
+  "original_docx_compared": true,
+  "source_docx_sha256": "7f6946bc2aeef7fac34e6679c154a00b88286f836e5332ffb150495d50884858",
+  "git_status_after": " M .gitignore\n M tests/test_dataset_builder_adaptive_radius.py\n?? .agent/\n?? .agents/\n?? docs/agent-archive/\n?? experiments/__init__.py\n?? scripts/tune_adaptive_radius.py\n",
+  "failures": [],
+  "limitations": [
+    "Link audit checks local existence, not external URL availability/model obedience.",
+    "Original DOCX comparison is skipped if the provenance source path is unavailable.",
+    "Integrity covers the saved file set, not arbitrary filesystem writes by another session."
+  ]
+}

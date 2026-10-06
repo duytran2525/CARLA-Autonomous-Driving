@@ -1,0 +1,17 @@
+{
+  "approved_by_user": true,
+  "backup_path": "docs/agent-archive/consolidation_20261005_222429",
+  "active_root": ".agents",
+  "removed_active_root": ".agent",
+  "removed_wrapper_count": 9,
+  "moved_components": [
+    "agents",
+    "rules",
+    "docs",
+    "workflows",
+    "scripts",
+    "README.md"
+  ],
+  "historical_archive": "docs/agent-archive/20261005_214213",
+  "notes": "Sources and pre-consolidation configuration preserved in backups. .gitignore and experiment files unchanged. No remote operations. An absent temporary path pointer caused one pre-move attempt to stop without changes; verified durable backup used instead."
+}

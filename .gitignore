@@ -6,6 +6,7 @@ outputs/*
 
 *.txt
 *.md
+!experiments/ego_intent_response/README.md
 
 # Trọng số mô hình
 models/*.pth

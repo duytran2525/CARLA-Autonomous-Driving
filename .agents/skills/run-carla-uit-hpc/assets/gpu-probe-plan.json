@@ -1,0 +1,17 @@
+{
+  "operation": "gpu_workload",
+  "node_kind": "compute",
+  "slurm_job_id": "12345",
+  "username": "researcher",
+  "account": "uit",
+  "partition": "normal",
+  "gres": "gpu:2g.35gb:1",
+  "cpus": 4,
+  "memory_gb": 4,
+  "time_hours": 1,
+  "queued_jobs": 0,
+  "workdir": "/datastore/researcher/project",
+  "home_usage_gb": 1,
+  "gpu_mode": "mig",
+  "_note": "Synthetic example only, not live allocation evidence. Replace with verified own-job metadata after authorization; never use sample job ID or quota as fact. CARLA server operation is blocked on all current profiles."
+}
