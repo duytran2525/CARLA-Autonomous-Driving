@@ -13,13 +13,17 @@ Script trợ giúp nằm ở `scripts/ledger.py` trong thư mục của skill n�
 python -I -X utf8 <thư mục skill>/scripts/ledger.py <lệnh>
 ```
 
+Skill này có hai bản: nguồn ở `.agents/skills/crfp-project/` trong repo, bản cài ở `~/.claude/skills/crfp-project/`. Sửa thì sửa bản nguồn rồi chép đè sang bản cài.
+
 ## Ba việc đầu tiên của một phiên
 
-1. `ledger where` — in đường dẫn sổ và file 8 nguyên tắc. Nếu nó cảnh báo có hai bản sổ khác nội dung thì dừng và báo người dùng: sổ chỉ được có một nơi gốc.
-2. `ledger brief` — in phần 1–3 của sổ (quy ước, bảng nhiệm vụ, điều kiện thắng SOTA), khoảng 230 dòng. Đọc xong là biết dự án đang ở bước nào, việc gì đang chạy, việc gì đang chờ ai.
-3. Biết mình đang nói chuyện với ai trước khi ghi tên ai vào sổ (xem "Ai là ai").
+1. `ledger where` — in đường dẫn sổ, commit gần nhất của sổ, sổ có đang sửa dở không, và danh sách worktree. Nếu nó cảnh báo một bản khác chứa nội dung mà nơi gốc không có thì dừng và báo người dùng: sổ chỉ được có một nơi gốc.
+2. `ledger brief` — in phần 1–3 của sổ (quy ước, bảng nhiệm vụ, điều kiện thắng SOTA), khoảng 27 KB. Đọc xong là biết dự án đang ở bước nào, việc gì đang chạy, việc gì đang chờ ai.
+3. Biết mình đang nói chuyện với ai trước khi ghi tên ai vào sổ hoặc làm việc cần thẩm quyền của người đó (xem "Ai là ai"). Phiên chỉ đọc thì không cần hỏi, chỉ cần đừng giả định.
 
-Đọc thêm file 8 nguyên tắc + 5 idea khi việc của phiên đụng tới hướng nghiên cứu, claim, ngưỡng hoặc cách diễn giải kết quả. Việc thuần vận hành (chạy CARLA, sửa bug) thì phần tóm tắt dưới đây là đủ.
+Đọc thêm file 8 nguyên tắc + 5 idea khi việc của phiên đụng tới hướng nghiên cứu, claim, ngưỡng hoặc cách diễn giải kết quả. Việc thuần vận hành (chạy CARLA, sửa bug) thì phần tóm tắt dưới đây là đủ. File nguyên tắc có thể chậm hơn sổ về trạng thái (ví dụ còn ghi "cần tạo M76"); về trạng thái thì sổ đúng.
+
+**Sổ có thể chậm hơn repo.** Các phiên M21, M56 commit liên tục, còn sổ chỉ được cập nhật khi có người ghi. Trước khi trả lời "đang ở đâu" về một việc đang chạy, lấy đường dẫn worktree của nó từ `ledger where` rồi xem `git -C <worktree> log -3 --format="%h %ad %s"`. Thấy sổ cũ hơn: phiên chỉ đọc thì nói rõ điều đó trong câu trả lời; phiên được sửa sổ thì cập nhật hàng đó với nguồn `[repo]`.
 
 ## Dự án này là gì
 
@@ -61,7 +65,7 @@ Một file duy nhất: `docs/crfp/crfp-main-ledger.md` **ở checkout chính c�
 
 Mỗi worktree có thể có một bản sổ được git checkout ra theo nhánh của nó. Các bản đó chỉ là ảnh chụp, thường cũ hơn; đừng đọc trạng thái từ chúng và đừng sửa chúng. Đọc và sửa luôn đi qua đường dẫn mà `ledger where` in ra, rồi commit trên `main` của checkout chính (`git -C <checkout chính> …`). Một file vật lý duy nhất thì không thể có hai bản lệch nhau.
 
-Ngoài máy này (ví dụ workspace của Muse) không có repo: đặt biến môi trường `CRFP_LEDGER` trỏ tới file sổ rồi dùng script như bình thường.
+Ngoài máy này (ví dụ workspace của Muse) không có repo: đặt biến môi trường `CRFP_LEDGER` trỏ tới file sổ rồi dùng script như bình thường (PowerShell: `$env:CRFP_LEDGER = '<đường dẫn>'`; bash: `export CRFP_LEDGER=<đường dẫn>`). Ở chế độ này script không kiểm được bản khác hay trạng thái git, nên người dùng phải tự bảo đảm đó là bản mới nhất.
 
 | Phần | Nội dung | Loại |
 |---|---|---|
@@ -83,25 +87,61 @@ File đã trên 130 KB và sẽ còn lớn; mỗi hàng là một dòng dài t�
 | Toàn cảnh, việc đang chờ | `ledger brief` |
 | Nội dung đầy đủ của vài hàng | `ledger row M21 M30` |
 | Lọc hàng | `ledger list --status "Mở" --pha 0` (thêm `--type Task`, `--text <từ khóa>`) |
+| Việc gì bị chặn, bởi cái gì | `ledger list --status "Bị chặn" --wide` (in cả ô trạng thái đầy đủ, phụ thuộc, người quyết, hạn), cộng khối B3 trong `brief` |
+| Mọi hàng nhắc tới một ID | `ledger list --text M30` |
 | Chuyện gì vừa xảy ra | `ledger log 8` (thêm `--full` để không cắt) |
 | Một quyết định cũ | tìm trong phần 6 theo ngày hoặc từ khóa bằng công cụ tìm kiếm, rồi đọc đúng dòng đó |
 
-Handoff và trí nhớ của phiên trước thường chậm hơn repo vài version. Trước khi tin một câu "trạng thái hiện tại", đối chiếu với worktree thật (ví dụ log và commit của nhánh M21).
+Hai điều cần biết khi tìm thứ đang bị chặn:
+
+- Cột Phụ thuộc chưa đầy đủ: nhiều phụ thuộc chỉ được viết bằng lời trong ô Trả lời. Trước khi quyết định hay đóng một hàng, chạy `ledger list --text <ID>` để thấy những hàng khác đang chờ nó hoặc nó đang chờ.
+- Có hàng ghi `Mở` nhưng thực tế đang chờ việc khác (ví dụ một việc chờ kết quả M21). Khối B3 và ghi chú trong phần 2 nói điều đó; bộ lọc theo trạng thái thì không.
+
+Tiêu chí đạt/rớt của một cổng nằm ở hàng định nghĩa metric và quy tắc (M22a, M31a, M35a) và ở spec của thí nghiệm trong worktree của nó, không nằm ở hàng của thí nghiệm. Khi ai đó nói "X đạt rồi", hỏi theo tiêu chí nào và file kết quả ở đâu.
+
+Handoff và trí nhớ của phiên trước thường chậm hơn repo vài version; xem "Sổ có thể chậm hơn repo" ở trên.
 
 ## Sửa sổ
 
 Làm theo thứ tự này; mỗi bước có lý do của nó.
 
-1. **Sửa bảng Main trước.** Tìm hàng bằng ID, sửa đúng ô cần sửa. Ô Trạng thái luôn bắt đầu bằng một trong: `Mở`, `Đang làm`, `Bị chặn`, `Đã trả lời chờ kiểm chứng`, `Đóng`, `Hoãn`, `Bỏ`; chi tiết viết sau, trong ngoặc hoặc sau dấu —. Script và bảng nhiệm vụ dựa vào từ khóa đầu ô này.
-2. **Hàng mới** lấy số từ `ledger next-id`. Không bao giờ đánh số lại hay tái dùng ID: spec, commit và báo cáo ở các nhánh khác trích M-số. Đủ 12 ô; ô nào chưa có thì để trống hoặc `—`. Dấu `|` trong ô phải viết `\|`.
-3. **Ghi một mục vào cuối phần 6** cho mọi thay đổi có nghĩa: ngày, ai quyết hoặc ai phát hiện, nội dung, và nguồn. Đánh dấu nguồn: `[repo]` nếu bạn đọc trực tiếp từ code/log/output; `[handoff]` nếu chỉ nghe từ tài liệu chuyển giao; ghi rõ "nhận định của Claude" nếu đó là suy luận. Sổ là thứ người khác sẽ dùng làm bằng chứng, nên người đọc phải phân biệt được ba loại này.
-4. **Đồng bộ view:** chạy `ledger sync-views` để chép Pha / Bước / Trạng thái sang phần 2. Sau đó tự xem lại bằng mắt những thứ script không làm được: ghi chú và vị trí khối của hàng trong phần 2, ngày "cập nhật lần cuối", dòng "Vị trí hiện tại", bảng phần 3 và phụ lục A nếu thay đổi chạm tới chúng. Hàng mới phải được đặt tay vào đúng khối của phần 2.
-5. **Kiểm:** `ledger check` phải in `OK`. Nó bắt lệch cột, ID trùng, ID được nhắc mà chưa có hàng, view lệch với bảng Main, và báo kích thước từng phần.
+1. **Sửa bảng Main trước, bằng script.** `ledger set <ID> <ô> "<nội dung>"` thay một ô; `ledger add <ID> <ô> "<nội dung>"` nối thêm vào cuối ô. Tên ô: `question source status answer evidence deps pha buoc owner han type`. Script tự escape dấu `|`, giữ nguyên kiểu xuống dòng của file và từ chối trạng thái sai từ khóa. Dùng script thay vì công cụ sửa file, vì mỗi hàng là một dòng dài vài nghìn ký tự và rất dễ sửa nhầm chỗ.
+   - Ô Trạng thái luôn bắt đầu bằng một từ khóa, chi tiết viết sau trong ngoặc hoặc sau dấu —:
+
+     | Từ khóa | Nghĩa |
+     |---|---|
+     | `Mở` | chưa có đáp án, chưa ai làm |
+     | `Đang làm` | đã có người nhận và đã bắt đầu; nếu mới giao mà chưa chạy thì ghi rõ trong ngoặc |
+     | `Bị chặn (bởi …)` | không làm tiếp được cho tới khi việc khác xong |
+     | `Đã trả lời chờ kiểm chứng` | có đáp án hoặc thiết kế, nhưng chưa có dữ liệu hay văn bản xác nhận |
+     | `Đóng` | đã quyết bởi người có thẩm quyền, hoặc đã có kết quả đã được kiểm |
+     | `Hoãn (điều kiện mở lại)` | chủ động để sau |
+     | `Bỏ` | không làm nữa |
+
+   - "Đạt" và "rớt" không phải trạng thái. Kết quả của một thí nghiệm ghi vào ô Trả lời (đúng con số, theo đúng tiêu chí đã đặt trước), nguồn vào ô Bằng chứng.
+   - Ô `owner` ghi người quyết, thêm người làm nếu khác ("Duy; Claude chạy"). Ô `han` là mốc phải xong việc. Ngân sách, cấu hình và các chi tiết của một quyết định ghi vào ô Trả lời.
+2. **Hàng mới** lấy số từ `ledger next-id`. Không bao giờ đánh số lại hay tái dùng ID: spec, commit và báo cáo ở các nhánh khác trích M-số. Hàng mới là một dòng đủ 12 ô thêm vào cuối bảng Main; ô nào chưa có thì để trống hoặc `—`.
+3. **Ghi một mục vào sổ vận hành** cho mọi thay đổi có nghĩa: `ledger log-add "<ngày> — <ai quyết hoặc ai phát hiện>: <nội dung>. Nguồn: …"`. Ngày là ngày thật theo đồng hồ máy; nếu người dùng nêu một ngày khác thì ghi cả hai. Luôn nói rõ nguồn thuộc loại nào, vì sổ là thứ người khác dùng làm bằng chứng:
+   - `[repo]`: bạn đọc trực tiếp từ code, log, output.
+   - `[chat]`: người có tên nói trong chat ("Duy quyết trong chat"). Nếu là lời thuật lại của người thứ ba ("Duy thuật lại lời TS. Hằng") thì ghi đúng như vậy và nói bạn chưa thấy nguyên văn.
+   - `[handoff]`: chỉ có trong tài liệu chuyển giao, chưa kiểm từ nguồn gốc.
+   - "nhận định của Claude": suy luận của bạn.
+
+   Một yêu cầu bị từ chối vì trái luật (ví dụ đề nghị nới ngưỡng sau khi thấy số) cũng đáng một mục: ai đề nghị, đề nghị gì, vì sao không làm.
+4. **Đồng bộ view:** chạy `ledger sync-views` để chép Pha / Bước / Trạng thái sang phần 2. Sau đó tự xem lại bằng mắt những thứ script không làm được:
+   - Khối của hàng trong phần 2 theo trạng thái mới: `Đóng` và `Đã trả lời chờ kiểm chứng` thuộc khối A; `Đang làm` thuộc B1; `Mở` làm được ngay thuộc B2; đang chờ việc khác thuộc B3; còn lại theo pha ở C và D. Đổi khối thì chuyển cả dòng. Hàng mới phải được đặt tay vào đúng khối.
+   - Ghi chú một dòng của hàng, dòng "Vị trí hiện tại", bảng phần 3 và phụ lục A nếu thay đổi chạm tới chúng.
+   - Ngày "cập nhật lần cuối" của view: chỉ sửa một vài dòng thì ghi kiểu "11/10/2026 (chỉ M37, M81; phần còn lại như 10/10)".
+5. **Kiểm:** `ledger check` phải in `OK`. Nó bắt lệch cột, ID trùng, ID được nhắc mà chưa có hàng, view lệch với bảng Main, và báo kích thước từng phần. `OK` chỉ nói về cấu trúc; khối, ghi chú và ngày của view vẫn do bạn chịu trách nhiệm.
 6. **Commit trên `main` của checkout chính:** `git -C <checkout chính> add -f docs/crfp/crfp-main-ledger.md` (cần `-f` vì `.gitignore` chặn `*.md`), rồi commit. Chỉ add đúng file sổ; checkout chính có nhiều file chưa theo dõi của người khác. Git là lịch sử của sổ: ai đổi đáp án, vì sao.
 
 Những điều sổ không cho phép, kể cả khi người dùng phiên này nhờ:
 
-- Đổi một ngưỡng hay tiêu chí đã khóa (M22a, M31a, mọi thứ đã vào Tag) sau khi đã thấy số. Việc được làm là ghi lại quyết định của Duy và công khai rằng nó đặt sau khi thấy số.
+- Đổi một ngưỡng hay tiêu chí sau khi đã thấy số liên quan tới nó. "Số liên quan" gồm cả kết quả của một thí nghiệm khác dùng cùng agent và cùng loại cảnh: thấy kết quả M21 rồi nới quy tắc của 1b vẫn là đổi sau khi thấy số. Cụ thể:
+  - Ngưỡng đã vào Tag: không ai được đổi, kể cả Duy. Từ chối, nêu nguyên tắc 6.
+  - Quy tắc đã duyệt nhưng chưa vào Tag (M22a, M31a hiện nay): sửa trước khi có số liên quan là việc soạn thảo bình thường. Sau khi có số, chỉ còn ngoại lệ của nguyên tắc 6: cổng thăm dò và ngưỡng cũ sai một cách khách quan (ví dụ dung sai 1 micromet cho một chiếc xe đang lắng). "Hơi chặt" không phải sai khách quan.
+  - Nếu Duy (đã xác nhận danh tính) vẫn quyết đổi theo ngoại lệ đó: giữ nguyên văn quy tắc cũ trong ô, viết quy tắc mới bên cạnh kèm câu "đặt sau khi thấy số, ngày …, lý do …", ghi mục sổ vận hành, và từ đó báo cáo kết quả theo cả hai quy tắc. Không bao giờ sửa lặng lẽ.
+- Làm một việc cần thẩm quyền của Duy (ngưỡng, hướng đi, chọn loại agent, phạm vi claim) khi chưa biết người đang chat là ai. Ghi "người dùng phiên này" chỉ dùng được cho việc không cần thẩm quyền.
 - Ghi đáp án vào một hàng khi chưa có dữ liệu, hoặc nâng "đã thiết kế" thành "đã có kết quả". Đóng một hàng không phải là có kết quả khoa học.
 - Viết "chưa ai làm" mà không kèm phạm vi "trong tập đã đọc".
 
