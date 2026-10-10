@@ -70,7 +70,7 @@ Số hàng theo trạng thái (134 hàng): Hoãn 55, Mở 25, Bị chặn 24, Đ
 
 Chuỗi mốc: `Cổng 0 (M76, M79, M80) + hỏi sớm (M77, M78, M81–M83)` → `Tag-A (M52, M47)` → `Tag-B (M63)` → `Tag-C (M66)` → `Gate 1 (M62) + Gate 1.5 (M68)` → `M85, M86, M84` → `Tag-D (M117)` → `Gate 2 (M116)` → nộp.
 
-### Lịch v2 — đẩy nhanh (bản nháp của Claude ngày 10/10/2026 17:15 — CHỜ DUY DUYỆT, chưa phải cam kết)
+### Lịch v2 — đẩy nhanh (Claude soạn 10/10/2026 17:15; DUY DUYỆT 10/10/2026)
 
 Thay cho lịch v1 (còn trong git, commit `2fdb0c3`). **Giả định do Duy đặt:** AI viết code nên code không phải nút thắt; chỉ tính những thứ AI không đẩy nhanh được. Claude thêm ba giả định để ra được ngày: Duy duyệt trong ngày; mỗi lần gửi GVHD chờ 5 ngày làm việc; không cổng nào rớt. Hạn nộp vẫn giả định 05/03/2027 (M77).
 
@@ -137,6 +137,7 @@ Pha 0–1. "Đã trả lời chờ kiểm chứng" nghĩa là có đáp án như
 | M31a | Baseline, seed, giao thức thống kê (quy tắc) | 0 | 1 | Đã trả lời chờ kiểm chứng | Quy tắc + giá trị khóa 05/10; có hiệu lực khi tạo Tag-A |
 | M76 | Đầu vào model học: trạng thái đặc quyền hay cảm biến? | 0 | — | Đóng | Duy xác nhận câu chữ 10/10 |
 | M77 | Venue mục tiêu và hạn nộp | 0 | 1 | Đã trả lời chờ kiểm chứng | Hạn dự đoán 05–08/03/2027, chưa chính thức |
+| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | 0 | 2 | Đóng | Lịch v2 ở mục Lịch phía trên; Duy duyệt 10/10. Phải theo dõi bốn điều kiện của lịch |
 | M13 | Kill-search cụm phong cách/đích đến | 1 | — | Đã trả lời chờ kiểm chứng | ALIVE trong tập đã đọc |
 | M15 | Intent-attention vs top-down attention | 1 | — | Đã trả lời chờ kiểm chứng | WEAKEN; bắt buộc cite-and-distinguish |
 | M16 | Confidence vs uncertainty/OOD/case-based | 1 | 1 | Đã trả lời chờ kiểm chứng | WEAKEN; bắt buộc cite-and-distinguish |
@@ -166,7 +167,6 @@ Xếp theo thứ tự Claude đề xuất làm (10/10).
 | M125 | Phiên bản CARLA mà benchmark yêu cầu so với 0.9.16 đang dùng ở Phase 1 | 0 | 2 | Mở | Kiểm cùng lúc với M79 |
 | M80 | Phạm vi claim: chỉ trong CARLA, hay có cầu sang dữ liệu thật? | 0 | 2 | Mở |  |
 | M78 | Tài nguyên tính toán thực có | 0 | 1 | Mở | Còn thiếu ước tính GPU-giờ theo từng phương án |
-| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | 0 | 2 | Đóng | Lịch v2 (đẩy nhanh) ở mục Lịch phía trên, chờ Duy duyệt |
 | M114 | Bảng kết quả Gate → loại paper (cả hai sống / một sống / cả hai thu hẹp → full / workshop /… | 3 | 7 | Mở | Hạn: trước Gate 1; bản nháp ở Phụ lục A |
 | M116 | Gate 2: hệ e2e + VLM có hơn SOTA trên benchmark M79 không | 6 | — | Mở | Chưa có tiêu chí đạt và phương án lùi |
 | M123 | Khóa giao thức và ngưỡng của pilot Gate 1.5 (M68) TRƯỚC khi chạy 1b | 3 | 6 | Mở | Phải xong trước M20; làm được ngay |
