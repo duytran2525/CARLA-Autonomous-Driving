@@ -64,7 +64,7 @@
 
 **Vị trí hiện tại: Bước 2.** M21 đang chạy lại ở V5.9 sau khi V5.8 thu được 245 capture rồi dừng; chưa có kết quả go/no-go; M56 đang cài offline; chưa có số liệu khoa học nào của dự án. Hạn nộp dự đoán: 05–08/03/2027 (M77), tức khoảng 21 tuần.
 
-Số hàng theo trạng thái (134 hàng): Hoãn 55, Mở 27, Bị chặn 23, Đã trả lời chờ kiểm chứng 15, Đóng 11, Đang làm 2, Bỏ 1.
+Số hàng theo trạng thái (134 hàng): Hoãn 55, Mở 26, Bị chặn 24, Đã trả lời chờ kiểm chứng 15, Đóng 11, Đang làm 2, Bỏ 1.
 
 Chuỗi mốc: `Cổng 0 (M76, M79, M80) + hỏi sớm (M77, M78, M81–M83)` → `Tag-A (M52, M47)` → `Tag-B (M63)` → `Tag-C (M66)` → `Gate 1 (M62) + Gate 1.5 (M68)` → `M85, M86, M84` → `Tag-D (M117)` → `Gate 2 (M116)` → nộp.
 
@@ -237,7 +237,7 @@ Xếp theo cột Bước.
 | M105 | Baseline: UniAD / VAD / SparseDrive / DA-WAM; baseline tối thiểu: vận tốc không đổi, điều ki… | 4 | — | Hoãn |  |
 | M106 | Định vị so với SOTA: SOTA hiện tại là ai, ta hơn ở điểm cụ thể nào, bằng chứng gì; quy tắc c… | 4 | — | Hoãn |  |
 | M113 | Phản biện dễ gặp ("sao không RL end-to-end", "phản ứng agent viết tay là luật tự viết", "sao… | 4 | — | Hoãn |  |
-| M117 | Đóng băng Tag-D (đăng ký trước khi huấn luyện) | 4 | — | Mở | Tag-D |
+| M117 | Đóng băng Tag-D (đăng ký trước khi huấn luyện) | 4 | — | Bị chặn | Tag-D |
 
 ### D3. Sau Gate 1 — Pha 5: kiến trúc, backbone, confidence
 
@@ -446,7 +446,7 @@ Gate 2 (M116) đọc ở cuối pha này.
 | M114 | Bảng kết quả Gate → loại paper (cả hai sống / một sống / cả hai thu hẹp → full / workshop / benchmark-dataset / negative result); phương án lùi cho Gate 2 | [K34, X2] | Mở | Chưa có bảng. Bản nháp các điểm dừng/rẽ: Phụ lục A (là đề xuất, chưa phải quyết định). Phương án lùi cho Gate 2 (M116) chưa định nghĩa — nguyên tắc 1 yêu cầu nêu rõ | Phụ lục A | M35a | 3 | 7 | Duy + GVHD | Trước Gate 1 (M62) | Q |
 | M115 | Phát hành và tái lập: mã, dữ liệu, phiên bản CARLA, giấy phép dữ liệu tự sinh; tài liệu minh họa định tính (quỹ đạo dự đoán so với thực tế, video closed-loop, attention map) | [K34, X3] | Hoãn (sau Gate 1) |  |  | M83 | 7 | — | Duy | Trước nộp | Task |
 | M116 | Gate 2: hệ e2e + VLM có hơn SOTA trên benchmark M79 không | [handoff 10/10 §5] | Mở (chưa có tiêu chí và phương án lùi) | Mới chỉ có tên. Chưa có: tiêu chí đạt, ngưỡng, phương án lùi nếu không đạt. Danh sách điều kiện cần: phần 3 của file này |  | M79, M106, M108, M114 | 6 | — | Duy + GVHD | Tiêu chí: Tag-D | Q |
-| M117 | Đóng băng Tag-D (đăng ký trước khi huấn luyện) | [K34, Tag-D] | Mở | Tag-D gồm: giao thức M68; M90, M39 (phần model học), M95, M96, M100, M103, M105, M106, M101, M102, M104, M6, M107, M108, M109, M87, M113. Claude đề xuất thêm 10/10: M118, M119, M120 và tiêu chí M116. Cùng quy tắc "không đổi sau khi thấy số" |  | các hàng liệt kê trong ô Trả lời | 4 | — | Duy | Trước huấn luyện | Task |
+| M117 | Đóng băng Tag-D (đăng ký trước khi huấn luyện) | [K34, Tag-D] | Bị chặn (bởi M62: đóng băng sau Gate 1, trước khi huấn luyện) | Tag-D gồm: giao thức M68; M90, M39 (phần model học), M95, M96, M100, M103, M105, M106, M101, M102, M104, M6, M107, M108, M109, M87, M113. Claude đề xuất thêm 10/10: M118, M119, M120 và tiêu chí M116. Cùng quy tắc "không đổi sau khi thấy số" |  | M62 | 4 | — | Duy | Trước huấn luyện | Task |
 | M118 | Tái lập số đã công bố của backbone trên phần cứng của mình trước khi thêm CRFP | [Claude 10/10; điều kiện thắng SOTA #13] | Hoãn (sau khi chọn backbone M97) | Không tái lập được thì phép so M108 mất nghĩa |  | M97, M78 | 5 | — | Duy | Trước M108 | Task |
 | M119 | Thước đo độ trung thực của lý do sinh ra: lý do có thật sự quyết định ý định không | [Claude 10/10; điều kiện thắng SOTA #19] | Hoãn (sau Gate 1) | Idea 4 chưa có phép đo riêng; liên quan bộ test can thiệp của M38 và thứ tự nhân quả của M69 |  | M69, M38 | 4 | — | Duy | Tag-D | Q |
 | M120 | Ablation: attention theo ý định so với nối vector (concat) | [Claude 10/10; điều kiện thắng SOTA #20; file 8 nguyên tắc, idea 2] | Hoãn (sau Gate 1) | Cơ chế M15 là giả thuyết, cần đúng ablation này để kiểm |  | M15, M27 | 6 | — | Duy | Tag-D | Q |
