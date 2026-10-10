@@ -129,7 +129,7 @@ Làm theo thứ tự này; mỗi bước có lý do của nó.
 
    Một yêu cầu bị từ chối vì trái luật (ví dụ đề nghị nới ngưỡng sau khi thấy số) cũng đáng một mục: ai đề nghị, đề nghị gì, vì sao không làm.
 4. **Đồng bộ view:** chạy `ledger sync-views` để chép Pha / Bước / Trạng thái sang phần 2. Sau đó tự xem lại bằng mắt những thứ script không làm được:
-   - Khối của hàng trong phần 2 theo trạng thái mới: `Đóng` và `Đã trả lời chờ kiểm chứng` thuộc khối A; `Đang làm` thuộc B1; `Mở` làm được ngay thuộc B2; đang chờ việc khác thuộc B3; còn lại theo pha ở C và D. Đổi khối thì chuyển cả dòng. Hàng mới phải được đặt tay vào đúng khối.
+   - Khối của hàng trong phần 2 theo trạng thái mới: `Đóng`, `Đã trả lời chờ kiểm chứng` và `Bỏ` thuộc khối A; `Đang làm` thuộc B1; `Mở` làm được ngay thuộc B2; đang chờ việc khác thuộc B3; còn lại theo pha ở C và D. Đổi khối thì chuyển cả dòng. Hàng mới phải được đặt tay vào đúng khối.
    - Ghi chú một dòng của hàng, dòng "Vị trí hiện tại", bảng phần 3 và phụ lục A nếu thay đổi chạm tới chúng.
    - Ngày "cập nhật lần cuối" của view: chỉ sửa một vài dòng thì ghi kiểu "11/10/2026 (chỉ M37, M81; phần còn lại như 10/10)".
 5. **Kiểm:** `ledger check` phải in `OK`. Nó bắt lệch cột, ID trùng, ID được nhắc mà chưa có hàng, view lệch với bảng Main, và báo kích thước từng phần. `OK` chỉ nói về cấu trúc; khối, ghi chú và ngày của view vẫn do bạn chịu trách nhiệm.
