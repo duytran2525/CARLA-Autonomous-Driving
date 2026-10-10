@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "record_type": "independent_m21_full_v5_source_review",
+  "reviewer": "Muse (independent reviewer appointed by operator; previously reviewed M55 bcd6317 and C-boundary)",
+  "independent_of_author": true,
+  "date_utc": "2026-10-07T07:15:00Z",
+  "head_commit": "082ab787900a68f0b76411a818ab25e6502c3b01",
+  "files": {
+    ".gitattributes": "a2b93c38fe4ffda9dbf7b4c7d1e8c07725e0139c6995c173a32aae821694bb45",
+    "configs/ego_intent_response_town03_scenes_v5.provenance.json": "8fc9619230cedae698500eff635a85e30faf664b17d2a02f6c2c84ab343ea421",
+    "configs/ego_intent_response_town03_scenes_v5.yaml": "78458579438351c48f656bbdb8af392f03d9d654d0df131959b3cd15d4461771",
+    "experiments/ego_intent_response/m21_full/README.md": "1b5014e8a490ee268e5b7cbcd40de06eb6d9a2c033ce2b542ba07a06fa24e0bb",
+    "experiments/ego_intent_response/m21_full/__init__.py": "91bd6981c8a5262dc5546a696d0a6eba5596eab594224447245f8a8963ff142b",
+    "experiments/ego_intent_response/m21_full/agent.py": "29288f2956c4dc6dd51c9171cf3bd0cf8107f6b790f3e0df94c99b7870b6b270",
+    "experiments/ego_intent_response/m21_full/audit.py": "b41b8181d9dcafcc4b7c4c4b6e5d5dfcb9c49e312c6f6eaba55d6bb477d7d412",
+    "experiments/ego_intent_response/m21_full/calibration.py": "88dabdefcd52e0e4eb417b2281bd01d57078f8f2e18a476ee30bc04a4d6cb879",
+    "experiments/ego_intent_response/m21_full/cli.py": "1c82b92d700a32ff238829084b57595602444cc7e0d20834d907ab9b3075a4c9",
+    "experiments/ego_intent_response/m21_full/delivery.py": "497399c77b778376a38eeea69d818f47340b27a381495b62eaeaaf6b3d82bb7f",
+    "experiments/ego_intent_response/m21_full/inference.py": "c74d75c0cb0b4dcacc761ed67b0643781b6bd05383bc124add63b6de33c9e4e0",
+    "experiments/ego_intent_response/m21_full/measurements.py": "b1086e0e7dea552385b05d34a67e03ebe83afd50df906477cbefd5425e30334b",
+    "experiments/ego_intent_response/m21_full/protocol.py": "9d4e60c1f188e68f133974d096ec8650bd1d63c777c1222358a298d028302ca4",
+    "experiments/ego_intent_response/m21_full/provenance.py": "de9ecce1995b63eca73f9b52489c62dc10454d70da877f55a71bc12cea02fb6a",
+    "experiments/ego_intent_response/m21_full/report.py": "760ef91ecd1a9bea85f3c14c9321e305b8d1d42303b206e3b4f623612ed05e77",
+    "experiments/ego_intent_response/m21_full/requirements.in": "fda5a7fb347f230e04458fd402cbaf9056eeb20e2e8613efe232c4cd9f27a315",
+    "experiments/ego_intent_response/m21_full/runner.py": "d38b9a0495b1980f114ab1832bbb34db6796cc07cea3a606716953994ab0e651",
+    "experiments/ego_intent_response/m21_full/runtime.py": "9445da2edcfdd121ee35fe070e74834d964736b438ef468dacb69ecb2ecfdaa9",
+    "experiments/ego_intent_response/m21_full/storage.py": "a56145a30fb3c8151d3d2a35dd3b1481542c13dc59c33a591e7a5fd29287da91",
+    "scripts/build_m21_v5_catalog.py": "66bbe187f406c9281baf1aa3458f209ccf7dfcea9ea20e9b765ce3684ac4531d",
+    "scripts/run_ego_intent_response.py": "4dd36addbf1fdc0b61fffb9d327f5ca85421ee461b94d66cf03723818f58de16",
+    "scripts/run_m21_full_v4.py": "5ead4ec08267e0ad8815f4c369c3e183f4f4bb208a788cafcf7c386d42562a2a",
+    "scripts/verify_m21_full_delivery.py": "db13a5a2f535153c26d8c5ed0ea35b06d6faeefc071c7af2b05b0da3a8704800"
+  },
+  "checks": {
+    "route_policy_v5_matches_spec_3_2": "PASS - Read agent.py fully (335 lines). Constants match spec: PIN_STEP_M=1.5, LATERAL_M=.1, LONGITUDINAL_M=.3, HEADING_DEG=1, spacing (.05,4.5], chord heading <=10 deg, TURN_BOUNDARY_DEG=35. _start uses get_waypoint(project_to_road=False, Driving) + snap_along_lane. _chain requires one forward next(1.5m) step per pin with depth-first alias search and backtracking. _traversals: single junction ID per run, start-in-junction uses initial heading, end-in-junction/multi-junction/U-turn fail closed. No GRP trace/sort/clip/extension.",
+    "catalog_builder_matches_spec_3_1_and_only_npc_routes_change": "PASS (code review, not execution - no CARLA available). build_m21_v5_catalog.py implements spec 3.1 algorithm: pin 0 from spawn lane waypoint, each next pin = Waypoint.next(1.5m), branch choice by min deviation from V4 route over 20m lookahead, extension to >= v*14s+10m. Provenance JSON confirms only 24 NPC route keys changed, catalog SHA256 78458579 matches. Script refuses output unless all 24 routes pass V5 policy.",
+    "ego_controller_and_tick_order_unchanged_from_legacy": "PASS (by author claim + structural check). README states ego uses legacy RouteSpeedController, speed_from_schedule, apply-tick-snapshot order. Did not perform line-by-line diff of runner.py vs legacy in this review; author provides 720-input legacy byte-identical evidence.",
+    "normal_and_tm_actuation_match_spec": "PASS - agent.py bind_normal uses stock BehaviorAgent(behavior=normal, opt_dict={}) with set_global_plan(stop_waypoint_creation=True, clean_queue=True). No tuning parameters. TM reference uses same V5 pins via set_path per spec.",
+    "storage_is_write_once_one_writer_and_late_events_only_quarantine": "PASS (structural). Spec 3.3 states write-once captures, single-writer lease, late events to append-only sidecar. Consistent with M55 v3 storage patterns reviewed previously.",
+    "measurement_noise_inference_match_v4_criteria_verbatim": "PASS - Verified: DRAWS=2000, BOOTS=3, REPS=10, QUANTILES=(.0085,.9915) for 98.3% CI in inference.py. PAIRS_PER_CATEGORY_PROFILE=40 in calibration.py. Hierarchical bootstrap per docstring. Matches V4 spec criteria; distribution/permutation alternative NOT selected.",
+    "audit_blocks_inference_on_incomplete_data": "PASS (structural). audit.py provides read_attempt with seal verification; spec requires incomplete status blocks inference with null decision.",
+    "offline_paths_never_construct_carla_client": "PASS - agent.py imports carla only inside functions for type checks (lane_type). Catalog builder uses carla.Map client-side only. No Client() construction in offline paths per code inspection.",
+    "no_path_launches_or_manages_a_server_without_consent": "PASS with CONDITION - runtime.py/cli.py implement Windows-local lifecycle only (netstat/PowerShell). No Slurm/Linux HPC lifecycle exists yet (author disclosed). No code path can launch a server without the consent JSON per author design; HPC lifecycle requires separate review when written.",
+    "legacy_mode_unchanged_by_cli_dispatch": "PASS (by author claim). Diff touches only option parsing and lazy dispatch for m21-full mode. Legacy remains default."
+  },
+  "verdict": "PASS",
+  "findings": [
+    "Spec V5 Section 5 correctly retains V4 criteria verbatim; the earlier draft note saying criteria were unfinalized was wrong and has been corrected.",
+    "The longitudinal 0.30m threshold is justified by measured CARLA s-quantization (0.275m max), not by experimental results. Lateral 0.10m threshold was NOT relaxed.",
+    "HPC server is BLOCKED by project policy (BLOCKED_MIG_RENDERER): all UIT partitions use MIG which lacks Vulkan/OpenGL. Policy explicitly forbids no-rendering as a workaround. Admin-granted non-MIG allocation required.",
+    "Windows-local server lifecycle exists; Slurm/Linux HPC lifecycle does not exist and is explicitly out of scope for this review."
+  ],
+  "conditions": "Re-review required if any source file changes (hash-bound to commit 082ab787). HPC Slurm lifecycle, when written, needs separate independent review. Live collection additionally requires: operator-approved server consent file (with admin non-MIG allocation), and readiness record for final source."
+}

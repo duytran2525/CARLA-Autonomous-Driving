@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "record_type": "independent_m21_full_v5_3_bundle_review",
+  "reviewer": "Muse",
+  "independent_of_author": true,
+  "date_utc": "2026-10-09T00:59:57Z",
+  "head_commit": "ccfe899846620dad7881eb58ad1078a03161f46c",
+  "previous_reviewed_head": "b2300a803c1d62405e20f33a4c07d4354e68b05e",
+  "files": {
+    ".gitattributes": "95b425a21710132331a46deb61b9834313ea31cc8b27bdb24564949d4aaeb7d5",
+    "configs/ego_intent_response_town03_scenes_v5.provenance.json": "8fc9619230cedae698500eff635a85e30faf664b17d2a02f6c2c84ab343ea421",
+    "configs/ego_intent_response_town03_scenes_v5.yaml": "78458579438351c48f656bbdb8af392f03d9d654d0df131959b3cd15d4461771",
+    "experiments/ego_intent_response/m21_full/README.md": "d5ea300ca85e2a20f8299cc82f4ca8fd7a31f62c26e85c93d3d8832adea19aea",
+    "experiments/ego_intent_response/m21_full/__init__.py": "91bd6981c8a5262dc5546a696d0a6eba5596eab594224447245f8a8963ff142b",
+    "experiments/ego_intent_response/m21_full/agent.py": "d7338b046b42b89bdc412a8d1fd26d5647108d0ed1d3c433ccd0e596a53b46b5",
+    "experiments/ego_intent_response/m21_full/audit.py": "e72a861f3c6ed775ef5b01ce030dcecf5d0871c83a8cdb76b674f01c2be4a28b",
+    "experiments/ego_intent_response/m21_full/calibration.py": "88dabdefcd52e0e4eb417b2281bd01d57078f8f2e18a476ee30bc04a4d6cb879",
+    "experiments/ego_intent_response/m21_full/cli.py": "9e4c0d3647640c596f2951ded13c7ac01086b4e8a8932800412c84ee632d0e16",
+    "experiments/ego_intent_response/m21_full/delivery.py": "497399c77b778376a38eeea69d818f47340b27a381495b62eaeaaf6b3d82bb7f",
+    "experiments/ego_intent_response/m21_full/inference.py": "c74d75c0cb0b4dcacc761ed67b0643781b6bd05383bc124add63b6de33c9e4e0",
+    "experiments/ego_intent_response/m21_full/measurements.py": "b1086e0e7dea552385b05d34a67e03ebe83afd50df906477cbefd5425e30334b",
+    "experiments/ego_intent_response/m21_full/protocol.py": "3cd277ffc9f75f52764995cf9f99b146354e9eee0d5f15c2a990b1e6bf9320c8",
+    "experiments/ego_intent_response/m21_full/provenance.py": "2eb7bc1a0771aad48b4ffafe22b50eab8a97da2944abae8a470d09f2030cb0f0",
+    "experiments/ego_intent_response/m21_full/report.py": "8a535d094fe8bdfbf312fa3798210fdb3779bbd7f55740cf0ea806633312f2ee",
+    "experiments/ego_intent_response/m21_full/requirements.in": "fda5a7fb347f230e04458fd402cbaf9056eeb20e2e8613efe232c4cd9f27a315",
+    "experiments/ego_intent_response/m21_full/runner.py": "6f061e6577fa5d571b599b0ddacecf7d7ccfa8cb2714edf8b892ca61947c1b2d",
+    "experiments/ego_intent_response/m21_full/runtime.py": "39af2b7df2e26f3497566fb191f8a3373b7bf7971da072630104f2e8d2661747",
+    "experiments/ego_intent_response/m21_full/storage.py": "a56145a30fb3c8151d3d2a35dd3b1481542c13dc59c33a591e7a5fd29287da91",
+    "scripts/build_m21_v5_catalog.py": "66bbe187f406c9281baf1aa3458f209ccf7dfcea9ea20e9b765ce3684ac4531d",
+    "scripts/run_ego_intent_response.py": "4dd36addbf1fdc0b61fffb9d327f5ca85421ee461b94d66cf03723818f58de16",
+    "scripts/run_m21_full_v4.py": "5ead4ec08267e0ad8815f4c369c3e183f4f4bb208a788cafcf7c386d42562a2a",
+    "scripts/verify_m21_full_delivery.py": "db13a5a2f535153c26d8c5ed0ea35b06d6faeefc071c7af2b05b0da3a8704800"
+  },
+  "registration": {
+    "protocol_sha256": "6b36a15791a2919cb9c82b68bf842af399e59bdea73b2abe8fca251dc42d7497",
+    "approval_sha256": "a3e4ccb432fc5d45a98e1dcb36bacd27bf62ea389c4b1932f6a98e1480e899aa",
+    "schedule_sha256": "d189adaf98ac62167ceb22172df4a9ff87524079919c86a7338f28cb29cef956"
+  },
+  "checks": {
+    "tm_route_options_match_spec_section_2_branch_points_tm_labels_void_guard": "PASS — Spec §2 documents: commands only at junctions entered from branch points (candidate_count≥2), TM 0.9.16 labels (STRAIGHT<19°, fail-closed within 5°), Void terminator. Evidence: tm_label_survey.txt shows min 18.5° clearance across 24 routes; crossing_01 J1019 LaneFollow observation drove the branch-point rule fix.",
+    "configure_tm_route_equals_legacy_except_set_route": "PASS — New configure_tm_route() in agent.py (+28 lines) preserves legacy order: set_autopilot, auto_lane_change=False, distance_to_leading_vehicle, ignore_lights/signs/vehicles=0, set_desired_speed. Only change: set_route(actor, options) replaces set_path(actor, pin). Direct comparison test vs legacy code exists and passes.",
+    "requested_tm_set_route_recorded_and_bound_to_plan_by_provenance": "PASS — Spec §2: metadata key changes from set_path:true to set_route:L; provenance.py verifies L matches values recomputed from npc_plan (catalog-constrained pins). Mutation W6 (provenance not binding route) caught by tests.",
+    "verification_record_section_3_matches_logs_K1a_K2_K3_and_new_K1b": "PASS — Spec §3.1/§3.3 documents all three checks with result tables: Check1 (22/24, setup error disclosed), Check2 (24/24: K1a/K2/K3 all PASS, crossing_04 fixed), Repeat check (4 overtake scenes ×5+5, permutation p-values 0.048/0.357/0.294/1.000). New K1b in §3.4: median d(A,B) ≤ max(median d(A,A'), median d(B,B')). Evidence logs present in 06_evidence/.",
+    "invalid_post_hoc_K1b_disclosed_and_not_used": "PASS — Spec §3.2 explicitly states the 0.05m K1b (draft 84b66850) was set AFTER seeing check-1 data, declared invalid by operator 2026-10-08, replaced by §3.4 criterion. Its check-2 result (fail at overtake_03) retained for reference only. §5 discloses criteria changed twice post-hoc.",
+    "protocol_pins_v53_spec_and_v52_approval_and_uses_new_namespace": "PASS — Protocol 6b36a157… registered under outputs/m21_full_v5_3/study-01 (new namespace, V5.2 study SUPERSEDED). Approval input contains verbatim operator quotes for direction (a) and P2, explicitly noted as NOT spec approval. Schedule d189adaf… unchanged from V5.2.",
+    "registration_reproducible_from_head_and_approval_input": "PASS — register.log shows re-registration byte-identical (protocol 6b36a157…, schedule d189adaf…, approval a3e4ccb4…). HEAD at registration d3c616a; bundle HEAD ccfe899 adds only proposal docs, no code change.",
+    "consent_draft_consistent_with_adopt_code_and_standing_authority": "PASS — Consent draft: launch=False, adopt=False (all off), expected_protocol 6b36a157… matches registration. Draft specifies CarlaUE4.exe -carla-rpc-port=2310 from non-admin process (avoids V5 Shipping-exe crashes). Consistent with standing operational authority.",
+    "nothing_else_changed_since_previous_reviewed_head": "PASS — Diff b2300a80→ccfe899: 20 files, +428/−25. Changes scoped to V5.3: proposal/spec docs, agent.py set_route (+28), runner/cli/protocol/provenance/report adjustments, test updates. No catalog/spawn/intent/fidelity-gate/threshold changes. Protected bytes (7 files, 1464 raw, 720 identities) verified unchanged."
+  },
+  "verdict": "PASS",
+  "findings": [
+    "K1b 0.05m criterion was post-hoc (set after check-1 data) — disclosed in spec §3.2 and invalidated, replaced by locked §3.4 criterion.",
+    "Verification criteria changed twice after seeing data — disclosed in spec §5 per operator requirement.",
+    "overtake_01 p=0.048 is borderline; with Bonferroni (0.0125) not significant; median A-B (1.96m) < median B-B' (3.30m), within natural variation.",
+    "Two invalid full-suite logs retained with explanations (pytest overlap; V5.2 test-copy contamination); conftest.py added to prevent recurrence."
+  ],
+  "conditions": [
+    "Readiness requires this receipt (source_review) + operator package approval (HEAD ccfe899, spec 12315428) + server consent.",
+    "Study V5.3 must be cancelled if this receipt is later deemed invalid.",
+    "New K1b (§3.4) is locked for all future verification checks from 2026-10-08."
+  ],
+  "receipt_id": "m21v53_review_receipt_ccfe899",
+  "verification": {
+    "hashes_checked": 23,
+    "hashes_matched": 23,
+    "registration_reregister_byte_identical": true,
+    "full_suite_d3c616a": {
+      "passed": 852,
+      "skipped": 4
+    },
+    "mutation_bugs_caught": "8/8",
+    "protected_bytes_intact": true
+  }
+}
