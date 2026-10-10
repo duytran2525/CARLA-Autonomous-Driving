@@ -57,7 +57,11 @@ Cả Duy và Dũng đều dùng máy này. Tài khoản git của máy là của
 
 ## Sổ nằm ở đâu, gồm những gì
 
-Một file duy nhất: `docs/crfp/crfp-main-ledger.md` (dùng `ledger where` để lấy đường dẫn thật). File đi kèm: `docs/crfp/crfp-8-nguyen-tac-5-idea.md`. Chuyển context sang phiên khác chỉ cần hai file này cộng skill này.
+Một file duy nhất: `docs/crfp/crfp-main-ledger.md` **ở checkout chính của repo, trên nhánh `main`** (dùng `ledger where` để lấy đường dẫn thật). File đi kèm: `docs/crfp/crfp-8-nguyen-tac-5-idea.md`. Chuyển context sang phiên khác chỉ cần hai file này cộng skill này.
+
+Mỗi worktree có thể có một bản sổ được git checkout ra theo nhánh của nó. Các bản đó chỉ là ảnh chụp, thường cũ hơn; đừng đọc trạng thái từ chúng và đừng sửa chúng. Đọc và sửa luôn đi qua đường dẫn mà `ledger where` in ra, rồi commit trên `main` của checkout chính (`git -C <checkout chính> …`). Một file vật lý duy nhất thì không thể có hai bản lệch nhau.
+
+Ngoài máy này (ví dụ workspace của Muse) không có repo: đặt biến môi trường `CRFP_LEDGER` trỏ tới file sổ rồi dùng script như bình thường.
 
 | Phần | Nội dung | Loại |
 |---|---|---|
@@ -93,7 +97,7 @@ Làm theo thứ tự này; mỗi bước có lý do của nó.
 3. **Ghi một mục vào cuối phần 6** cho mọi thay đổi có nghĩa: ngày, ai quyết hoặc ai phát hiện, nội dung, và nguồn. Đánh dấu nguồn: `[repo]` nếu bạn đọc trực tiếp từ code/log/output; `[handoff]` nếu chỉ nghe từ tài liệu chuyển giao; ghi rõ "nhận định của Claude" nếu đó là suy luận. Sổ là thứ người khác sẽ dùng làm bằng chứng, nên người đọc phải phân biệt được ba loại này.
 4. **Đồng bộ view:** chạy `ledger sync-views` để chép Pha / Bước / Trạng thái sang phần 2. Sau đó tự xem lại bằng mắt những thứ script không làm được: ghi chú và vị trí khối của hàng trong phần 2, ngày "cập nhật lần cuối", dòng "Vị trí hiện tại", bảng phần 3 và phụ lục A nếu thay đổi chạm tới chúng. Hàng mới phải được đặt tay vào đúng khối của phần 2.
 5. **Kiểm:** `ledger check` phải in `OK`. Nó bắt lệch cột, ID trùng, ID được nhắc mà chưa có hàng, view lệch với bảng Main, và báo kích thước từng phần.
-6. **Commit:** `git add -f docs/crfp/crfp-main-ledger.md` (cần `-f` vì `.gitignore` chặn `*.md`), rồi commit. Git là lịch sử của sổ: ai đổi đáp án, vì sao.
+6. **Commit trên `main` của checkout chính:** `git -C <checkout chính> add -f docs/crfp/crfp-main-ledger.md` (cần `-f` vì `.gitignore` chặn `*.md`), rồi commit. Chỉ add đúng file sổ; checkout chính có nhiều file chưa theo dõi của người khác. Git là lịch sử của sổ: ai đổi đáp án, vì sao.
 
 Những điều sổ không cho phép, kể cả khi người dùng phiên này nhờ:
 

@@ -54,6 +54,22 @@ def locate() -> tuple[Path, list[Path]]:
     return (main if main in copies else max(copies, key=lambda p: p.stat().st_mtime)), copies
 
 
+def rogue_copies(path: Path, copies: list[Path]) -> list[Path]:
+    """Copies that hold edits the source does not have. A worktree that merely has an older committed
+    version checked out is a harmless snapshot; a copy whose content never existed on main is not."""
+    others = [c for c in copies if c != path and c.read_bytes() != path.read_bytes()]
+    if not others:
+        return []
+    def git(cwd: Path, *args: str) -> str:
+        return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, encoding="utf-8").stdout
+    root = path.parents[len(REL.parts) - 1]
+    known = set(re.findall(r"\b[0-9a-f]{40}\b", git(root, "log", "--format=", "--raw", "--no-abbrev", "--", REL.as_posix())))
+    if not known:  # the source is not committed yet: every differing copy is suspect
+        return others
+    return [c for c in others
+            if git(c.parents[len(REL.parts) - 1], "hash-object", "--", REL.as_posix()).strip() not in known]
+
+
 def split(line: str) -> list[str]:
     return [c.strip() for c in PIPE.split(line.strip())[1:-1]]
 
@@ -100,9 +116,9 @@ def cmd_where(_: list[str]) -> int:
     print("ledger:    ", path)
     principles = path.parent / PRINCIPLES.name
     print("principles:", principles if principles.is_file() else f"{principles} (MISSING)")
-    others = [c for c in copies if c != path and c.read_bytes() != path.read_bytes()]
+    others = rogue_copies(path, copies)
     for c in others:
-        print("WARNING: another copy with DIFFERENT content:", c)
+        print("WARNING: this copy holds edits that the source does not have:", c)
     if others:
         print("There must be one source. Reconcile the copies before editing.")
     return 1 if others else 0
@@ -178,9 +194,8 @@ def cmd_check(_: list[str]) -> int:
     led = Ledger(path)
     errors: list[str] = []
     warns: list[str] = []
-    for c in copies:
-        if c != path and c.read_bytes() != path.read_bytes():
-            errors.append(f"second copy with different content: {c}")
+    for c in rogue_copies(path, copies):
+        errors.append(f"a second copy holds edits that the source does not have: {c}")
     width = None
     for n, line in enumerate(led.lines, 1):  # every table keeps one column count
         if line.startswith("|"):
