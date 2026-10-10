@@ -178,8 +178,6 @@ def cmd_check(_: list[str]) -> int:
     led = Ledger(path)
     errors: list[str] = []
     warns: list[str] = []
-    if b"\r\n" in path.read_bytes():
-        errors.append("file has CRLF line endings; the ledger is LF")
     for c in copies:
         if c != path and c.read_bytes() != path.read_bytes():
             errors.append(f"second copy with different content: {c}")
