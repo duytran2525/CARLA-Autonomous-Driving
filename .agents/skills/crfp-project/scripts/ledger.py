@@ -1,7 +1,8 @@
 """Read, edit, check and keep in sync the CRFP Main ledger without loading the whole file.
 
     python -I -X utf8 ledger.py where                 where the ledger is, how fresh it is, sibling worktrees
-    python -I -X utf8 ledger.py brief                 sections 1-3: conventions, task table, SOTA conditions
+    python -I -X utf8 ledger.py brief                 sections 1-3: conventions, glossary, task table, schedule, SOTA conditions
+    python -I -X utf8 ledger.py section 5             one whole section (5 = appendices A-D)
     python -I -X utf8 ledger.py row M21 M30           full rows, one field per line
     python -I -X utf8 ledger.py list --status "Mở" --pha 0 [--type Task] [--text benchmark] [--wide]
     python -I -X utf8 ledger.py log [N] [--full]      last N entries of the operations log (default 8)
@@ -162,6 +163,13 @@ def cmd_brief(_: list[str]) -> int:
     led = Ledger(locate()[0])
     print("\n".join(led.lines[: led.heads[4]]))
     print(f"[sections 1-3 of {led.path}; use `row <ID>` for a full row and `log` for recent history]")
+    return 0
+
+
+def cmd_section(args: list[str]) -> int:
+    if len(args) != 1 or args[0] not in "123456":
+        sys.exit("usage: section <1-6>   (5 = appendices: stop/turn points, Tag-A checklist, run registry, external documents)")
+    print("\n".join(Ledger(locate()[0]).section(int(args[0]))))
     return 0
 
 
@@ -359,7 +367,7 @@ def cmd_check(_: list[str]) -> int:
     return 1 if errors else 0
 
 
-COMMANDS = {"where": cmd_where, "brief": cmd_brief, "row": cmd_row, "list": cmd_list, "log": cmd_log,
+COMMANDS = {"where": cmd_where, "brief": cmd_brief, "section": cmd_section, "row": cmd_row, "list": cmd_list, "log": cmd_log,
             "next-id": cmd_next_id, "set": cmd_set, "add": cmd_add, "log-add": cmd_log_add,
             "sync-views": cmd_sync_views, "check": cmd_check}
 

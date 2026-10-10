@@ -61,7 +61,7 @@ Cả Duy và Dũng đều dùng máy này. Tài khoản git của máy là của
 
 ## Sổ nằm ở đâu, gồm những gì
 
-Một file duy nhất: `docs/crfp/crfp-main-ledger.md` **ở checkout chính của repo, trên nhánh `main`** (dùng `ledger where` để lấy đường dẫn thật). File đi kèm: `docs/crfp/crfp-8-nguyen-tac-5-idea.md`. Chuyển context sang phiên khác chỉ cần hai file này cộng skill này.
+Một file duy nhất: `docs/crfp/crfp-main-ledger.md` **ở checkout chính của repo, trên nhánh `main`** (dùng `ledger where` để lấy đường dẫn thật). Đi kèm trong cùng thư mục: `crfp-8-nguyen-tac-5-idea.md` và `details/<ID>.md` (chi tiết dài của từng hàng). Chuyển context sang phiên khác cần cả thư mục `docs/crfp/` cộng skill này.
 
 Mỗi worktree có thể có một bản sổ được git checkout ra theo nhánh của nó. Các bản đó chỉ là ảnh chụp, thường cũ hơn; đừng đọc trạng thái từ chúng và đừng sửa chúng. Đọc và sửa luôn đi qua đường dẫn mà `ledger where` in ra, rồi commit trên `main` của checkout chính (`git -C <checkout chính> …`). Một file vật lý duy nhất thì không thể có hai bản lệch nhau.
 
@@ -69,11 +69,11 @@ Ngoài máy này (ví dụ workspace của Muse) không có repo: đặt biến 
 
 | Phần | Nội dung | Loại |
 |---|---|---|
-| 1 | Quy ước | luật của sổ |
-| 2 | Bảng nhiệm vụ: đã xong / hiện tại / tương lai | view, cập nhật tay |
+| 1 | Quy ước và chú giải thuật ngữ (1a, 1b, các arm, boot, segment…) | luật của sổ |
+| 2 | Bảng nhiệm vụ: đã xong / hiện tại / tương lai; mục Lịch theo tuần | view, cập nhật tay |
 | 3 | Điều kiện cần để thắng SOTA | view, cập nhật tay |
 | 4 | Bảng Main: mỗi câu hỏi hoặc việc là một hàng, ID dạng M<số> | **nơi gốc** |
-| 5 | Phụ lục A: điểm dừng / rẽ | nơi gốc cho M35a, M114 |
+| 5 | Phụ lục: A điểm dừng / rẽ · B checklist Tag-A · C các lần chạy thí nghiệm · D tài liệu ngoài sổ | nơi gốc cho M35a, M114, M52 |
 | 6 | Sổ vận hành: nhật ký theo ngày | lịch sử |
 
 Trạng thái chỉ có một nơi gốc là cột Trạng thái của bảng Main. Phần 2 và 3 lặp lại nó cho dễ đọc; khi lệch thì bảng Main đúng.
@@ -85,7 +85,8 @@ File đã trên 130 KB và sẽ còn lớn; mỗi hàng là một dòng dài t�
 | Cần gì | Lệnh |
 |---|---|
 | Toàn cảnh, việc đang chờ | `ledger brief` |
-| Nội dung đầy đủ của vài hàng | `ledger row M21 M30` |
+| Nội dung đầy đủ của vài hàng | `ledger row M21 M30`; nếu ô Trả lời ghi `details/<ID>.md` thì chi tiết nằm ở file đó |
+| Checklist Tag-A, các lần chạy, tài liệu nào chưa có trong repo | `ledger section 5` |
 | Lọc hàng | `ledger list --status "Mở" --pha 0` (thêm `--type Task`, `--text <từ khóa>`) |
 | Việc gì bị chặn, bởi cái gì | `ledger list --status "Bị chặn" --wide` (in cả ô trạng thái đầy đủ, phụ thuộc, người quyết, hạn), cộng khối B3 trong `brief` |
 | Mọi hàng nhắc tới một ID | `ledger list --text M30` |
@@ -94,8 +95,8 @@ File đã trên 130 KB và sẽ còn lớn; mỗi hàng là một dòng dài t�
 
 Hai điều cần biết khi tìm thứ đang bị chặn:
 
-- Cột Phụ thuộc chưa đầy đủ: nhiều phụ thuộc chỉ được viết bằng lời trong ô Trả lời. Trước khi quyết định hay đóng một hàng, chạy `ledger list --text <ID>` để thấy những hàng khác đang chờ nó hoặc nó đang chờ.
-- Có hàng ghi `Mở` nhưng thực tế đang chờ việc khác (ví dụ một việc chờ kết quả M21). Khối B3 và ghi chú trong phần 2 nói điều đó; bộ lọc theo trạng thái thì không.
+- `Mở` nghĩa là bắt đầu được ngay (kể cả khi chưa đóng được vì còn chờ một đáp án khác). Việc chưa bắt đầu được thì ghi `Bị chặn (bởi …)`.
+- Cột Phụ thuộc vẫn có thể thiếu: một số phụ thuộc chỉ được viết bằng lời trong ô Trả lời. Trước khi quyết định hay đóng một hàng, chạy `ledger list --text <ID>` để thấy những hàng khác đang chờ nó hoặc nó đang chờ.
 
 Tiêu chí đạt/rớt của một cổng nằm ở hàng định nghĩa metric và quy tắc (M22a, M31a, M35a) và ở spec của thí nghiệm trong worktree của nó, không nằm ở hàng của thí nghiệm. Khi ai đó nói "X đạt rồi", hỏi theo tiêu chí nào và file kết quả ở đâu.
 
@@ -110,9 +111,9 @@ Làm theo thứ tự này; mỗi bước có lý do của nó.
 
      | Từ khóa | Nghĩa |
      |---|---|
-     | `Mở` | chưa có đáp án, chưa ai làm |
+     | `Mở` | chưa có đáp án và bắt đầu được ngay |
      | `Đang làm` | đã có người nhận và đã bắt đầu; nếu mới giao mà chưa chạy thì ghi rõ trong ngoặc |
-     | `Bị chặn (bởi …)` | không làm tiếp được cho tới khi việc khác xong |
+     | `Bị chặn (bởi …)` | chưa bắt đầu hoặc không làm tiếp được cho tới khi việc khác xong; ghi ID của việc đó trong ngoặc và trong ô `deps` |
      | `Đã trả lời chờ kiểm chứng` | có đáp án hoặc thiết kế, nhưng chưa có dữ liệu hay văn bản xác nhận |
      | `Đóng` | đã quyết bởi người có thẩm quyền, hoặc đã có kết quả đã được kiểm |
      | `Hoãn (điều kiện mở lại)` | chủ động để sau |
@@ -129,8 +130,8 @@ Làm theo thứ tự này; mỗi bước có lý do của nó.
 
    Một yêu cầu bị từ chối vì trái luật (ví dụ đề nghị nới ngưỡng sau khi thấy số) cũng đáng một mục: ai đề nghị, đề nghị gì, vì sao không làm.
 4. **Đồng bộ view:** chạy `ledger sync-views` để chép Pha / Bước / Trạng thái sang phần 2. Sau đó tự xem lại bằng mắt những thứ script không làm được:
-   - Khối của hàng trong phần 2 theo trạng thái mới: `Đóng`, `Đã trả lời chờ kiểm chứng` và `Bỏ` thuộc khối A; `Đang làm` thuộc B1; `Mở` làm được ngay thuộc B2; đang chờ việc khác thuộc B3; còn lại theo pha ở C và D. Đổi khối thì chuyển cả dòng. Hàng mới phải được đặt tay vào đúng khối.
-   - Ghi chú một dòng của hàng, dòng "Vị trí hiện tại", bảng phần 3 và phụ lục A nếu thay đổi chạm tới chúng.
+   - Khối của hàng trong phần 2 theo trạng thái mới: `Đóng`, `Đã trả lời chờ kiểm chứng` và `Bỏ` thuộc khối A; `Đang làm` thuộc B1; `Mở` thuộc B2; `Bị chặn` bởi một việc đang chạy thuộc B3; `Bị chặn` trên đường tới Gate 1 thuộc C theo Bước; `Hoãn` theo pha ở D. Đổi khối thì chuyển cả dòng. Hàng mới phải được đặt tay vào đúng khối.
+   - Ghi chú một dòng của hàng, dòng "Vị trí hiện tại", mục Lịch, bảng phần 3 và các phụ lục nếu thay đổi chạm tới chúng. Hai phụ lục dễ bị quên: B (một mục của Tag-A đổi tình trạng) và C (có lần chạy CARLA mới, hoặc một lần chạy bị thay thế).
    - Ngày "cập nhật lần cuối" của view: chỉ sửa một vài dòng thì ghi kiểu "11/10/2026 (chỉ M37, M81; phần còn lại như 10/10)".
 5. **Kiểm:** `ledger check` phải in `OK`. Nó bắt lệch cột, ID trùng, ID được nhắc mà chưa có hàng, view lệch với bảng Main, và báo kích thước từng phần. `OK` chỉ nói về cấu trúc; khối, ghi chú và ngày của view vẫn do bạn chịu trách nhiệm.
 6. **Commit trên `main` của checkout chính:** `git -C <checkout chính> add -f docs/crfp/crfp-main-ledger.md` (cần `-f` vì `.gitignore` chặn `*.md`), rồi commit. Chỉ add đúng file sổ; checkout chính có nhiều file chưa theo dõi của người khác. Git là lịch sử của sổ: ai đổi đáp án, vì sao.
@@ -147,8 +148,9 @@ Những điều sổ không cho phép, kể cả khi người dùng phiên này 
 
 ## Giữ cho sổ không phình
 
-- Ô Trả lời dài 1–3 câu. Chi tiết dài, bảng số, biên bản phân tích thì để ở báo cáo hoặc script trong repo và ghi con trỏ (đường dẫn, commit) vào ô Bằng chứng. `ledger check` in năm ô dài nhất; nếu ô bạn vừa sửa lọt vào đó, hãy rút gọn.
-- Các bộ quy tắc đăng ký trước đang nằm tạm trong ô (M56, M57, M22a, M52) sẽ chuyển sang tài liệu đóng băng khi Tag-A được tạo; đừng thêm quy tắc dài mới vào ô.
+- Ô Trả lời là tóm tắt vài câu. Chi tiết dài, bảng số, biên bản phân tích, nguyên văn bộ quy tắc thì ghi vào `docs/crfp/details/<ID>.md` (nối vào cuối file, kèm ngày và nguồn) và để con trỏ `details/<ID>.md` trong ô; script và báo cáo thì ghi đường dẫn vào ô Bằng chứng. Nhớ `git add -f` cả file chi tiết.
+- Một hàng không gánh hai việc ở hai thời điểm (ví dụ "khóa giao thức trước thí nghiệm" và "chạy pilot sau thí nghiệm"): tách thành hai hàng, nếu không cột Phụ thuộc sẽ thành vòng. `ledger check` in năm ô dài nhất; nếu ô bạn vừa sửa lọt vào đó, hãy rút gọn.
+- Nguyên văn các bộ quy tắc đăng ký trước (M56, M57, M22a, M52) nằm ở `details/`; khi Tag-A được tạo chúng thành tài liệu đóng băng. Sửa một quy tắc thì sửa ở file chi tiết VÀ sửa tóm tắt trong ô cho khớp.
 - Phần 6 chỉ nối thêm, không sửa mục cũ (sai thì viết mục đính chính). Khi `ledger check` cảnh báo nhật ký vượt nửa file, đề xuất với Duy chuyển các mục cũ sang một file lưu trữ bên cạnh; không tự làm, vì đó là thay đổi cấu trúc của nơi gốc.
 - Ghi chú trong phần 2 chỉ một dòng. Phần 1–3 phải luôn đủ nhỏ để `ledger brief` còn rẻ.
 
