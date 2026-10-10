@@ -161,6 +161,7 @@ Nhiều phiên chạy song song trên cùng máy, mỗi phiên một worktree (M
 - Chỉ đọc code, log và output của phiên khác; không ghi vào namespace output của họ (một người ghi cho mỗi namespace). Muốn họ làm gì thì nói với người dùng.
 - Không đụng vào code, config, catalog, seed, ngưỡng đã đóng băng của một thí nghiệm nếu chưa có phê duyệt tạo version mới.
 - Đọc `AGENTS.md` ở gốc checkout chính trước mọi việc liên quan tới HPC: các lát MIG hiện bị chặn cho CARLA và không được tự suy ra quyền.
+- Khi bàn giao một việc cho agent hoặc người khác: chép nguyên văn quy tắc đang hiệu lực (ô trong sổ và `details/<ID>.md`) vào bản bàn giao, ghi commit của sổ lúc chép, và yêu cầu bên nhận liệt kê lại các yêu cầu họ hiểu; đối chiếu danh sách đó với quy tắc trước khi cho làm. Ở M56, điều khoản "lấy cảnh từ nguồn ngoài" đã rơi mất đúng ở khâu này và bốn ngày sau mới lộ ra.
 - Hai phiên không sửa sổ cùng lúc. Trước khi sửa, xem `git log -3 -- docs/crfp/crfp-main-ledger.md` và `ledger where` để chắc bạn đang ở bản mới nhất.
 
 ## Hai bài học đã trả giá
