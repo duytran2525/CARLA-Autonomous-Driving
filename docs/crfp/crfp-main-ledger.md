@@ -62,7 +62,7 @@
 
 ## 2. Bảng nhiệm vụ: đã xong, hiện tại, tương lai
 
-> View cập nhật tay lần cuối **10/10/2026 14:30** (sau rà soát toàn sổ). Nơi gốc của trạng thái là bảng Main (phần 4); lệch thì bảng Main đúng. Phần này thay cho "View pipeline" cũ.
+> View cập nhật tay lần cuối **10/10/2026 17:15** (lịch v2; M21, M56). Nơi gốc của trạng thái là bảng Main (phần 4); lệch thì bảng Main đúng. Phần này thay cho "View pipeline" cũ.
 
 **Vị trí hiện tại: Bước 2.** M21 đang chạy lại ở V5.9 sau khi V5.8 thu được 245 capture rồi dừng; chưa có kết quả go/no-go; M56 đang cài offline; chưa có số liệu khoa học nào của dự án. Hạn nộp dự đoán: 05–08/03/2027 (M77), tức khoảng 21 tuần.
 
@@ -70,24 +70,54 @@ Số hàng theo trạng thái (134 hàng): Hoãn 55, Mở 26, Bị chặn 24, Đ
 
 Chuỗi mốc: `Cổng 0 (M76, M79, M80) + hỏi sớm (M77, M78, M81–M83)` → `Tag-A (M52, M47)` → `Tag-B (M63)` → `Tag-C (M66)` → `Gate 1 (M62) + Gate 1.5 (M68)` → `M85, M86, M84` → `Tag-D (M117)` → `Gate 2 (M116)` → nộp.
 
-### Lịch (bản nháp của Claude ngày 10/10/2026 — CHỜ DUY DUYỆT, chưa phải cam kết)
+### Lịch v2 — đẩy nhanh (bản nháp của Claude ngày 10/10/2026 17:15 — CHỜ DUY DUYỆT, chưa phải cam kết)
 
-Giả định: hạn nộp 05/03/2027 (dự đoán, M77); tuần 1 bắt đầu 12/10/2026; CARLA chỉ chạy trên một laptop nên các việc cần CARLA nối đuôi nhau; không tính trượt.
+Thay cho lịch v1 (còn trong git, commit `2fdb0c3`). **Giả định do Duy đặt:** AI viết code nên code không phải nút thắt; chỉ tính những thứ AI không đẩy nhanh được. Claude thêm ba giả định để ra được ngày: Duy duyệt trong ngày; mỗi lần gửi GVHD chờ 5 ngày làm việc; không cổng nào rớt. Hạn nộp vẫn giả định 05/03/2027 (M77).
 
-| Tuần | Ngày | Mốc phải đạt | Việc chính (ID) |
+**Bốn nút thắt thật:** (1) giờ máy CARLA — một laptop, chạy nối đuôi; (2) GPU có đồ họa cho đánh giá closed-loop có cảm biến (M121); (3) thời gian GVHD phản hồi; (4) lỗi chỉ lộ ra khi chạy thật.
+
+Giờ máy CARLA của Phase 1 (một tiến trình, không tính lỗi):
+
+| Việc | Khối lượng | Giờ máy | Cơ sở của con số |
 |---|---|---|---|
-| 1–2 | 12–25/10 | Cổng 0 có đáp án; M21 có kết quả | xong M21 và review M122; gửi M121; M79, M125, M80, M78; khóa M123 và M89; M114, tiêu chí M116; M128 |
-| 3–4 | 26/10–08/11 | Tag-A gửi GVHD (M47) | M55, M30; M56 giao catalog; M53; M52 |
-| 5–6 | 09–22/11 | Tag-B (M63) | M58, M54, M35b, M31b |
-| 7–9 | 23/11–13/12 | Xong 1b chính thức và tuning | M59, M60, M20; M61 (ước 12–14 ngày máy chạy liên tục) |
-| 10–11 | 14–27/12 | Gate 1 (M62) | M64, M66, M19, M14, M68, M62, M67 |
-| 12–13 | 28/12–10/01 | Tag-D (M117) | M85, M86, M84; chốt M97; dữ liệu cặp; giao thức train |
-| 14–18 | 11/01–14/02 | Gate 2 (M116) | train, đánh giá trên benchmark, ablation |
-| 19–21 | 15/02–07/03 | Nộp | viết, hình, GVHD duyệt (M130) |
+| Phần còn lại của M21 full | khoảng 4.180 capture | khoảng 15 | ĐO ĐƯỢC: V5.9 thu 1.101 capture trong 3,9 giờ, tức 12,7 giây mỗi capture kể cả xoay server |
+| Chạy live của M55 | chưa có số | chưa ước được | — |
+| Kiểm cảnh của M56 (sau phần offline) | 46 cảnh × 2 phương án, mỗi lượt tối đa 76,5 giây mô phỏng; cộng dựng 20 cảnh còn thiếu | khoảng 1 ngày máy, chưa kể dựng cảnh thiếu | plan M56 |
+| Pilot 1b (M54) | 22 cảnh dev × 3 nhánh × 10 lặp × 3 phiên = 1.980 capture | khoảng 7 | giả định 10 lặp |
+| 1b chính thức (M20) | 24 cảnh test × 3 nhánh × 10–30 lặp × 3 boot | 8–23 | số lặp chờ M31b |
+| Tuning 5 arm (M61) | 5 × 79–89 lượt × 44 phút | 290–325 | ước của M57; con số 44 phút mỗi lượt CHƯA ĐO |
+| Pilot nhiễu các arm (M64) | 5 arm × khoảng 5 lượt | khoảng 18 | cùng giả định 44 phút |
+| 1a và thí nghiệm 2 (M19, M14) | 5 arm × 10–30 lượt test | 37–110 | cùng giả định 44 phút |
+| **Tổng** | | **khoảng 375–500 giờ = 16–21 ngày máy liên tục** | tuning chiếm khoảng 70% |
 
-Chạy song song từ tuần 1 trên H200, không cần CARLA: bảng tiêu chí và chọn backbone (M97), tái lập backbone (M118), thí nghiệm VLM frozen (M37).
+Lịch theo ngày (ID ở cột cuối):
 
-**Chỗ lịch không khớp (nhận định của Claude):** Phase 1 chiếm hết 11 tuần nếu không trượt, trong khi riêng M21 đã qua 9 phiên bản trong 3 ngày. Còn lại 10 tuần cho toàn bộ Phase 2 (dữ liệu cảm biến, train, benchmark, ablation, viết), với một laptop 4 GB là máy render duy nhất. Ba đòn bẩy, theo thứ tự tác động: (1) xin GPU không-MIG (M121); (2) làm ngay phần Phase 2 không cần CARLA; (3) chốt sớm phương án lùi (M114): nếu Gate 2 không kịp thì nộp ICCV bài nào, hay dời venue. Quyết định (3) thuộc Duy và TS. Hằng.
+| Khi nào | Mốc | Nút thắt quyết định ngày | Việc |
+|---|---|---|---|
+| 11–14/10 | M21 có kết quả; chốt loại agent | giờ máy (15 giờ) + review | xong M21; M122; M55 live; M30. Song song: gửi M121; Cổng 0 (M79, M80, M125, M78); khóa M123, M89; M114; tiêu chí M116 |
+| 13–21/10 | Catalog 46 cảnh | giờ máy + các cổng duyệt G3–G6 của M56 | M56: xong phần offline (T10–T17), rồi chạy kiểm cảnh trên laptop. Song song, không cần máy: code M53, M58, M59, M60 |
+| 20–22/10 | Tag-A gửi GVHD | chạy thử executor và các arm trên laptop | M52, M47 |
+| 22–28/10 | GVHD phản hồi Tag-A | con người | trong lúc chờ: đo thời gian một lượt tuning; thử chạy 2 tiến trình CARLA song song |
+| 29–31/10 | Tag-B | giờ máy (7 giờ) | M54, M35b, M31b, M63 |
+| 01–03/11 | Xong 1b chính thức | giờ máy (8–23 giờ) | M20; rồi M68 trên H200 |
+| 04–18/11 | Xong tuning | giờ máy (12–14 ngày) | M61 |
+| 19–26/11 | Xong 1a và thí nghiệm 2 | giờ máy (2–5 ngày) | M64, M66, M19, M14 |
+| 27–30/11 | **Gate 1** | đọc kết quả | M62, M67 |
+| 01–07/12 | Tag-D | con người | M85, M86, M84; M117 |
+| 08/12–04/01 | Model đã train | H200, mỗi job tối đa 72 giờ | 3–4 vòng train; dữ liệu cặp có cảm biến cần GPU đồ họa |
+| 05–25/01 | Xong đánh giá và ablation | GPU đồ họa: khoảng 8–10 lượt chạy benchmark | M127, M108, M6, M95, M96 |
+| 26/01–08/02 | **Gate 2**; bản nháp đầy đủ | GVHD đọc | M116, M130 |
+| 09/02–05/03 | Nộp | con người; dự phòng khoảng 3 tuần | sửa, phụ lục |
+
+Chạy song song trên H200 từ bây giờ, không chờ Gate 1 và không cần CARLA: M97 (chọn backbone), tải dữ liệu benchmark, M118 (tái lập backbone), M37.
+
+**So với v1:** Gate 1 về khoảng 30/11 thay vì 27/12, tức sớm hơn 4 tuần; Phase 2 có khoảng 13 tuần thay vì 10.
+
+**Điều kiện để lịch này đứng được, theo thứ tự tác động:**
+1. **M121 có kết quả trước đầu tháng 12.** Không có GPU đồ họa thì các dòng từ 08/12 trở đi không chạy được, bất kể AI viết code nhanh thế nào: laptop 4 GB không chứa nổi CARLA có render cùng model e2e.
+2. **Tuning thật sự là 44 phút mỗi lượt.** Đây là con số chưa đo và nó quyết định 70% giờ máy của Phase 1. Đo ngay khi có arm đầu tiên. Hai cách rút ngắn cần kiểm: chạy 2 tiến trình CARLA song song trên laptop; hoặc xin quản trị HPC cho chạy CARLA không render trên CPU (policy hiện cấm tự coi `-nullrhi` là cách lách, phải có phê duyệt).
+3. **GVHD phản hồi trong 5 ngày** ở cả ba lần: Tag-A, sau Gate 1, bản nháp bài.
+4. **Lỗi lộ ra khi chạy thật không kéo dài.** Bằng chứng ngược lại trong chính dự án: M21 cần 9 phiên bản trong 3 ngày để qua được smoke, dù code do AI viết; M56 làm 9/17 task offline trong 2,5 ngày. Lịch trên chưa cộng hệ số trượt này.
 
 ### A. Đã xong, đã có đáp án, hoặc đã bỏ
 
@@ -122,7 +152,7 @@ Pha 0–1. "Đã trả lời chờ kiểm chứng" nghĩa là có đáp án như
 
 | ID | Việc | Pha | Bước | Trạng thái | Ghi chú |
 |---|---|---|---|---|---|
-| M21 | Benchmark có agent phản ứng? | 2 | 1 | Đang làm | Kết quả chỉ là go/no-go. V5.9 đang chạy lại boot 0 từ 13:08; V5.8 dừng vì một cell bị chặn do lỗi đèn giao thông |
+| M21 | Benchmark có agent phản ứng? | 2 | 1 | Đang làm | Kết quả chỉ là go/no-go. V5.9: boot 0 đã thu 1.101/1.824 capture lúc 16:58; còn khoảng 15 giờ máy cho cả 3 boot nếu không dừng |
 | M56 | Chọn scenario từ nguồn ngoài | 0 | 2 | Đang làm | Đang thực hiện plan: T09–T10/17, chỉ offline, chưa chạy CARLA, chưa commit; người chọn cảnh = Astra |
 
 ### B2. Hiện tại — làm được ngay, không cần CARLA
@@ -136,7 +166,7 @@ Xếp theo thứ tự Claude đề xuất làm (10/10).
 | M125 | Phiên bản CARLA mà benchmark yêu cầu so với 0.9.16 đang dùng ở Phase 1 | 0 | 2 | Mở | Kiểm cùng lúc với M79 |
 | M80 | Phạm vi claim: chỉ trong CARLA, hay có cầu sang dữ liệu thật? | 0 | 2 | Mở |  |
 | M78 | Tài nguyên tính toán thực có | 0 | 1 | Mở | Còn thiếu ước tính GPU-giờ theo từng phương án |
-| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | 0 | 2 | Mở | Bản nháp ở mục Lịch bên dưới, chờ Duy duyệt |
+| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | 0 | 2 | Mở | Lịch v2 (đẩy nhanh) ở mục Lịch phía trên, chờ Duy duyệt |
 | M114 | Bảng kết quả Gate → loại paper (cả hai sống / một sống / cả hai thu hẹp → full / workshop /… | 3 | 7 | Mở | Hạn: trước Gate 1; bản nháp ở Phụ lục A |
 | M116 | Gate 2: hệ e2e + VLM có hơn SOTA trên benchmark M79 không | 6 | — | Mở | Chưa có tiêu chí đạt và phương án lùi |
 | M123 | Khóa giao thức và ngưỡng của pilot Gate 1.5 (M68) TRƯỚC khi chạy 1b | 3 | 6 | Mở | Phải xong trước M20; làm được ngay |
@@ -348,7 +378,7 @@ Gate 2 (M116) đọc ở cuối pha này.
 | M18 | Tiền lệ MPDM |  | Đóng | MPDM không giết idea; là tiền thân thủ công bắt buộc trích dẫn | Kill-search | — | 1 | — |  | — | Q |
 | M19 | Killer experiment 1a | [Sub_1, Q3, Q16] | Đã trả lời chờ kiểm chứng (thiết kế xong, chưa chạy) | Cùng cảnh, D (goal-on) vs D_off (w_goal=0); metric: đúng hạn + an toàn | spec v5.1 §8, §12 | M61, M66, M47 | 3 | 13 |  | — | Q |
 | M20 | Killer experiment 1b (CRFP) | [Sub_1, Q17] | Bị chặn (bởi M30; thiết kế xong; đã chạy 1 lần nhưng audit ngoài KHÔNG nghiệm thu 04/10) | Chế độ ép ý định: cùng scene+seed, 3 arm (ép A / ép B / null không ép) → đo phản ứng xe khác. Kỷ luật matched-pair: chung lịch sử, chỉ tách trong cửa sổ can thiệp. Quét nhiều giá trị T (bao độ trễ phản ứng của agent + thời gian của chính maneuver), báo cáo độ phân biệt theo T. Metric dạng discriminability (chi tiết: M22a/M35b). Động lực "làm phần reactive-agent mà Purdue/Bosch để lại (Limitations tr.17)" chỉ ghi có điều kiện — đưa vào bài sau khi M21 xác nhận agent phản ứng tồn tại. **BỊ CHẶN đến khi: (1) chọn xong loại agent phản ứng (M30), (2) ~~chạy lại có sửa (M73)~~ — gỡ 10/10: M73 đã bỏ, các mục sửa của nó nằm ở M21 full, M54, M56 và chính hàng này** | spec v5.1 §17 | M63, M47, M30 | 3 | 8 |  | — | Q |
-| M21 | Benchmark có agent phản ứng? |  | Đang làm (V5.9, 10/10/2026 13:08: boot 0 đang chạy lại sau hai lần dừng; chưa có kết quả cuối) | Go/no-go: agent có sẵn của CARLA có phản ứng theo ý định của ego không. Thiết kế (M21 full): 24 cảnh Town03, 6 loại × 4 biến thể, 3 ý định mỗi cảnh, 2 profile xe khác (BehaviorAgent Normal và TM reference), 5.280 capture trên 3 boot server. Tiêu chí đạt/không đạt = quy tắc 1b của M22a, chốt trước khi thu (spec M21 V4 §6–§8, V5 §5, trong worktree m21-full-v4). Trạng thái: V5.9 đang chạy lại boot 0 (10/10 13:08); CHƯA có số liệu nào được tính. Mọi study V5.1–V5.8 đã bị thay thế: phụ lục C. Khi đọc kết quả phải tách ô unavailable do va chạm với ô dưới ngưỡng (xem M30). Review V5.4 trở đi: M122. Lịch sử từng phiên bản: details/M21.md | repo m21-full-v4 (specs, STUDY_01_SUPERSEDED.json, logs), đọc 10/10/2026 | — | 2 | 1 |  | — | Q |
+| M21 | Benchmark có agent phản ứng? |  | Đang làm (V5.9, 10/10/2026 16:58: boot 0 đã thu 1.101/1.824 capture, đang ở segment 9; chưa có kết quả cuối) | Go/no-go: agent có sẵn của CARLA có phản ứng theo ý định của ego không. Thiết kế (M21 full): 24 cảnh Town03, 6 loại × 4 biến thể, 3 ý định mỗi cảnh, 2 profile xe khác (BehaviorAgent Normal và TM reference), 5.280 capture trên 3 boot server. Tiêu chí đạt/không đạt = quy tắc 1b của M22a, chốt trước khi thu (spec M21 V4 §6–§8, V5 §5, trong worktree m21-full-v4). Trạng thái: V5.9 đang chạy lại boot 0 (10/10 13:08); CHƯA có số liệu nào được tính. Mọi study V5.1–V5.8 đã bị thay thế: phụ lục C. Khi đọc kết quả phải tách ô unavailable do va chạm với ô dưới ngưỡng (xem M30). Review V5.4 trở đi: M122. Lịch sử từng phiên bản: details/M21.md | repo m21-full-v4 (specs, STUDY_01_SUPERSEDED.json, logs), đọc 10/10/2026 | — | 2 | 1 |  | — | Q |
 | M22a | Metric cho từng luận điểm (định nghĩa) |  | Đã trả lời chờ kiểm chứng (quy tắc + giá trị Duy duyệt 05/10; ràng buộc tuyệt đối khi vào Tag-A; trước đó chỉ được sửa nếu chưa thấy số liên quan) | Mỗi thí nghiệm một metric chính + rào chắn, khóa trước test; ngưỡng số từ pilot, không đổi sau khi thấy số. **1a:** độ trễ liên tục, Δ_min = max(2,0 s; 5% thời gian đến danh định); phụ: chênh tỷ lệ đúng hạn ≥ 20 điểm %; rào chắn: arm va chạm hơn baseline ≥ 5 điểm % thì không tính thắng. **1b:** discriminability, đơn vị là LOẠI cảnh; đạt khi ≥ 3/5 loại tương tác, mỗi loại ≥ 3/4 cảnh, và ≥ 1 loại trong {crossing, unprotected_left, overtake}; ô đạt khi CẬN DƯỚI khoảng tin cậy ≥ max(2,0 m; 3σ_loại) cho vị trí và ≥ max(1,0 m/s; 3σ_loại) cho vận tốc; cắt cả hai ý định tại va chạm đầu tiên; cửa sổ sau cắt < 4 s hoặc > 20% run bị cắt thì "không đánh giá được" và tính KHÔNG ĐẠT; cần ≥ 8/10 run hợp lệ; cửa sổ chính T = 8 s; giữ arm null và quét T; rear_follow báo riêng; agent viết tay đạt chỉ là kiểm tra đường ống. **Thí nghiệm 2:** 3 so sánh + Holm; đơn ngưỡng D ≈ C trong δ = 1,0 s; đa bước D > C ít nhất Δ_min = 2,0 s; thiếu lực thì "không kết luận được". **Khoảng tin cậy:** phương án A (Duy chốt 10/10, M52 mục 11). Nguyên văn đầy đủ: details/M22a.md | Duy duyệt 05/10/2026 (sổ vận hành 05/10) | — | 0 | 1 | Duy | — | Q |
 | M23 | Tầng ý định nằm ở đâu trong stack | [spec v5.1] | Đã trả lời chờ kiểm chứng | Lớp quyết định ngồi trên executor (ra maneuver command), không thay planner | spec v5.1 §1 | M2 | 0 | — |  | — | Q |
 | M24 | "Thay command bằng ý định" thực thi thế nào | [Sub_1, Q8] [spec v5.1] | Đóng (phạm vi killer exp) | Nhãn → maneuver command 1-1 qua executor | spec v5.1 §1–2 | M2 | 0 | — |  | — | Q |
@@ -387,7 +417,7 @@ Gate 2 (M116) đọc ở cuối pha này.
 | M53 | Xây executor + chế độ ép ý định | [spec v5.1] | Bị chặn (bởi M55, M30) | Thử tái dùng BehaviorAgent (strip quyết định tự động) |  | M55, M30 | 2 | 2 | Duy duyệt; Dũng làm | — | Task |
 | M54 | Pilot đo nhiễu 1b → tính số lần lặp | [pipeline cũ] | Bị chặn (bởi M53, M56) | Chạy trên cảnh dev (M56); đầu vào cho M35b/M31b. Quét nhiều giá trị T, báo cáo độ phân biệt theo T (bao độ trễ phản ứng của agent + thời gian của chính maneuver). Nếu xe khác không phản ứng: dừng và quyết (đổi agent/sim/bỏ lõi b) |  | M53, M56 | 3 | 5 | Duy duyệt; Dũng làm | — | Task |
 | M55 | Kiểm tra tái dùng CARLA BehaviorAgent |  | Bị chặn (chờ M21) — V3 TECHNICAL_KHÔNG → v4 comparative study (07/10/2026) | V3: Task 9 xong; Task 10 chạm B=752/750 → TECHNICAL_KHÔNG, giữ làm điểm dữ liệu. [Đ] 07/10: đổi sang nghiên cứu so sánh v4 — nhánh tái dùng CARLA stock vs nhánh tự viết (planner+PID), cùng spec/test suite, số dòng chỉ đo không chấm loại. Protocol v4: route road_id 4→65, s 80→150, hash 87d235bb…. Live chỉ sau M21. Còn thiếu: 2 biên nhận review độc lập, xác nhận không trùng M21, authority JSON |  | M21 | 2 | 1 | Duy duyệt; Dũng làm | — | Task |
-| M56 | Chọn scenario từ nguồn ngoài | [spec v5.1 §19] | Đang làm — G1 duyệt + G2 (chỉ offline) cấp 08/10/2026; đang thực hiện plan 17 task: T01–T07 xong, T09 và T10 đang làm, T11–T17 chưa làm (10/10 16:38); chưa chạy CARLA, chưa chọn cảnh thật, chưa commit, G3–G6 chưa cấp — [repo] m56-v1 progress.md | Một người độc lập với hệ ý định chọn khoảng 46 cảnh MỚI từ nguồn ngoài (5 loại tương tác × 8 cảnh + 6 cảnh loại tự do), phủ ít nhất 3 town. Yêu cầu chính: mỗi cảnh cho ego ít nhất hai cách xử lý hợp lý mà không cách nào chắc chắn gây va chạm; catalog chỉ gồm vị trí, tốc độ ban đầu, tuyến, vai trò, thời tiết — không gán bộ điều khiển xe khác; đội chia dev/test ngẫu nhiên phân tầng theo loại, seed đăng ký trước; người chọn không xem kết quả nào; cảnh hỏng do người chọn thay, tối đa 20%. Bỏ town holdout (M39). Đang cài đặt offline. Giao thức đầy đủ (v5): details/M56.md Người chọn cảnh là Astra (Duy xác nhận 10/10). Giới hạn do chính spec M56 ghi: không tuyên bố selector sạch hay người độc lập, vì ngữ cảnh của Astra đã lộ thông tin ngoài M56; việc chọn tiếp cần ngữ cảnh chỉ-M56 do người vận hành duyệt. Hiện có 26 đề xuất cảnh đã neo, thiếu 20 chỗ; 6 cảnh loại tự do mới là khái niệm; Town04–07, không dùng Town03. |  | — | 0 | 2 | Duy duyệt; Dũng làm; người chọn cảnh = Astra (agent AI của Dũng), làm từ handoff đã lọc | — | Task |
+| M56 | Chọn scenario từ nguồn ngoài | [spec v5.1 §19] | Đang làm — G1 duyệt + G2 (chỉ offline) cấp 08/10/2026; đang thực hiện plan 17 task: T01–T07 xong, T09 và T10 đang làm, T11–T17 chưa làm (10/10 16:38); chưa chạy CARLA, chưa chọn cảnh thật, chưa commit, G3–G6 chưa cấp — [repo] m56-v1 progress.md | Một người độc lập với hệ ý định chọn khoảng 46 cảnh MỚI từ nguồn ngoài (5 loại tương tác × 8 cảnh + 6 cảnh loại tự do), phủ ít nhất 3 town. Yêu cầu chính: mỗi cảnh cho ego ít nhất hai cách xử lý hợp lý mà không cách nào chắc chắn gây va chạm; catalog chỉ gồm vị trí, tốc độ ban đầu, tuyến, vai trò, thời tiết — không gán bộ điều khiển xe khác; đội chia dev/test ngẫu nhiên phân tầng theo loại, seed đăng ký trước; người chọn không xem kết quả nào; cảnh hỏng do người chọn thay, tối đa 20%. Bỏ town holdout (M39). Đang cài đặt offline. Giao thức đầy đủ (v5): details/M56.md Người chọn cảnh là Astra (Duy xác nhận 10/10). Giới hạn do chính spec M56 ghi: không tuyên bố selector sạch hay người độc lập, vì ngữ cảnh của Astra đã lộ thông tin ngoài M56; việc chọn tiếp cần ngữ cảnh chỉ-M56 do người vận hành duyệt. Hiện có 26 đề xuất cảnh đã neo, thiếu 20 chỗ; 6 cảnh loại tự do mới là khái niệm; Town04–07, không dùng Town03. Nguồn cảnh (Claude đọc 7 báo cáo của Astra, 10/10): cảnh được DỰNG từ hình học bản đồ gốc Town04–07 (OpenDRIVE) và khảo sát đèn tín hiệu, KHÔNG lấy từ Bench2Drive hay CARLA Leaderboard như spec v5.1 §19 và giao thức 05/10 ghi — lệch so với quy tắc đã duyệt, chờ Duy quyết chấp nhận hay yêu cầu sửa. |  | — | 0 | 2 | Duy duyệt; Dũng làm; người chọn cảnh = Astra (agent AI của Dũng), làm từ handoff đã lọc | — | Task |
 | M57 | Ngân sách tuning cho từng arm | [pipeline cũ] | Mở (draft v5 — Duy duyệt 05/10: chốt 3 quyết định của AI ngoài; PHỤ THUỘC quy tắc lấy mẫu deadline + arm cài xong M58–M60) | Mỗi arm K = 64 lượt đánh giá đầy đủ trên dev (dãy Sobol có xáo trộn, seed riêng mỗi arm), rồi vòng 2: top-5 cấu hình × 3–5 lần lặp. Mục tiêu: độ trễ trung bình nhỏ nhất, với ràng buộc va chạm neo vào chính sách mặc định dùng chung + 5 điểm %. Dừng và báo cáo nếu dưới 25% cấu hình khả thi; arm còn đi lên ở K = 64 thì ghi thiếu ngân sách hoặc tăng K đồng loạt. Chỉ dùng dev, đóng băng trước test. Ước tính: 290–325 giờ CARLA cho 5 arm chạy tuần tự (12–14 ngày). Hai ngưỡng còn là đề xuất chờ M47. Nguyên văn (draft v5): details/M57.md |  | — | 0 | 2 |  | — | Task |
 | M58 | Cài chính sách mặc định chung + rollout | [spec v5.1 §7, §9] | Bị chặn (bởi M53) |  |  | M53 | 2 | 5 |  | — | Task |
 | M59 | Cài arm D và D_off | [spec v5.1 §8, §12] | Bị chặn (bởi M58) |  |  | M58 | 3 | 8 |  | — | Task |
@@ -455,7 +485,7 @@ Gate 2 (M116) đọc ở cuối pha này.
 | M121 | Xin cấp phát GPU không-MIG có đồ họa cho CARLA trên UIT HPC | [Claude 10/10] | Mở | Mọi lát MIG hiện bị chặn cho CARLA (M78). Thiếu cấp phát này thì thu dữ liệu cảm biến và đánh giá closed-loop phải render trên RTX 3050 4 GB. Cần quản trị viên duyệt và sửa policy (AGENTS.md cấm tự suy ra quyền) | AGENTS.md; hàng M78 | M78 | 0 | 2 | Duy + TS. Hằng | Ngay | Task |
 | M122 | Review chéo phiên cho M21 V5.4 trở đi (diff ccfe899..HEAD) | [sổ vận hành 10/10] | Bị chặn (bởi M21: làm một lần khi code M21 ổn định) | Duy cho Claude review thay Muse (10/10). Gọi đúng tên là review chéo phiên, không phải review độc lập. Bắt buộc trước khi dùng kết quả M21 cho M30 |  | M21 | 2 | 1 | Claude | Trước M30 | Task |
 | M123 | Khóa giao thức và ngưỡng của pilot Gate 1.5 (M68) TRƯỚC khi chạy 1b | [K34, P3] [tách từ M68 ngày 10/10] | Mở | Phải khóa: 3 biến thể (điều kiện theo quỹ đạo / theo ý định không có loss Δresponse / theo ý định có loss Δresponse), tập cảnh giữ lại, và ngưỡng "thắng" theo quy tắc M22a và M35a. Khóa trong Tag-B (M63), tức trước khi thấy kết quả 1b; nếu không sẽ thành điều chỉnh sau khi biết số. Chưa soạn |  | M22a, M35a, M89 | 3 | 6 | Duy | Trước M20 (trong Tag-B) | Task |
-| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | [rà soát sổ 10/10] | Mở (bản nháp của Claude ở phần 2, chờ Duy duyệt) | Bản nháp: mục "Lịch" ở phần 2. Nhận định của Claude: nếu không trượt, Gate 1 rơi vào cuối tháng 12/2026, còn khoảng 10 tuần cho toàn bộ Phase 2 — không đủ cho hệ e2e + VLM trên benchmark closed-loop với một laptop 4 GB làm máy render duy nhất. Ba đòn bẩy: M121, chạy song song phần Phase 2 không cần CARLA ngay từ bây giờ, và chốt sớm phương án lùi (M114) |  | M77, M78 | 0 | 2 | Duy + TS. Hằng | Ngay | Task |
+| M124 | Lịch ngược từ hạn nộp: mỗi pha được bao nhiêu tuần | [rà soát sổ 10/10] | Mở (lịch v2 đẩy nhanh ở phần 2, chờ Duy duyệt) | Lịch v2 (10/10, theo giả định của Duy: AI viết code nên code không phải nút thắt): mục Lịch ở phần 2. Kết quả: Phase 1 cần khoảng 375–500 giờ máy CARLA, trong đó tuning chiếm khoảng 70%; Gate 1 về khoảng 30/11/2026; Phase 2 có khoảng 13 tuần. Lịch chỉ đứng được nếu M121 có kết quả trước đầu tháng 12, con số 44 phút mỗi lượt tuning đúng (chưa đo), GVHD phản hồi trong 5 ngày, và không cổng nào rớt. Lịch v1 (Gate 1 cuối tháng 12): commit 2fdb0c3 |  | M77, M78 | 0 | 2 | Duy + TS. Hằng | Ngay | Task |
 | M125 | Phiên bản CARLA mà benchmark yêu cầu so với 0.9.16 đang dùng ở Phase 1 | [rà soát sổ 10/10] | Mở | Chưa kiểm. Theo trí nhớ của Claude, Bench2Drive chạy trên một bản CARLA khác 0.9.16; nếu đúng thì executor, catalog và agent của Phase 1 phải chạy lại hoặc chuyển phiên bản. Kiểm từ nguồn gốc khi làm M79 |  | M79 | 0 | 2 | Duy | Cùng M79 | Q |
 | M126 | Bộ cảm biến và đường ống thu dữ liệu cảm biến cho Phase 2 (camera/LiDAR, độ phân giải, thông lượng render) | [rà soát sổ 10/10] | Hoãn (sau Gate 1; riêng thông lượng render cần ước sớm cho M78) |  |  | M62, M76, M78 | 4 | — | Duy | Trước M32 | Q |
 | M127 | Bộ khung chạy đánh giá closed-loop trên benchmark đã chọn | [rà soát sổ 10/10] | Bị chặn (bởi M79, M121) |  |  | M79, M121, M125 | 5 | — | Duy | Trước Gate 2 (M116) | Task |
@@ -527,7 +557,7 @@ Mỗi lần chạy CARLA có dữ liệu được ghi một dòng. "Được tí
 | M21 full V5.6 | 10/10 | spec d547ab65…, HEAD 1dc9f49 | `…/m21_full_v5_6` | 94 capture; lỗi resume qua segment | Không, bị thay thế |
 | M21 full V5.7 | 10/10 | spec e665ce99…, HEAD 30d0587 | `…/m21_full_v5_7` | smoke 144/144; boot 0 dừng ở khởi động segment 2 (lỗi đèn) | Không, bị thay thế |
 | M21 full V5.8 | 10/10 | spec 28ef2a99…, HEAD af628a1 | `…/m21_full_v5_8` | 245 capture; một cell bị chặn do lỗi đèn | Không, bị thay thế |
-| M21 full V5.9 | 10/10 | spec 7fce984c…, HEAD 7f29c0d | `…/m21_full_v5_9` | đang chạy (boot 0, từ 13:08) | Chưa xong; chỉ là go/no-go |
+| M21 full V5.9 | 10/10 | spec 7fce984c…, HEAD 7f29c0d | `…/m21_full_v5_9` | đang chạy: boot 0 đã thu 1.101 capture lúc 16:58, segment 9 | Chưa xong; chỉ là go/no-go |
 | M55 v3 | 07/10 | nhánh feat/m55-executor-v3 | worktree m55-executor-v3 `outputs/m55_v3` | TECHNICAL_KHÔNG (752/750 dòng) | Chỉ là điểm dữ liệu |
 | M56 signal probe | 06/10 | — | checkout chính `outputs/m56_signal_probe_20261006_091205` | Claude chưa đọc | — |
 
@@ -633,3 +663,4 @@ Sổ trỏ tới các tài liệu dưới đây. "Trong repo" nghĩa là mở đ
 - 10/10/2026 (chiều) — Duy phân công trong chat [chat]: M53, M54, M55, M56 do Dũng làm, Duy duyệt; M22a do Duy làm. Claude ghi riêng cho M56: giao thức M56 (details/M56.md) yêu cầu NGƯỜI CHỌN cảnh độc lập với hệ ý định, chưa chỉnh arm nào, không biết macro và chưa xem kết quả nào; Dũng đã chạy 1b và M21 nên theo đúng chữ của giao thức thì không đủ điều kiện làm người chọn. Claude ghi Dũng làm phần cài đặt và kiểm tra khả thi, còn người chọn cảnh để ngỏ, chờ Duy trả lời.
 - 10/10/2026 (chiều) — Muse gửi hai gói bổ sung qua Duy; Claude đã đưa 18 file vào docs/crfp/external/: spec giao diện v5.1, bảng 21 câu hỏi gốc, báo cáo M65, 6 ghi chú kill-search, báo cáo M74 bản 10/10, 3 biên nhận review M21 của Muse, và 4 bản trích M22a/M31a/M56/M57 từ sổ của Muse. Còn thiếu duy nhất: machine-environment.json của lần chạy 1b đầu tiên (Muse không có). Đối chiếu [repo]: bảng chú giải các arm khớp với spec v5.1 §21 và đã được viết lại theo spec; nội dung M22a, M56, M57 trong bản trích của Muse nằm trọn trong details/ của repo, M31a khớp với ô trong sổ. Bản trích của Muse còn mang trạng thái cũ (ví dụ M56 chưa có ghi chú T09/17, M22a chưa có quyết định về khoảng tin cậy), tức sổ ở workspace của Muse CHƯA được đồng bộ từ bản gộp trong repo. Claude chưa đọc kỹ 6 file kill-search và báo cáo M65.
 - 10/10/2026 (16:45) — Duy trả lời trong chat [chat]: người chọn cảnh của M56 là Astra (agent AI của Dũng). Theo yêu cầu của Duy, Claude kiểm trạng thái M56 [repo, chỉ đọc worktree m56-v1]: M56 đang ở giai đoạn THỰC HIỆN plan 17 task đã duyệt (G1 08/10), chỉ offline (G2); T01–T07 xong, T09 và T10 đang làm, T11–T17 chưa làm; hoạt động gần nhất 16:38 hôm nay; chưa commit, chưa chạy CARLA, chưa có cảnh nào được xác nhận; G3–G6 chưa cấp. Catalog: 26 đề xuất đã neo, thiếu 20 chỗ, 6 cảnh loại tự do mới là khái niệm. Spec M56 tự ghi không tuyên bố selector sạch. Chi tiết: details/M56.md. Hai điểm Claude nêu để Duy xem: (1) tính độc lập của người chọn đạt bằng lọc ngữ cảnh chứ không bằng người thứ ba — phải ghi thành giới hạn trong bài; (2) chưa thấy cảnh lấy từ Bench2Drive/Leaderboard như giao thức 05/10 ghi, cần kiểm.
+- 10/10/2026 (17:15) — Theo yêu cầu của Duy [chat]: (1) Claude dựng lịch v2 trên giả định của Duy rằng AI viết code nên code không phải nút thắt; chỉ còn giờ máy CARLA, GPU đồ họa, thời gian GVHD phản hồi và lỗi lộ ra khi chạy thật. Số đo được [repo]: M21 V5.9 thu 1.101 capture trong 3,9 giờ (12,7 giây mỗi capture). Ước Phase 1 cần 375–500 giờ máy, tuning chiếm khoảng 70% và dựa trên con số 44 phút mỗi lượt chưa đo. Gate 1 về khoảng 30/11 (v1: 27/12). Lịch chờ Duy duyệt. (2) Claude đọc 7 báo cáo tham chiếu của Astra: cảnh M56 được dựng từ hình học bản đồ Town04–07, không lấy từ Bench2Drive/Leaderboard như spec v5.1 §19 và giao thức 05/10 ghi; ngữ cảnh của Astra được lọc (không đọc mã thí nghiệm, catalog cũ, kết quả). Đây là lệch so với quy tắc đã duyệt, chờ Duy quyết; chi tiết ở details/M56.md. (3) Ghi nhận: policy HPC hiện cấm coi no_rendering hay -nullrhi là cách lách đã được duyệt; muốn chạy CARLA không render trên HPC phải xin quản trị.
