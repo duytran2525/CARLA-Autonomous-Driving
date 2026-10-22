@@ -137,8 +137,15 @@ def _category_proven(candidate, category: str) -> bool:
 
 
 def freeze_c0(revision: CandidateRevision, sites: SiteLedger,
-              review: ReviewRecord) -> CandidateRevision | ReleaseBlocked:
+              review: ReviewRecord, partial: SourceRef | None = None) -> CandidateRevision | ReleaseBlocked:
+    """partial = the verified partial-C0 spec addendum (A-C0P, Duy 2026-10-22): the count deficit alone is waived when no
+    category exceeds its target; every other gate still blocks; the receipt is marked C0_PARTIAL. Release is unchanged."""
     reasons=list(_construction_deficits(revision,sites))
+    counts=Counter(c.category for c in revision.candidates)
+    partial_ok=(partial is not None and _source_verified(partial) and len(revision.candidates)<46
+                and set(counts)<=set(_TARGETS) and all(counts.get(k,0)<=n for k,n in _TARGETS.items()))
+    if partial_ok and 'CANDIDATE_COUNT' in reasons:
+        reasons.remove('CANDIDATE_COUNT')
     if revision.c0_receipt is not None:
         reasons.append('C0_ALREADY_FROZEN')
     if not _review_binds(review,_digest({'revision':revision,'sites':sites}),('C0',)):
@@ -147,7 +154,8 @@ def freeze_c0(revision: CandidateRevision, sites: SiteLedger,
         reasons.append('INCOMPLETE_CANDIDATE_RECIPE')
     if reasons:
         return ReleaseBlocked('C0_BLOCKED',tuple(dict.fromkeys(reasons)))
-    return replace(revision,c0_receipt=review.authority_ref)
+    receipt=review.authority_ref
+    return replace(revision,c0_receipt=replace(receipt,kind='C0_PARTIAL') if partial_ok else receipt)
 
 
 def _complete_recipe(candidate) -> bool:
@@ -354,9 +362,11 @@ def classify_failure(verdict: EpisodeVerdict, review: ReviewRecord) -> str:
 
 def validation_precondition(revision: CandidateRevision) -> AdmissionVerdict:
     """Catalog-only prerequisite, never grants runtime authority; runtime also admits G4/G5."""
-    if revision.c0_receipt is None or len(revision.candidates)!=46:
+    partial=(revision.c0_receipt is not None and revision.c0_receipt.kind=='C0_PARTIAL'
+             and len(revision.candidates)<46)  # addendum A-C0P: validation of the frozen entries only
+    if revision.c0_receipt is None or (len(revision.candidates)!=46 and not partial):
         return AdmissionVerdict('BLOCKED_C0',('COMPLETE_FROZEN_C0_REQUIRED',))
-    return AdmissionVerdict('C0_PRESENT_NOT_RUNTIME_AUTHORITY',('G4_G5_STILL_REQUIRED',),
+    return AdmissionVerdict('C0_PRESENT_NOT_RUNTIME_AUTHORITY',('G4_G5_STILL_REQUIRED',)+(('C0_PARTIAL',) if partial else ()),
                             (revision.c0_receipt,))
 
 

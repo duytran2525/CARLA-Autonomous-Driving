@@ -159,3 +159,62 @@ def test_probe_charter_not_acceptance_trial(staged_inputs, require, monkeypatch)
     from types import SimpleNamespace
     out = runtime.admit(SimpleNamespace(freeze_ref=None, proofs=()), ApprovalBundle((receipt,), {}, probe), env, own)
     assert out.status == 'BLOCKED_AUTHORITY' and 'SCOPE_NOT_APPROVED:VALIDATE_AB' in out.reasons and binds == []
+
+
+def _complete_revision(c):
+    """The test_c0_requires_46 construction: every candidate has a complete recipe; M has its category review."""
+    from m56.catalog import _digest
+    from m56.model import FrozenResponse, encode_record
+    proof = SourceRef('synthetic://m', 'a'*64, 1, '1', 'branch-to-mainflow-geometry-topology', 'SYNTHETIC_TEST')
+    cands = []
+    for x in c.revision.candidates:
+        env = {k: v for k, v in x.environment.items() if k != 'kind'} | {'weather': {'w': 1}, 'light': {'l': 1}}
+        responses = tuple(FrozenResponse('EGO', a, None, {'NOMINAL': F(4)}, {}, {'program': {'initial': 'NOMINAL'}}, 'b'*64)
+                          for a in ('A', 'B'))
+        x = replace(x, environment=env, responses=responses,
+                    parameters={'vN': ParameterProposal('vN', (F(3),), 'm/s', 'synthetic', (c.ref,), 'TEST')})
+        if x.category == 'M':
+            review = c.review_factory(_digest((x.id, x.category, x.actors)), 'CATEGORY:M')
+            x = replace(x, environment={**x.environment, 'category_review': encode_record(replace(review, refs=(proof,)))})
+        cands.append(x)
+    return replace(c.revision, candidates=tuple(cands))
+
+
+def _drop(revision, sites, ids):
+    kept = tuple(x for x in revision.candidates if x.id not in ids)
+    return replace(revision, candidates=kept), replace(sites, assignments={k: v for k, v in sites.assignments.items() if k not in ids})
+
+
+def _addendum(tmp_path):
+    path = tmp_path/'addendum.md'; path.write_text('partial C0 addendum (test)', encoding='utf-8')
+    return ref(path, 'SPEC_ADDENDUM')
+
+
+def test_partial_c0_freezes_only_the_count_deficit_with_the_addendum(catalog_case, require, tmp_path):
+    freeze, guard = require('m56.catalog', 'freeze_c0'), require('m56.catalog', 'validation_precondition')
+    from m56.catalog import _digest
+    c = catalog_case()
+    revision, sites = _drop(_complete_revision(c), c.sites, {x.id for x in c.revision.candidates if x.category == 'I'})
+    review = c.review_factory(_digest({'revision': revision, 'sites': sites}), 'C0')
+    assert 'CANDIDATE_COUNT' in freeze(revision, sites, review).reasons  # old rule unchanged without the addendum
+    frozen = freeze(revision, sites, review, partial=_addendum(tmp_path))
+    assert frozen.c0_receipt is not None and frozen.c0_receipt.kind == 'C0_PARTIAL'
+    verdict = guard(frozen)
+    assert verdict.status == 'C0_PRESENT_NOT_RUNTIME_AUTHORITY' and 'C0_PARTIAL' in verdict.reasons
+
+
+def test_partial_c0_never_waives_other_gates(catalog_case, require, tmp_path):
+    freeze = require('m56.catalog', 'freeze_c0')
+    from m56.catalog import _digest
+    c = catalog_case()
+    full = _complete_revision(c)
+    revision, sites = _drop(full, c.sites, {x.id for x in full.candidates if x.category == 'I'})
+    broken = replace(revision, candidates=(replace(revision.candidates[0], environment={
+        k: v for k, v in revision.candidates[0].environment.items() if k != 'weather'}), *revision.candidates[1:]))
+    review = c.review_factory(_digest({'revision': broken, 'sites': sites}), 'C0')
+    out = freeze(broken, sites, review, partial=_addendum(tmp_path))
+    assert out.reasons == ('INCOMPLETE_CANDIDATE_RECIPE',)  # recipe gate still blocks; count deficit waived only
+    missing = tmp_path/'gone.md'
+    unverified = SourceRef(str(missing), 'f'*64, 1, '1', 'sha256', 'SPEC_ADDENDUM')
+    review = c.review_factory(_digest({'revision': revision, 'sites': sites}), 'C0')
+    assert 'CANDIDATE_COUNT' in freeze(revision, sites, review, partial=unverified).reasons  # unverified addendum
