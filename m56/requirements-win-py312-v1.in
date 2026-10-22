@@ -1,0 +1,9 @@
+carla==0.9.16
+numpy==2.2.6
+networkx==3.4.2
+shapely==2.0.7
+pytest==8.3.5
+colorama==0.4.6
+iniconfig==2.1.0
+packaging==24.2
+pluggy==1.5.0
