@@ -11,7 +11,8 @@ from tests.m56.response_cases import response_case
 from tests.m56.source_cases import Sources
 
 
-def reverse_case(root,mechanism='F06-ALT1',progress=F(0),speed=0.,reverse=False,phase='HOLD',stop_bound=True,rear_clearance=F(1),role='EGO',waiting_s=F(0),ground=True,reverse_region=None):
+def reverse_case(root,mechanism='F06-ALT1',progress=F(0),speed=0.,reverse=False,phase='HOLD',stop_bound=True,rear_clearance=F(1),role='EGO',waiting_s=F(0),ground=True,reverse_region=None,
+                 stop_method='bounded-reverse-stop-v1',stop_limits=None):
     s=Sources(root);c=response_case('F','B',events=(),speed=0.);geometry=s.source('geometry',{'scope':'synthetic flat straight corridor'})
     route=replace(c.response.route,continuity=(geometry,));body=replace(c.frame.actors[0].body,source=geometry)
     rows=tuple({'cause':cause,'after_event':event,'delay_s':F(0),'requires':()} for cause,event in (
@@ -46,8 +47,10 @@ def reverse_case(root,mechanism='F06-ALT1',progress=F(0),speed=0.,reverse=False,
         'fixture_recipe_hash':recipe_hash,'target_mps':F(1,2),'gain':F(1,2),'throttle_cap':F(1,4),'brake_cap':F(3,10),
         'terminal_brake':F(3,10),'hard_limit_m':hard,'stopping_boundary_m':hard-F(1,5),
         'stopping_distance_bound_m':F(1,5),'maximum_reverse_speed_mps':F(1)}
+    # Optional other frozen law (e.g. v2): overrides apply before the proof enters the fixture (ground binds its digest).
+    limits={k:v for k,v in {**limits,**(stop_limits or {})}.items() if v is not None}
     proof_ref=s.source('stop-bound',limits)
-    proof=s.capability('REVERSE_STOP_BOUND','bounded-reverse-stop-v1',limits,(proof_ref,),F(0))
+    proof=s.capability('REVERSE_STOP_BOUND',stop_method,limits,(proof_ref,),F(0))
     fixture=replace(fixture,proofs=(proof,) if stop_bound else ())
     ground_recipe=s.source('ground-recipe',{'method':'recorded-ground-contact-v1','version':'synthetic-v1','limitations':'software receipt only; not contact calibration'})
     frames=[];steps=int(progress/F(1,40));remainder=progress-steps*F(1,40)

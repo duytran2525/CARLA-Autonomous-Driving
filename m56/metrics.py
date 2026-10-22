@@ -640,6 +640,14 @@ def _forward_tail(frames,fixture,end):
     return tuple(dict.fromkeys(failed)),tuple(dict.fromkeys(unknown))
 
 
+def _reverse_throttle_cap(fixture):
+    """Consumer throttle limit while reversing: the frozen law's cap (v1 1/4 unless the EGO stop proof is a known law)."""
+    from .response import REVERSE_LAWS
+    proof=next((p for p in fixture.proofs if p.kind=='REVERSE_STOP_BOUND' and p.limits.get('actor_role')=='EGO'),None)
+    law=REVERSE_LAWS.get(proof.method) if proof is not None else None
+    return law['throttle_cap'] if law is not None else Fraction(1,4)
+
+
 def _f_action_window(frames,fixture,events):
     """Observed reverse/hold limits; a frozen metric end is not forward completion."""
     mechanism=fixture.domain.topology.get('mechanism');response=_action_response(frames,fixture)
@@ -667,6 +675,7 @@ def _f_action_window(frames,fixture,events):
     if any(v is None for v in speeds):
         return PhysicalState.UNKNOWN,('ACTION_SPEED_UNKNOWN',)
     failed=[];unknown=[];reverse=Fraction(0);cap=Fraction(2 if mechanism=='F03' else 1)
+    throttle_cap=float(_reverse_throttle_cap(fixture))
     if response.action_id=='B' and mechanism=='F06-ALT1':
         from .response import _reverse_reservation_ready
         try:
@@ -691,7 +700,7 @@ def _f_action_window(frames,fixture,events):
                 if control is None:
                     unknown.append('REVERSE_CONTROL_UNKNOWN')
                 elif (not control.reverse or not control.manual_gear_shift or control.gear!=-1 or control.steer!=0
-                      or control.throttle>.25 or control.brake>.30):
+                      or control.throttle>throttle_cap or control.brake>.30):
                     failed.append('REVERSE_CONTROL_MISMATCH')
     if response.action_id=='B':
         if reverse>cap:

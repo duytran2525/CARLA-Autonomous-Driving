@@ -504,6 +504,15 @@ def _reverse_body_hash(body):
     return _digest({k:getattr(body,k) for k in ('bbox_offset','rotation','extents','blueprint','attrs','physics')})
 
 
+# Frozen reverse stop-bound laws. v1 is the approved law, unchanged. v2 (D3, 2026-10-22) was set after the native
+# capability probes A2/A3/A4 (vehicle.audi.a2 stalls at the v1 cap 1/4 in reverse), and before any A/B; it is chosen
+# only by the fixture's proof method, never inferred.
+REVERSE_LAWS={'bounded-reverse-stop-v1':{'target_mps':Number(1,2),'gain':Number(1,2),'throttle_cap':Number(1,4),
+                                          'brake_cap':Number(3,10),'terminal_brake':Number(3,10)},
+              'bounded-reverse-stop-v2':{'target_mps':Number(1,2),'hold_throttle':Number(29,100),'gain':Number(1,5),
+                                          'throttle_cap':Number(2,5),'brake_cap':Number(3,10),'terminal_brake':Number(3,10)}}
+
+
 def _reverse_capability(proof,kind,method):
     from .model import CapabilityProof
     from .catalog import _digest,_review_binds
@@ -575,12 +584,12 @@ def _reverse_inputs(frame,response,fixture,forward=False):
             or (actor.pose.pitch,actor.pose.yaw,actor.pose.roll)!=(0.,0.,0.)):
         raise ValueError('REVERSE_ALIGNMENT_UNSUPPORTED')
     proofs=tuple(p for p in fixture.proofs if p.kind=='REVERSE_STOP_BOUND' and p.limits.get('actor_role')==role)
-    if len(proofs)!=1 or not _reverse_capability(proofs[0],'REVERSE_STOP_BOUND','bounded-reverse-stop-v1'):
+    if (len(proofs)!=1 or proofs[0].method not in REVERSE_LAWS
+            or not _reverse_capability(proofs[0],'REVERSE_STOP_BOUND',proofs[0].method)):
         raise ValueError('REVERSE_STOP_BOUND_MISSING')
     proof=proofs[0];limits=proof.limits;hard=Number(2 if mechanism=='F03' or npc else 1)
     expected={'actor_role':role,'response_hash':response.hash,'route_hash':_digest(route),'body_hash':_reverse_body_hash(actor.body),
-              'fixture_recipe_hash':recipe,'target_mps':Number(1,2),'gain':Number(1,2),'throttle_cap':Number(1,4),
-              'brake_cap':Number(3,10),'terminal_brake':Number(3,10),'hard_limit_m':hard}
+              'fixture_recipe_hash':recipe,**REVERSE_LAWS[proof.method],'hard_limit_m':hard}
     extra={'stopping_boundary_m','stopping_distance_bound_m','maximum_reverse_speed_mps'}
     if (set(limits)!=set(expected)|extra or any(limits[k]!=v for k,v in expected.items())
             or any(not isinstance(limits[k],Number) for k in extra)
@@ -1032,7 +1041,8 @@ def reverse_intent(frame:FrameRecord,state:ScriptState,response:FrozenResponse,f
             phase='NPC_STOPPING' if npc else 'STOPPING'
             command=CommandRecord(actor.id,frame.frame,frame.frame+1,'REVERSE',Number(0),Number(0),control,None,phase,response.hash)
             return ResponseState(command,ScriptState(phase,state.start if state.phase==phase else frame.simtime,state.events))
-        throttle=min(Number(1,4),max(Number(0),Number(1,2)*(Number(1,2)-speed)))
+        law=REVERSE_LAWS[proof.method]  # v1: hold 0, gain 1/2, cap 1/4, i.e. exactly the approved regulator
+        throttle=min(law['throttle_cap'],max(Number(0),law.get('hold_throttle',Number(0))+law['gain']*(law['target_mps']-speed)))
         brake=min(Number(3,10),max(Number(0),Number(1,2)*(speed-Number(1,2))))
         control=ControlPacket(float(throttle),0.,float(brake),False,True,True,-1)
         command=CommandRecord(actor.id,frame.frame,frame.frame+1,'REVERSE',Number(9,5),Number(0),control,None,'REVERSE',response.hash)
