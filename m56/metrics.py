@@ -396,6 +396,33 @@ def _o_return_action(frames,fixture,events,selected,states):
     return None,()
 
 
+def _reverse_beyond_jitter(previous,frame,before,after,fixture):
+    """Station decrease larger than the pair's reviewed CONTINUOUS_GEOMETRY uncertainty.
+
+    Duy, 2026-10-22, set AFTER seeing a 0.82 mm native station decrease (physics jitter). The OLD rule was zero
+    tolerance: any decrease failed. It stays computable through reverse_jitter_report, and results are reported under
+    both rules. Without a proof (or for the first frame) the tolerance is zero, i.e. the old rule."""
+    if before is None or after is None or after>=before:
+        return False
+    proof=_continuous_proof(previous,frame,_digest(fixture)) if previous is not None else None
+    return before-after>(proof.uncertainty if proof is not None else Fraction(0))
+
+
+def reverse_jitter_report(frames,fixture):
+    """(role, frame, decrease, tolerance) for every decrease the old zero-tolerance rule fails and the new rule accepts."""
+    out=[]
+    for role,route in fixture.routes.items():
+        previous=None;last=None
+        for frame in frames:
+            actors=tuple(a for a in frame.actors if a.role==role)
+            station=_metric_station((actors[0].pose.x,actors[0].pose.y,actors[0].pose.z),route) if len(actors)==1 else None
+            if station is not None and last is not None and station<last and not _reverse_beyond_jitter(previous,frame,last,station,fixture):
+                proof=_continuous_proof(previous,frame,_digest(fixture))
+                out.append((role,frame.frame,last-station,proof.uncertainty))
+            previous,last=frame,station
+    return tuple(out)
+
+
 def _f_queue_action(frames,fixture,events,response):
     by_name={e.name:e for e in events};trigger=by_name.get('TRIGGER');move=by_name.get('N_MOVE')
     if trigger is None:
@@ -425,10 +452,10 @@ def _f_queue_action(frames,fixture,events,response):
         before=records[i-1][2];duration=f.simtime-records[i-1][0].simtime
         if duration!=Fraction(1,20):
             return PhysicalState.UNKNOWN,('ACTION_WINDOW_UNKNOWN',)
-        step=max(stations['EGO'])-max(before['EGO'])
-        if step<0:
+        step=max(stations['EGO'])-max(before['EGO']);previous=records[i-1][0]
+        if _reverse_beyond_jitter(previous,f,max(before['EGO']),max(stations['EGO']),fixture):
             failed.append('UNPLANNED_REVERSE')
-        if any(b<a for a,b in zip(before['NPC'],stations['NPC'])):
+        if any(_reverse_beyond_jitter(previous,f,a,b,fixture) for a,b in zip(before['NPC'],stations['NPC'])):
             failed.append('NPC_UNPLANNED_REVERSE')
         # Commands applied before this observed release cannot resume in the same frame.
         held=release is None or f.frame<=release.frame
@@ -468,7 +495,7 @@ def _f_wait_action(frames,fixture,events,response):
         unknown.append('ACTION_PROJECTION_UNKNOWN')
     # Missing route projection cannot erase independent stop/door/lane findings.
     # Compare adjacent observed projections only; never bridge an unknown sample.
-    if any(a is not None and b is not None and b<a for a,b in zip(stations,stations[1:])):
+    if any(_reverse_beyond_jitter(p,f,a,b,fixture) for p,f,a,b in zip(selected,selected[1:],stations,stations[1:])):
         failed.append('UNPLANNED_REVERSE')
     release=None
     if mechanism=='F01':
@@ -627,16 +654,16 @@ def _forward_tail(frames,fixture,end):
     if not tail or tail[0].frame!=end.frame:
         return (),('POST_END_PROJECTION_UNKNOWN',)
     for role in ('EGO','NPC'):
-        route=fixture.routes.get(role);previous=None
+        route=fixture.routes.get(role);previous=None;previous_frame=None
         for frame in tail:
             actors=tuple(a for a in frame.actors if a.role==role)
             station=(_metric_station((actors[0].pose.x,actors[0].pose.y,actors[0].pose.z),route)
                      if route is not None and len(actors)==1 and actors[0].route_valid is True else None)
             if station is None:
                 unknown.append('POST_END_PROJECTION_UNKNOWN')
-            elif previous is not None and station<previous:
+            elif previous is not None and _reverse_beyond_jitter(previous_frame,frame,previous,station,fixture):
                 failed.append('POST_END_UNPLANNED_REVERSE')
-            previous=station  # Never compare across a missing observation.
+            previous,previous_frame=station,frame  # Never compare across a missing observation.
     return tuple(dict.fromkeys(failed)),tuple(dict.fromkeys(unknown))
 
 
@@ -824,7 +851,7 @@ def _crossing_action(frames,fixture,events):
         stations=tuple(_metric_station((a.pose.x,a.pose.y,a.pose.z),route) for a in actors)
         if any(s is None for s in stations):
             return PhysicalState.UNKNOWN,('ACTION_PROJECTION_UNKNOWN',)
-        if any(b<a for a,b in zip(stations,stations[1:])):
+        if any(_reverse_beyond_jitter(p,f,a,b,fixture) for p,f,a,b in zip(frames,frames[1:],stations,stations[1:])):
             failed.append('UNPLANNED_REVERSE' if role=='EGO' else 'NPC_UNPLANNED_REVERSE')
     if entry is not None and (clear is None or entry.frame<=clear.frame):
         failed.append('EARLY_ENTRY_BEFORE_NPC_CLEAR')
