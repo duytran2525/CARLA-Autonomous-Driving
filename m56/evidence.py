@@ -408,6 +408,24 @@ def _verified_review(evidence,review,digest,scope):
             and all(_admitted_source(evidence,r) for r in (*review.refs,review.authority_ref)))
 
 
+def _f32_control(control):
+    """CARLA stores VehicleControl floats as float32 (native 2026-10-22: brake .3 reads back 0.30000001192092896).
+    The readback of an exact command is the command or its float32 image, nothing else."""
+    from dataclasses import replace
+    from .response import _f32
+    return replace(control,throttle=_f32(control.throttle),steer=_f32(control.steer),brake=_f32(control.brake))
+
+
+def _readback_matches(control,readback):
+    """Server readback of an exact command: the command or its float32 image. In automatic transmission
+    (manual_gear_shift False on both) CARLA ignores the commanded gear and reads back the transmission's actual gear
+    (native 2026-10-22: HOLD gear=1 reads back gear=0 at standstill), so gear is not compared there."""
+    from dataclasses import replace
+    if not control.manual_gear_shift and not readback.manual_gear_shift:
+        control=replace(control,gear=readback.gear)
+    return readback in (control,_f32_control(control))
+
+
 def _frame_integrity(evidence,fixture):
     invalid=[];uncertain=[];identity=None
     response_hashes={r.hash for r in fixture.responses}
@@ -447,7 +465,8 @@ def _frame_integrity(evidence,fixture):
             if type(actor.plan_queue) is not int or actor.plan_queue<0 or len(actor.commands)>1:
                 invalid.append('FRAME_CORRELATION_INVALID')
             for command in actor.commands:
-                if command.control is not None and actor.readback is not None and command.control!=actor.readback:
+                if (command.control is not None and actor.readback is not None
+                        and not _readback_matches(command.control,actor.readback)):
                     invalid.append('CONTROL_READBACK_MISMATCH')
                 if (command.actor!=actor.id or command.frame!=f.frame-1 or command.next_frame!=f.frame
                         or command.response_hash not in response_hashes):

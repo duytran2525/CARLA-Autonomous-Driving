@@ -163,3 +163,20 @@ def test_early_empty_queue_brake_one_not_clamped_into_valid_control(stock_case,r
     # A failed effect consumes the frame; no automatic same-frame retry.
     with pytest.raises(ValueError,match='COMMAND_ORDER'):
         require('m56.response','apply_intent')(driver,intent)
+
+
+@pytest.mark.parametrize('field,value,ok', [
+    ('steer', -0.800000011920929, True), ('steer', 0.800000011920929, True), ('throttle', 0.75, True),
+    ('brake', 0.30000001192092896, True), ('steer', -0.8000001, False), ('brake', 0.3000001, False),
+    ('throttle', 0.7500001, False)])
+def test_stock_limits_accept_carla_float32_images_only(stock_case, require, field, value, ok):
+    # CARLA's VehicleControl stores float32: the agent's 0.8 steer clamp reads back -0.800000011920929 (native 22/10).
+    s = stock_case; driver = s.create(s.actor, s.c.response, s.policy)
+    control = dict(throttle=0., steer=0., brake=0., hand_brake=False, reverse=False, manual_gear_shift=False, gear=1)
+    s.fake.run_step = lambda: SimpleNamespace(**{**control, field: value})
+    intent = require('m56.response', 'step_response')(s.c.frame, s.c.state, s.c.response).command
+    if ok:
+        assert getattr(require('m56.response', 'apply_intent')(driver, intent).control, field) == value
+    else:
+        with pytest.raises(ValueError, match='STOCK_CONTROL_INVALID'):
+            require('m56.response', 'apply_intent')(driver, intent)

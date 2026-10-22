@@ -275,3 +275,24 @@ def test_owned_adapter_hands_sensor_packets_to_the_runner_thread_only():
     assert got == []  # nothing written from CARLA's thread (exclusive RunStore writer lock)
     backend._drain()
     assert got == [(threading.get_ident(), 77)]
+
+
+def test_readback_is_the_command_or_its_float32_image_only():
+    from dataclasses import replace
+    from m56.evidence import _f32_control
+    from m56.model import ControlPacket
+    sent = ControlPacket(0., 0., .3, False, True, True, -1)
+    assert _f32_control(sent).brake == 0.30000001192092896  # what CARLA reads back for brake .3 (native 22/10)
+    assert sent in (sent, _f32_control(sent)) and _f32_control(sent) in (sent, _f32_control(sent))
+    assert replace(sent, brake=.31) not in (sent, _f32_control(sent))
+
+
+def test_automatic_transmission_readback_gear_is_not_the_command():
+    from dataclasses import replace
+    from m56.evidence import _readback_matches
+    from m56.model import ControlPacket
+    hold = ControlPacket(0., 0., .3, False, False, False, 1)
+    assert _readback_matches(hold, replace(hold, brake=0.30000001192092896, gear=0))  # native 22/10
+    manual = ControlPacket(.25, 0., 0., False, True, True, -1)
+    assert not _readback_matches(manual, replace(manual, gear=1))  # manual gear must match exactly
+    assert not _readback_matches(hold, replace(hold, brake=.31, gear=0))

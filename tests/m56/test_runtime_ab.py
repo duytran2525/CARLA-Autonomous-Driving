@@ -312,3 +312,26 @@ def test_common_fixed_release_is_action_independent(tmp_path, require):
         assert issue_time - trigger.time == 3, (trigger, release)
         offsets.append(release.frame - trigger.frame)
     assert offsets[0] == offsets[1] == 60
+
+
+def test_runner_anchors_capture_start_like_the_consumer(tmp_path, require):
+    # Native 22/10: programs released by CAPTURE_START + delay (initial target 0, as settle requires) never left
+    # their first phase because the runner did not admit the boundary anchor the consumer replays with.
+    run = require('m56.runtime', 'run_episode')
+    from tests.m56.response_cases import response_case
+    base = fixture()
+    ego = response_case('C', 'A', role='EGO').response
+    program = ego.phases['program']
+    held = replace(ego, route=base.routes['EGO'], hash='a' * 64, targets={**ego.targets, 'HOLD': F(0)},
+                   phases={**ego.phases, 'program': {**program, 'initial': 'HOLD', 'transitions': (
+                       {'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': F(3, 2), 'requires': ()},
+                       *program['transitions'])}})
+    fx = replace(base, responses=(held, *(r for r in base.responses if r.hash != 'a' * 64)))
+    backend = ScriptBackend(tmp_path/'native', lambda t: {'EGO': (F(6), 0), 'NPC': (F(20), 0)},
+                            queue=lambda role, t: 0 if t > 1 else 1).bind(fx)
+    issued, apply = [], backend.apply
+    backend.apply = lambda commands: issued.extend((c.frame, c.cause) for c in commands if c.actor == backend.ids['EGO']) or apply(commands)
+    run(context(tmp_path, backend), fx, 'A')
+    boundary = issued[0][0]  # the first command is issued from the boundary observation
+    assert issued[0][1] == 'HOLD'
+    assert next(frame for frame, cause in issued if cause == 'NOMINAL') - boundary == 30  # boundary + 1.5 s

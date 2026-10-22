@@ -675,7 +675,8 @@ def _f_action_window(frames,fixture,events):
     if any(v is None for v in speeds):
         return PhysicalState.UNKNOWN,('ACTION_SPEED_UNKNOWN',)
     failed=[];unknown=[];reverse=Fraction(0);cap=Fraction(2 if mechanism=='F03' else 1)
-    throttle_cap=float(_reverse_throttle_cap(fixture))
+    from .response import _f32
+    throttle_cap=_f32(float(_reverse_throttle_cap(fixture)))  # readback is float32 (native 2026-10-22)
     if response.action_id=='B' and mechanism=='F06-ALT1':
         from .response import _reverse_reservation_ready
         try:
@@ -700,7 +701,7 @@ def _f_action_window(frames,fixture,events):
                 if control is None:
                     unknown.append('REVERSE_CONTROL_UNKNOWN')
                 elif (not control.reverse or not control.manual_gear_shift or control.gear!=-1 or control.steer!=0
-                      or control.throttle>throttle_cap or control.brake>.30):
+                      or control.throttle>throttle_cap or control.brake>_f32(.30)):
                     failed.append('REVERSE_CONTROL_MISMATCH')
     if response.action_id=='B':
         if reverse>cap:

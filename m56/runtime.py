@@ -18,7 +18,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from m56.evidence import append_record
-from m56.model import (AdmissionVerdict, BlockedPreparation, CleanupReceipt, EpisodeVerdict, FrameRecord,
+from m56.model import (AdmissionVerdict, BlockedPreparation, CleanupReceipt, EpisodeVerdict, EventRecord, FrameRecord,
                        IntegrityReport, OperationResponse, OwnedRegistry, PhysicalState, QueryBundle,
                        RuntimeIdentity, SourceRef, SpawnResponse, SpawnState, WitnessState)
 
@@ -204,9 +204,12 @@ class ReadOnlyCarlaBackend:
         world = self.client.get_world()
         mods = module_refs()
         v = sys.version_info
+        # Routes carry the map as the sha256 of its OpenDRIVE, and W01 compares route.map_hash with identity.map:
+        # report the server's own OpenDRIVE hash, never the map name (native 2026-10-22).
+        xodr = hashlib.sha256(world.get_map().to_opendrive().encode('utf-8')).hexdigest()
         return RuntimeIdentity(self.ownership.boot, str(world.id), self.client.get_client_version(),
                                self.client.get_server_version(), f'{v.major}.{v.minor}.{v.micro}',
-                               mods, world.get_map().name, {k: m.sha256 for k, m in mods.items()})
+                               mods, xodr, {k: m.sha256 for k, m in mods.items()})
 
     def query(self, request):
         world = self.client.get_world()
@@ -327,10 +330,54 @@ def cleanup_owned(context, registry):
     return CleanupReceipt(status, tuple(destroyed), tuple(survivors), tuple(refs))
 
 
+class _NativeStock:
+    """Admitted native materialization for response.create_stock_driver: the PINNED stock BasicAgent (EGO) or
+    LocalPlanner (NPC) with the reviewed config. The reviewed plan is a tuple of {'x','y','z'} points on the frozen
+    route; each becomes the map waypoint at that point with LANEFOLLOW (no other waypoint is created)."""
+
+    def __init__(self, actor, config, world):
+        sys.path.insert(0, str(Path(STOCK_ROOT).parents[1]))  # E:/Carla/PythonAPI/carla (pinned hashes checked at admit)
+        from agents.navigation.basic_agent import BasicAgent
+        from agents.navigation.local_planner import LocalPlanner
+        self.map = world.get_map()
+        opt = dict(config['opt_dict'])
+        if config['backend'] == 'BasicAgent':
+            self.agent = BasicAgent(actor, target_speed=0., opt_dict=opt, map_inst=self.map)
+            self.planner = self.agent.get_local_planner()
+        else:
+            self.agent = self.planner = LocalPlanner(actor, opt_dict=opt, map_inst=self.map)
+
+    def set_global_plan(self, plan, stop_waypoint_creation, clean_queue):
+        import carla
+        from agents.navigation.local_planner import RoadOption
+        route = [(self.map.get_waypoint(carla.Location(float(p['x']), float(p['y']), float(p['z']))), RoadOption.LANEFOLLOW)
+                 for p in plan]
+        self.planner.set_global_plan(route, stop_waypoint_creation=stop_waypoint_creation, clean_queue=clean_queue)
+
+    def follow_speed_limits(self, value):
+        self.agent.follow_speed_limits(value)
+
+    def set_target_speed(self, value):
+        self.agent.set_target_speed(value)
+
+    def set_speed(self, value):
+        self.planner.set_speed(value)
+
+    def set_offset(self, value):
+        self.agent.set_offset(value)
+
+    def run_step(self):
+        return self.agent.run_step()
+
+    def queue(self):
+        return len(self.planner._waypoints_queue)
+
+
 class OwnedCarlaBackend(ReadOnlyCarlaBackend):
-    """T13 native methods behind the same seam. WRITTEN, NEVER EXECUTED NATIVELY: running it needs an
-    approved probe charter (spawn/tick/settings). Raw actor states go to the RunStore; converting them into
-    fixture-bound ActorFrame records (body/route/arc/gaps) is T14's job, so frames carry actors=()."""
+    """T13/T14 native methods behind the same seam. With bind(fixture, policy_for) the frames carry fixture-bound
+    ActorFrames (observed pose/velocity/bounding box, route station by the consumer's own projection, the attributed
+    command, server control readback, stock plan queue), and stock intents run through response.create_stock_driver /
+    apply_intent on the pinned stock agents. Without bind, frames carry actors=() (capability probes)."""
 
     def __init__(self, client, ownership, store):
         super().__init__(client, ownership)
@@ -345,10 +392,21 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         self.settings = {'synchronous_mode': True, 'fixed_delta_seconds': Fraction(1, 20),
                          'max_substep_delta_time': Fraction(1, 100), 'max_substeps': 10}
 
-    def _raw(self, stream, record):
+    def bind(self, fixture, policy_for, geometry_review=None):
+        """policy_for(response, actor) -> the reviewed PolicyBundle whose stock binding names that response and actor.
+        geometry_review(packet) -> ReviewRecord for a per-frame CONTINUOUS_GEOMETRY proof, or None: no proof is emitted
+        (the consumer then stays UNKNOWN). The adapter never reviews anything itself."""
+        from m56 import response as response_module
+        self.fixture, self.policy_for, self.drivers, self.applied, self.roles, self.bodies = fixture, policy_for, {}, {}, {}, {}
+        self.geometry_review, self.previous_actors = geometry_review, None
+        response_module._stock_factory = lambda actor, config: _NativeStock(actor, config, self.world)
+        self.plan_refs = {role: self._raw(f'native/plan-{role}.json', route) for role, route in fixture.routes.items()}
+        return self
+
+    def _raw(self, stream, record, frame=None, time=None):
         self.count = getattr(self, 'count', 0) + 1  # one immutable file per record: refs never go stale
         a = append_record(self.store, f'{stream.rsplit(".", 1)[0]}/{self.count:07d}.json', record)
-        return SourceRef(str(self.store.root / a.relativepath), a.hash, a.size, '1', 'native', 'NATIVE_RAW')
+        return SourceRef(str(self.store.root / a.relativepath), a.hash, a.size, '1', 'native', 'NATIVE_RAW', frame, time)
 
     def spawn(self, actors, due_tick_cue):
         # Two batches: vehicles first, then sensors attached to the parent's REAL actor id (SpawnActor's parent
@@ -376,9 +434,13 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
                 result[i] = (actor_id, r.error or None)
                 if actor_id:
                     self.owned.add(actor_id); ids[actors[i].role] = actor_id
-        return tuple(SpawnResponse(actor_id, error, self._raw('native/spawn.jsonl',
-                     {'role': a.role, 'blueprint': a.blueprint, 'actor_id': actor_id, 'error': error}))
-                     for a, (actor_id, error) in zip(actors, result))
+                    if hasattr(self, 'roles') and not sensors:
+                        self.roles[actor_id] = actors[i].role
+        out = tuple(SpawnResponse(actor_id, error, self._raw('native/spawn.jsonl',
+                    {'role': a.role, 'blueprint': a.blueprint, 'actor_id': actor_id, 'error': error}))
+                    for a, (actor_id, error) in zip(actors, result))
+        self.spawn_refs = {a.role: r.source for a, r in zip(actors, out)}
+        return out
 
     def listen(self, sensor_id, callback):
         # Keep the Python sensor object alive: when it goes out of scope CARLA drops the stream and no packet is
@@ -394,9 +456,23 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
                                                                      'time': event.timestamp, 'repr': repr(event)})))
         return OperationResponse(sensor_id, None, None, self._raw('native/listen.jsonl', {'sensor_id': sensor_id}))
 
+    def _materialize(self, c):
+        """Stock intent (control None) -> the reviewed stock driver's control; explicit controls pass unchanged."""
+        from m56.response import apply_intent, create_stock_driver
+        if c.control is not None or not hasattr(self, 'fixture'):
+            return c
+        if c.actor not in self.drivers:
+            response = next(r for r in self.fixture.responses if r.hash == c.response_hash)
+            actor = self.world.get_actor(c.actor)
+            self.drivers[c.actor] = create_stock_driver(actor, response, self.policy_for(response, actor))
+        return apply_intent(self.drivers[c.actor], c)
+
     def apply(self, commands):
         import carla
         batch = []
+        commands = tuple(self._materialize(c) for c in commands)
+        if hasattr(self, 'fixture'):
+            self.applied = {c.actor: c for c in commands}
         for c in commands:
             k = c.control
             # Every ControlPacket field reaches the server: reverse gear needs manual_gear_shift and gear=-1.
@@ -432,6 +508,8 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         snap = self.world.get_snapshot()
         self._drain()
         actors = self.world.get_actors()
+        if hasattr(self, 'fixture'):
+            return self._bound_frame(frame_id, snap, actors)
         state = {}
         for a in actors:
             if a.id in self.owned:
@@ -448,9 +526,67 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
                                                 'delta_seconds': snap.timestamp.delta_seconds, 'owned': state})
         movable = tuple(a.id for a in actors if a.type_id.startswith(('vehicle.', 'walker.', 'sensor.')))
         dt, simtime = self._clock(frame_id, snap)
-        return FrameRecord(self.ownership.boot, str(self.world.id), frame_id, simtime, dt,
-                           (), (), {'actor_ids': movable, 'writers': (self.ownership.writer,), 'raw_ref': ref,
-                                    'settings': self.settings})
+        integrity = {'actor_ids': movable, 'writers': (self.ownership.writer,), 'raw_ref': ref, 'settings': self.settings}
+        return FrameRecord(self.ownership.boot, str(self.world.id), frame_id, simtime, dt, (), (), integrity)
+
+    def _bound_frame(self, frame_id, snap, actors):
+        """Bound mode: the observation record IS the raw per-tick record (it carries the server's pose, velocity and
+        control readback values unchanged), so no duplicate server-state file is written (~13 ms each)."""
+        movable = tuple(a.id for a in actors if a.type_id.startswith(('vehicle.', 'walker.', 'sensor.')))
+        dt, simtime = self._clock(frame_id, snap)
+        integrity = {'actor_ids': movable, 'writers': (self.ownership.writer,), 'settings': self.settings,
+                     'delta_seconds_raw': snap.timestamp.delta_seconds, 'plan_refs': self.plan_refs}
+        npc = next((a for a in actors if self.roles.get(a.id) == 'NPC'), None)
+        if npc is not None:
+            # Stock NPC = pinned LocalPlanner (no obstacle logic): its only observable priority input is the light.
+            red = npc.is_at_traffic_light() and str(npc.get_traffic_light_state()) == 'Red'
+            packet = {'boot': self.ownership.boot, 'world': str(self.world.id), 'frame': frame_id, 'actor_id': npc.id,
+                      'status': 'RED_LIGHT' if red else 'CLEAR'}
+            integrity['npc_controls'] = {**packet, 'witness_refs': (self._raw('native/npc_controls.json', packet,
+                                                                                frame_id, simtime),)}
+        frames = self._actor_frames(actors)
+        # The consumer requires each frame ref to hold exactly the observation it evaluates (native 2026-10-22).
+        observation = self._raw('native/observation.json', {'boot': self.ownership.boot, 'world': str(self.world.id),
+                                'frame': frame_id, 'simtime': simtime, 'actors': frames}, frame_id, simtime)
+        integrity['frame_refs'], integrity['raw_ref'] = (observation,), observation
+        if self.geometry_review is not None and self.previous_actors is not None:
+            from m56.catalog import _digest
+            from m56.model import CapabilityProof
+            limits = {'fixture_hash': _digest(self.fixture), 'previous_frame': frame_id - 1, 'frame': frame_id,
+                      'previous_actors': _digest(self.previous_actors), 'actors': _digest(frames)}
+            packet = {'kind': 'CONTINUOUS_GEOMETRY', 'method': 'bounded-interframe-body-v1', 'raw_refs': (observation,),
+                      'uncertainty': Fraction(1, 1000), 'limits': limits, 'status': 'CORROBORATED'}
+            integrity['continuous_geometry'] = CapabilityProof(**packet, review=self.geometry_review(packet))
+        self.previous_actors = frames
+        return FrameRecord(self.ownership.boot, str(self.world.id), frame_id, simtime, dt, frames, (), integrity)
+
+    def _actor_frames(self, actors):
+        from m56.metrics import _metric_station
+        from m56.model import ActorFrame, BodyRecord, ControlPacket, Transform6
+        out = []
+        for a in actors:
+            role = self.roles.get(a.id)
+            if role is None:
+                continue
+            t, v, k = a.get_transform(), a.get_velocity(), a.get_control()
+            if role not in self.bodies:  # observed bounding box of the spawned actor, never the recipe's guess
+                b = a.bounding_box
+                self.bodies[role] = BodyRecord((b.location.x, b.location.y, b.location.z),
+                                               (b.rotation.pitch, b.rotation.yaw, b.rotation.roll),
+                                               (b.extent.x, b.extent.y, b.extent.z), (), a.type_id, {}, {},
+                                               self.spawn_refs[role])
+            pose = Transform6(t.location.x, t.location.y, t.location.z, t.rotation.pitch, t.rotation.yaw, t.rotation.roll)
+            station = _metric_station((pose.x, pose.y, pose.z), self.fixture.routes[role])
+            sent = self.applied.get(a.id)
+            driver = self.drivers.get(a.id)
+            out.append(ActorFrame(role, a.id, pose, (v.x, v.y, v.z), self.bodies[role], station, {},
+                                  (sent,) if sent is not None else (),
+                                  ControlPacket(k.throttle, k.steer, k.brake, k.hand_brake, k.reverse,
+                                                k.manual_gear_shift, k.gear),
+                                  None, driver.handle.backend.queue() if driver is not None else 1,
+                                  station is not None, None))
+        self.applied = {}
+        return tuple(sorted(out, key=lambda x: x.role))
 
     def stop_listeners(self, ids):
         out = []
@@ -571,6 +707,8 @@ def _commands(frames, boundary, states, responses, registry_ids, fixture, known=
             continue
         state = replace(states[r.actor_role], events=admitted)
         if _bounded(r) and any(e.name == 'TRIGGER' for e in admitted):
+            # As the consumer replays: CAPTURE_START is a program timer anchor, never passed to the bounded kernel.
+            state = replace(state, events=tuple(e for e in admitted if e.name != 'CAPTURE_START'))
             rs = reverse_intent(frame, state, r, fixture)
         else:
             rs = step_response(frame, state, r)
@@ -627,12 +765,12 @@ def run_episode(context, fixture, action_id):
     registry = spawned
     ids = {r.role: x.actor_id for r, x in zip(fixture.actors, registry.spawn_responses)}
     responses = tuple(r for r in fixture.responses if r.actor_role != 'EGO' or r.action_id == action_id)
-    states, boundary, settled, ready, known = {}, None, None, None, ()
+    states, boundary, settled, ready, known, capture = {}, None, None, None, (), ()
     while True:
         commands = ()
         if boundary is not None and responses:  # witness requires attributed commands on every recorded frame
             try:
-                commands = _commands(frames, boundary, states, responses, ids, fixture, known)
+                commands = _commands(frames, boundary, states, responses, ids, fixture, (*capture, *known))
             except Exception as e:  # unsupported/blocked script: stop, never fall back
                 fail('RESPONSE_BLOCKED', e)
                 break
@@ -645,6 +783,9 @@ def run_episode(context, fixture, action_id):
         previous = f.frame
         if boundary is None:
             boundary = f
+            # The consumer replays programs with CAPTURE_START at the boundary observation; the runner must too, or a
+            # program released at CAPTURE_START + delay never leaves its first phase (native 2026-10-22).
+            capture = (EventRecord('CAPTURE_START', f.frame, f.simtime, tuple(f.integrity.get('frame_refs', ()))),)
             # Each response starts in its own frozen program phase; one without a program is blocked downstream.
             states = {r.actor_role: ScriptState((r.phases.get('program') or {}).get('initial', 'UNSET'), f.simtime, ())
                       for r in responses}

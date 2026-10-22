@@ -76,6 +76,13 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     return StockDriver(_StockSession(backend),config,digest)
 
 
+def _f32(limit):
+    """CARLA VehicleControl fields are float32: a control at exactly a configured limit reads back as the limit's
+    float32 image (native 2026-10-22: steer clamp 0.8 -> 0.800000011920929). Bounds compare against that image."""
+    import struct
+    return struct.unpack('<f',struct.pack('<f',limit))[0]
+
+
 def apply_intent(driver: StockDriver, intent: CommandRecord) -> CommandRecord:
     """Compute a stock forward control; application/tick/readback belong to runtime.
 
@@ -115,7 +122,7 @@ def apply_intent(driver: StockDriver, intent: CommandRecord) -> CommandRecord:
         fields=('throttle','steer','brake','hand_brake','reverse','manual_gear_shift','gear')
         control=ControlPacket(*(getattr(raw,k) for k in fields))
         if (any(type(v) not in (int,float) or not isfinite(v) for v in (control.throttle,control.steer,control.brake))
-                or not 0<=control.throttle<=.75 or not 0<=control.brake<=.3 or not -.8<=control.steer<=.8
+                or not 0<=control.throttle<=_f32(.75) or not 0<=control.brake<=_f32(.3) or not -_f32(.8)<=control.steer<=_f32(.8)
                 or any(type(v) is not bool for v in (control.hand_brake,control.reverse,control.manual_gear_shift))
                 or control.hand_brake or control.reverse or control.manual_gear_shift
                 or type(control.gear) is not int or control.gear<0):
