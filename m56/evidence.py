@@ -584,6 +584,31 @@ def _target_integrity(evidence,fixture):
     return tuple(dict.fromkeys(invalid)),tuple(dict.fromkeys(uncertain))
 
 
+def _initial_state_matches(actor,pose):
+    """First observation vs the frozen spawn pose (M56 v2 errata E3/E5, objective-error exception, 2026-10-23).
+
+    OLD RULE (kept verbatim in initial_state_old_rule): actor.velocity==(0,0,0) and actor.pose==pose exactly. A spawned
+    CARLA vehicle is only observable after one physics step, by which time it has settled 1-2 mm with a few mm/s
+    (native g4 probe 2026-10-23), so the old rule can never hold natively. NEW RULE: x/y/yaw equal the float32
+    image of the frozen pose within 1e-4; 0 <= z_frozen - z_observed <= 0.02 m (measured spawn clearance);
+    |pitch|,|roll| <= 0.1 deg; speed <= 0.10 m/s (the spec's settle/stop threshold)."""
+    from .response import _f32
+    from .metrics import _speed
+    a=actor.pose;yaw=(a.yaw-_f32(pose.yaw)+180)%360-180;speed=_speed(actor.velocity)
+    return (abs(a.x-_f32(pose.x))<=1e-4 and abs(a.y-_f32(pose.y))<=1e-4 and abs(yaw)<=1e-4
+            and 0<=pose.z-a.z<=.02 and abs(a.pitch)<=.1 and abs(a.roll)<=.1
+            and speed is not None and speed<=Fraction(1,10))
+
+
+def initial_state_old_rule(evidence,fixture):
+    """Report-only: roles whose first observation fails the OLD exact rule (both rules are reported)."""
+    boundary=_pre_observation(evidence)
+    if boundary is None:
+        return None
+    return tuple(a.role for a in boundary.actors
+                 if a.velocity!=(0.,0.,0.) or a.pose!=fixture.poses.get(a.role))
+
+
 def _initialization_integrity(evidence,fixture):
     """Recorded spawn/settle/readiness contracts, not a native spawn implementation."""
     source=_bound_json(evidence,'initialization_ref')
@@ -624,8 +649,8 @@ def _initialization_integrity(evidence,fixture):
         if set(initial)!=set(declared) or set(initial)!={'EGO','NPC'}:
             raise ValueError('spawn registry')
         for role,a in initial.items():
-            if (declared[role].initial_speed_mps!=0 or a.velocity!=(0.,0.,0.)
-                    or a.pose!=fixture.poses[role] or declared[role].pose!=fixture.poses[role]
+            if (declared[role].initial_speed_mps!=0 or not _initial_state_matches(a,fixture.poses[role])
+                    or declared[role].pose!=fixture.poses[role]
                     or a.body.blueprint!=declared[role].blueprint or a.route_valid is not True):
                 raise ValueError('actual initial state')
         gi,gu=_ground_integrity(replace(evidence,raw=(boundary,)),fixture)

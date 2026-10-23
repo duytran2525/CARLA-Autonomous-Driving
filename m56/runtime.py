@@ -272,6 +272,11 @@ def spawn_owned(context, fixture):
             reasons.append(f'SPAWN_ERROR:{recipe.role}')
         else:
             (sensors if recipe.blueprint.startswith('sensor.') else vehicles).append(resp.actor_id)
+    instrument = getattr(context.backend, 'instrument', None)
+    if instrument is not None and not reasons:
+        # Runner-owned collision instrumentation (v2 erratum E1): one sensor per scene vehicle, never a scene actor.
+        sensors.extend(instrument({r.role: x.actor_id for r, x in zip(fixture.actors, responses)
+                                   if not r.blueprint.startswith('sensor.')}))
     registry = OwnedRegistry(live.boot, live.world, tuple(vehicles), tuple(sensors), tuple(responses))
     _record_registry(context, registry)
     if reasons:  # no movement, no respawn, no fallback actor
@@ -350,7 +355,10 @@ class _NativeStock:
     def set_global_plan(self, plan, stop_waypoint_creation, clean_queue):
         import carla
         from agents.navigation.local_planner import RoadOption
-        route = [(self.map.get_waypoint(carla.Location(float(p['x']), float(p['y']), float(p['z']))), RoadOption.LANEFOLLOW)
+        # A point that names its lane (road/lane/s) becomes exactly that lane's waypoint: inside a junction the nearest
+        # waypoint to a location can belong to an overlapping connector of another movement (M56 v2, 2026-10-23).
+        route = [(self.map.get_waypoint_xodr(int(p['road']), int(p['lane']), float(p['s'])) if 'road' in p else
+                  self.map.get_waypoint(carla.Location(float(p['x']), float(p['y']), float(p['z']))), RoadOption.LANEFOLLOW)
                  for p in plan]
         self.planner.set_global_plan(route, stop_waypoint_creation=stop_waypoint_creation, clean_queue=clean_queue)
 
@@ -392,13 +400,19 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         self.settings = {'synchronous_mode': True, 'fixed_delta_seconds': Fraction(1, 20),
                          'max_substep_delta_time': Fraction(1, 100), 'max_substeps': 10}
 
-    def bind(self, fixture, policy_for, geometry_review=None):
+    def bind(self, fixture, policy_for, geometry_review=None, kit=None):
         """policy_for(response, actor) -> the reviewed PolicyBundle whose stock binding names that response and actor.
         geometry_review(packet) -> ReviewRecord for a per-frame CONTINUOUS_GEOMETRY proof, or None: no proof is emitted
-        (the consumer then stays UNKNOWN). The adapter never reviews anything itself."""
+        (the consumer then stays UNKNOWN). The adapter never reviews anything itself.
+        kit (G4, optional): external producer/reviewer. kit.frame(backend, frame_id, simtime, actors) -> (actors,
+        integrity additions) before the observation is written; kit.initialization_recipe/finish at seal. With a kit
+        the backend also owns one collision sensor per vehicle and an ack fence (v2 erratum E1)."""
         from m56 import response as response_module
         self.fixture, self.policy_for, self.drivers, self.applied, self.roles, self.bodies = fixture, policy_for, {}, {}, {}, {}
         self.geometry_review, self.previous_actors = geometry_review, None
+        if kit is not None:
+            self.seal_kit, self.instrument, self.fence = kit, self._instrument, self._fence
+            self.sensor_parents, self.collisions, self.lifecycle, self.fences = {}, [], {}, {}
         response_module._stock_factory = lambda actor, config: _NativeStock(actor, config, self.world)
         self.plan_refs = {role: self._raw(f'native/plan-{role}.json', route) for role, route in fixture.routes.items()}
         return self
@@ -452,9 +466,46 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         self.callbacks = {**getattr(self, 'callbacks', {}), sensor_id: callback}
         if getattr(self, 'pending', None) is None:
             self.pending = collections.deque()  # append/popleft are thread-safe
-        sensor.listen(lambda event: self.pending.append((sensor_id, {'sensor_id': sensor_id, 'frame': event.frame,
-                                                                     'time': event.timestamp, 'repr': repr(event)})))
+        def queue(event):  # CARLA thread: copy plain values only
+            packet = {'sensor_id': sensor_id, 'frame': event.frame, 'time': event.timestamp, 'repr': repr(event)}
+            other = getattr(event, 'other_actor', None)
+            if other is not None:  # collision event: the consumer's row schema, completed on the runner thread
+                i = event.normal_impulse
+                packet['collision'] = {'actor_id': event.actor.id, 'other_actor_id': other.id,
+                                       'normal_impulse': (i.x, i.y, i.z)}
+            self.pending.append((sensor_id, packet))
+        sensor.listen(queue)
+        if hasattr(self, 'lifecycle'):
+            self.lifecycle[sensor_id] = {'sensor_id': sensor_id, 'actor_id': self.sensor_parents.get(sensor_id),
+                                         'listen_frame': self.world.get_snapshot().frame, 'stop_frame': None, 'errors': []}
         return OperationResponse(sensor_id, None, None, self._raw('native/listen.jsonl', {'sensor_id': sensor_id}))
+
+    def _instrument(self, vehicles):
+        """One sensor.other.collision per scene vehicle (runner instrumentation, not a scene actor)."""
+        import carla
+        bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        roles = tuple(vehicles)
+        results = self.client.apply_batch_sync([carla.command.SpawnActor(bp, carla.Transform(), vehicles[r]) for r in roles], False)
+        out = []
+        for role, r in zip(roles, results):
+            if r.error or not r.actor_id:
+                raise RuntimeError(f'COLLISION_SENSOR_SPAWN_FAILED:{role}:{r.error}')
+            self.owned.add(r.actor_id); self.sensor_parents[r.actor_id] = vehicles[role]; out.append(r.actor_id)
+            self._raw('native/spawn.jsonl', {'role': role + '_COLLISION', 'blueprint': 'sensor.other.collision',
+                                             'actor_id': r.actor_id, 'parent': vehicles[role], 'error': None})
+        return tuple(out)
+
+    def _fence(self, last_frame):
+        """recorded-ack-fence-v1: request = one owned tick after the last frame; acknowledged when world.tick returns
+        exactly that frame and the callback queue is drained; remaining = packets still pending afterwards."""
+        request = self.world.tick(10.)
+        self._drain()
+        remaining = len(getattr(self, 'pending', ()) or ())
+        for sensor_id, life in self.lifecycle.items():
+            life['stop_frame'] = request
+            self.fences[sensor_id] = {'sensor_id': sensor_id, 'request_id': str(last_frame + 1),
+                                      'acknowledged_request_id': str(request), 'first_frame': life['listen_frame'],
+                                      'last_frame': request, 'remaining': remaining}
 
     def _materialize(self, c):
         """Stock intent (control None) -> the reviewed stock driver's control; explicit controls pass unchanged."""
@@ -501,11 +552,19 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         pending = getattr(self, 'pending', None)
         while pending:
             sensor_id, packet = pending.popleft()
+            hit = packet.pop('collision', None)
+            if hit is not None and hasattr(self, 'collisions') and getattr(self, 'clock_origin', None) is not None:
+                start_frame, start_time = self.clock_origin  # same owned clock as the frames (x 1/20 from origin)
+                self.collisions.append({'boot': self.ownership.boot, 'world': str(self.world.id), 'sensor_id': sensor_id,
+                                        'frame': packet['frame'],
+                                        'time': start_time + (packet['frame'] - start_frame) * Fraction(1, 20),
+                                        **hit})
             self.callbacks[sensor_id](packet)
 
     def tick(self, timeout_s):
         frame_id = self.world.tick(timeout_s)
         snap = self.world.get_snapshot()
+        self._clock(frame_id, snap)  # fixes the owned clock origin before any packet of this tick is timed
         self._drain()
         actors = self.world.get_actors()
         if hasattr(self, 'fixture'):
@@ -545,6 +604,10 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
             integrity['npc_controls'] = {**packet, 'witness_refs': (self._raw('native/npc_controls.json', packet,
                                                                                 frame_id, simtime),)}
         frames = self._actor_frames(actors)
+        kit = getattr(self, 'seal_kit', None)
+        if kit is not None:  # per-frame ground proofs / metric context, attached before the observation is written
+            frames, added = kit.frame(self, frame_id, simtime, frames)
+            integrity.update(added)
         # The consumer requires each frame ref to hold exactly the observation it evaluates (native 2026-10-22).
         observation = self._raw('native/observation.json', {'boot': self.ownership.boot, 'world': str(self.world.id),
                                 'frame': frame_id, 'simtime': simtime, 'actors': frames}, frame_id, simtime)
@@ -814,6 +877,9 @@ def run_episode(context, fixture, action_id):
             break
         if f.simtime - ready.simtime >= VALIDATION_S or f.simtime - boundary.simtime >= TOTAL_S:
             break
+    fence = getattr(context.backend, 'fence', None)
+    if fence is not None and frames:  # delivery ack fence: one owned tick after the last frame, queue drained
+        fence(frames[-1].frame)
     cleanup = cleanup_owned(context, registry)
     wall_interval = (Fraction(0), Fraction(round(time.monotonic() - t0)))
     if ready is None:
@@ -844,6 +910,8 @@ def _seal(context, fixture, frames, boundary, settled, ready, registry, phase_pa
     from m56.metrics import evaluate_episode
     from m56.model import EpisodeEvidence
     store, meta = context.store, fixture.environment['readiness']
+    kit = getattr(context.backend, 'seal_kit', None)  # external reviewer/producer (G4), never the runner itself
+    parents = getattr(context.backend, 'sensor_parents', None) or {}
     append_record(store, 'fixture.json', fixture)
     append_record(store, 'trajectory.json', tuple(frames))
     streams = {'pre_observation_ref': boundary,
@@ -855,20 +923,27 @@ def _seal(context, fixture, frames, boundary, settled, ready, registry, phase_pa
                'initialization_ref': {'method': 'recorded-initialization-v1', 'fixture_hash': _digest(fixture),
                                       'boundary_hash': _digest(boundary), 'settled_frame': settled.frame,
                                       'ready_frame': ready.frame, 'targets_mps': meta['targets_mps'],
-                                      'ready_markers_m': meta['markers_m'], 'recipe_ref': None,
+                                      'ready_markers_m': meta['markers_m'],
+                                      'recipe_ref': kit.initialization_recipe(store) if kit is not None else None,
                                       'settings': boundary.integrity.get('settings')},
                'sensor_registry_ref': {'boot': registry.boot, 'world': registry.world,
-                                       'sensors': {str(i): i for i in registry.owned_sensor_ids}},
-               'collision_ref': []}
+                                       'sensors': {str(i): parents.get(i, i) for i in registry.owned_sensor_ids}},
+               'collision_ref': list(getattr(context.backend, 'collisions', ()))}
     pointers = {'trajectory_ref': _ref(store, 'trajectory.json')}
     for key, value in streams.items():
         append_record(store, f'{key}.json', value)
         pointers[key] = _ref(store, f'{key}.json')
+    extra = ()
+    if kit is not None:  # reviews/proofs over the written streams; bound to their exact bytes before the seal
+        added, extra = kit.finish(store, fixture, tuple(frames), boundary, pointers, context)
+        for key, value in added.items():
+            append_record(store, f'{key}.json', value)
+            pointers[key] = _ref(store, f'{key}.json')
     append_record(store, 'runner/stop.json', {'reasons': list(reasons), 'cleanup': cleanup.status,
                                               'cleanup_survivors': list(cleanup.survivors), 'phase': phase_packet})
     # Observation packets only (integrity + per-actor ground proofs); body/route metadata belongs to the fixture.
-    raw = tuple(dict.fromkeys(r for f in (boundary, *frames)
-                              for r in _observed_refs((f.integrity, tuple(a.ground for a in f.actors)))))
+    raw = tuple(dict.fromkeys((*(r for f in (boundary, *frames)
+                                 for r in _observed_refs((f.integrity, tuple(a.ground for a in f.actors)))), *extra)))
     snapshot = snapshot_sources(store, raw)
     if snapshot.status != 'INTEGRITY_VALID':
         reasons = [*reasons, 'SOURCE_SNAPSHOT_FAILED', *snapshot.reasons]
