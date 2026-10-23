@@ -120,7 +120,9 @@ def main(outdir, *prep_dirs):
             report.append({'id': c.id, **{k: v for k, v in status.items() if k != 'prepare_json'}}); continue
         vN = c.parameters['vN'].values[0]
         markers = {k: plain(v) for k, v in p['markers'].items()}
-        readiness = {'targets_mps': {'EGO': cr.SPEEDS[c.category][0], 'NPC': vN}, 'markers_m': markers}
+        # E6 (erratum 3): readiness targets = the measured stock plateaus from probe 2 (v2.0 wrongly used the nominal
+        # speeds here; Duy 2026-10-24 allowed exactly one run of the corrected v2.1 fixtures)
+        readiness = {'targets_mps': {k: plain(v) for k, v in p['targets'].items()}, 'markers_m': markers}
         actors = tuple(replace(a, destination=F(p['destinations'][a.role]),
                                route_recipe={**a.route_recipe, **({'v2_start': 'probe-1 route cut at station '
                                                                     f"{plain(p['npc_start_station_probe1'])!r} (phasing rule, prereg 3)"}
@@ -128,9 +130,11 @@ def main(outdir, *prep_dirs):
                                              'v2_routes_sha256': p['routes_v2_sha256']})
                        for a in c.actors)
         status = {'status': 'PREPARED', **pref}
-        done[i] = replace(c, actors=actors, environment={**c.environment, 'readiness': readiness, 'runtime_recipe_v2': status})
+        phase = {'phase_predicate': p['phase_predicate']} if p.get('phase_predicate') else {}  # signal-phase v1 S5
+        done[i] = replace(c, actors=actors, environment={**c.environment, 'readiness': readiness, 'runtime_recipe_v2': status,
+                                                         **phase})
         report.append({'id': c.id, 'status': 'PREPARED', 'markers': {k: str(v) for k, v in markers.items()}})
-    revision = CandidateRevision('retained-23+fill20-v1-minus-F02-F03+recipes+runtime-recipe-v2', tuple(done), 'x' * 64, None)
+    revision = CandidateRevision('retained-23+fill20-v1-minus-F02-F03+recipes+runtime-recipe-v2.1', tuple(done), 'x' * 64, None)
     # identity ledger exactly as v1 (touching-cross-section-v1)
     ev = (cr.st.ref(EV1, 'IDENTITY_EVIDENCE'), cr.st.ref(EV2, 'IDENTITY_EVIDENCE')); dref = b['decision_ref']
     rules = {'id': 'touching-cross-section-v1', 'rule': 'same physical place iff modelled XODR cross-sections touch/overlap',
@@ -154,7 +158,7 @@ def main(outdir, *prep_dirs):
     addendum = cr.st.ref(WORK / 'docs/m56/SPEC_ADDENDUM_C0_PARTIAL_20261022.md', 'SPEC_ADDENDUM')
     receipt = out / 'duy-v2-receipt.json'
     receipt.write_text(json.dumps({'source': '[chat] 2026-10-23, user self-stated as Duy',
-                                   'quote': 'Approve v2 (Recommended)', 'question': 'runtime-recipe v2 version after C0, '
+                                   'quote': 'Approve v2 (Recommended)', 'v2.1': '[chat] 2026-10-24 Duy: Cho chạy v2.1 (Recommended): fix E6 targets, run C01/C02 A/B exactly once', 'question': 'runtime-recipe v2 version after C0, '
                                    'pre-registered before any CARLA run, Claude phasing rule disclosed',
                                    'prereg_sha256': prereg_sha, 'revision_id': revision.revision_id}, indent=1), encoding='utf-8')
     rref = cr.st.ref(receipt, 'OPERATOR_RECEIPT')

@@ -105,7 +105,8 @@ def main():
 
 
 def run_scene(c, client, proc, start, world, m, identity):
-    v2 = c.environment['runtime_recipe_v2']
+    v2 = dict(c.environment['runtime_recipe_v2'])
+    v2['prepare_json'] = str(WORK / v2['prepare_json']) if not Path(v2['prepare_json']).is_absolute() else v2['prepare_json']
     raw_prep = json.loads(Path(v2['prepare_json']).read_text(encoding='utf-8'))
     prep = {k: (v if k == 'poses' else plain(v)) for k, v in raw_prep.items()}
     rows_all = plain(json.loads(Path(prep['routes_v2']).read_text(encoding='utf-8')))

@@ -28,6 +28,7 @@ from m56.metrics import _metric_station, _speed
 from m56.model import (ActorRecipe, ApprovalBundle, CompiledFixture, Domain, FrozenMetricPair, RuntimeContext, Section,
                        SourceRef, Transform6, encode_record)
 from m56.response import _f32
+from native_v2_kit import PhaseObserver
 
 TOWN = sys.argv[1]
 root = WORK / f'outputs/m56_v2_prepare_{TOWN}_{now()}'
@@ -69,7 +70,7 @@ def steady_time(frames, role, target, span=1.0, tol=.05):
     return None
 
 
-def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label):
+def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label, predicate=None):
     own = ownership(proc, start, world)
     store = open_run(root / scene / label, f'{scene}-{label}', own.writer)
     actors = tuple(ActorRecipe(r, 'vehicle.audi.a2', F(0), poses[r], {'probe': label}, {'probe': label},
@@ -78,7 +79,8 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
     pair = FrozenMetricPair(('probe', 'probe2'), ('m', 'm'), ('none', 'none'), (('X', 'Y'), ('X', 'Y')), 'probe', '0' * 64, 'PROBE')
     fixture = CompiledFixture(_digest({'probe': scene, 'label': label}), 'f' * 64, actors,
                               {'readiness': {'targets_mps': {'EGO': F(10 ** 3), 'NPC': F(10 ** 3)},
-                                             'markers_m': {'EGO': F(-10 ** 6), 'NPC': F(-10 ** 6)}}},
+                                             'markers_m': {'EGO': F(-10 ** 6), 'NPC': F(-10 ** 6)}},
+                               **({'phase_predicate': predicate} if predicate else {})},
                               poses, routes, Domain(far, far, far, far, (), {}, (), '0' * 64), None, {}, responses, pair,
                               (), authority)
     admission = runtime.admit(fixture, approvals, identity, own)
@@ -89,8 +91,13 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
     source = write_ref(root / scene / f'{label}-plan-source.json', {'rows': {k: len(v[0]) for k, v in rows.items()},
                                                                     'rule': 'route lane waypoints every 2 m'}, 'G4_STOCK_SOURCE')
     backend.bind(fixture, policy_maker(fixture, rows, review, source))
+    if predicate:
+        backend.seal_kit = PhaseObserver(predicate['light'])  # observe-only phase packets, no instrumentation
     ev = runtime.run_episode(replace(ctx, backend=backend), fixture, 'A')
-    log(event='PROBE', scene=scene, label=label, frames=len(ev.raw), reasons=list(ev.verdict.reasons) if ev.verdict else None)
+    holds = sum(1 for f in ev.raw for a in f.actors if a.role == 'NPC' and a.commands
+                and a.commands[0].cause == 'NPC_TRAFFIC_HOLD')
+    log(event='PROBE', scene=scene, label=label, frames=len(ev.raw), npc_hold_frames=holds, predicate=predicate,
+        reasons=list(ev.verdict.reasons) if ev.verdict else None)
     return ev.raw
 
 
@@ -183,10 +190,23 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         poses[role], grounds[role] = pose_at(routes[role])
     ego_responses = tuple(r for r in c.responses if r.actor_role == 'EGO')
     responses = (next(r for r in ego_responses if r.action_id == 'A'), npc_response(c.category, vN, routes['NPC']))
-    p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1')
+    signal = {role: find_light(world, m, rows[role], exit_idx[role], routes[role], {'NPC': n_entry, 'EGO': e_entry}[role])
+              for role in ('NPC', 'EGO')}
+    sig = signal['NPC']
+    cycle = observe_cycle(world, sig['actor']) if sig else None
+    for role in signal:
+        if signal[role]:
+            signal[role] = {k: v for k, v in signal[role].items() if k != 'actor'}
+    if cycle is not None and cycle.get('reason'):
+        finish(c, {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': cycle['reason'], 'signal': signal, 'cycle': cycle})
+        return
+    pred1 = dict(cycle['green_first_packet']) if sig else None
+    p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'G': G, 'vE': vE, 'vN': vN, 'LrefN': LrefN,
            'e_entry': e_entry, 'n_entry_probe1': n_entry, 'region': region, 'overlap_connected': connected,
-           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6)'}
+           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1',
+           'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
+           'phase_predicate_probe1': pred1}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)
@@ -204,7 +224,10 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     sn = [(float(f.simtime), next(x for x in f.actors if x.role == 'NPC')) for f in p1]
     origin0 = float(_metric_station((sn[0][1].pose.x, sn[0][1].pose.y, sn[0][1].pose.z), routes['NPC']))
     front_off = front_station(sn[0][1], routes['NPC']) - origin0
-    dN = [(t - release, float(_metric_station((x.pose.x, x.pose.y, x.pose.z), routes['NPC'])) - origin0) for t, x in sn]
+    first_hold = next((i for i, (t, x) in enumerate(sn) if x.commands and x.commands[0].cause == 'NPC_TRAFFIC_HOLD'), len(sn))
+    dN = [(t - release, float(_metric_station((x.pose.x, x.pose.y, x.pose.z), routes['NPC'])) - origin0)
+          for t, x in sn[:first_hold]]
+    out['npc_first_hold_probe1_s'] = None if first_hold == len(sn) else sn[first_hold][0] - release
     npc_steady = steady_at(p1, 'NPC', vNp)
     out.update(t_E=t_E, t_N=t_N, release=release, npc_steady_s=None if npc_steady is None else npc_steady - release,
                front_offset_npc=front_off)
@@ -219,6 +242,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     if s0 < 0:
         out.update(status='BLOCKED_FIXTURE', reason='PHASING_ROOM')
         return finish(c, out)
+    routes_probe1_npc = routes['NPC']
     r, arc_n = rows['NPC']
     k = next(i for i, x in enumerate(arc_n) if float(x) >= s0)
     rows['NPC'] = (r[k:], [x - arc_n[k] for x in arc_n[k:]]); exit_idx['NPC'] -= k
@@ -228,7 +252,47 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         routes[role] = directed(r_, a_, identity.map, c.town, notation[role], cont2, a_[exit_idx[role]] + 5)
     poses['NPC'], grounds['NPC'] = pose_at(routes['NPC'])
     responses = (responses[0], npc_response(c.category, vN, routes['NPC']))
-    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2')
+    pred2 = None
+    if sig and sig.get('stop_station') is None:
+        out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_STOP_UNMAPPED')
+        return finish(c, out)
+    if sig:  # signal-phase v1 S4: anchor so L_N turns green 2 s before the NPC front reaches s_stop - 5 m
+        rel = .05 + float(RELEASE)  # predicate tick -> boundary (+1 tick) -> program release
+        s_stop = sig['stop_station'] - float(arc_n[k])
+        rear_off = origin0 - min_station(sn[0][1], routes_probe1_npc)
+        def t_at(d):
+            if d <= 0:
+                return rel
+            for (t0_, d0), (t1, d1) in zip(dN, dN[1:]):
+                if d0 <= d <= d1:
+                    return rel + t0_ + (t1 - t0_) * (d - d0) / (d1 - d0 or 1e-9)
+            return rel + dN[-1][0] + (d - dN[-1][1]) / vNp
+        t_in, t_out = t_at(s_stop - 5 - front_off), t_at(s_stop + 5 + rear_off)
+        kk = round(20 * (t_in - 2))
+        seq = cycle['sequence']; g0 = cycle['green_start_index']; C = len(seq)
+        if kk <= 0 and -kk >= cycle['N_G']:
+            out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, status='BLOCKED_FIXTURE',
+                       reason='SIGNAL_TIMING_INFEASIBLE')
+            return finish(c, out)
+        pred2 = dict(seq[(g0 - kk) % C])
+        if sum(1 for x in seq if x == pred2) != 1:
+            out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, phase_predicate=pred2,
+                       status='BLOCKED_FIXTURE', reason='SIGNAL_ANCHOR_AMBIGUOUS')
+            return finish(c, out)
+        green_end = (t_in - 2) + (cycle['N_G'] + cycle['N_Y']) / 20
+        out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, phase_predicate=pred2, green_window_end=green_end)
+        if t_out > green_end - 1:
+            out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_TIMING_INFEASIBLE')
+            return finish(c, out)
+    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2', pred2)
+    holds2 = sum(1 for f in p2 for a in f.actors if a.role == 'NPC' and a.commands and a.commands[0].cause == 'NPC_TRAFFIC_HOLD')
+    out['npc_hold_frames_probe2'] = holds2
+    if sig and not p2:
+        out.update(status='BLOCKED_FIXTURE', reason='BLOCKED_SIGNAL_ADMISSION_OR_NO_FRAMES')
+        return finish(c, out)
+    if holds2:
+        out.update(status='BLOCKED_FIXTURE', reason='NPC_SIGNAL_HOLD_IN_PROBE2')
+        return finish(c, out)
     plat2 = plateaus(p2, routes, body, e_entry, G) if p2 else {'reason': 'PROBE2_NO_FRAMES'}
     out['probe2'] = plat2
     if plat2.get('reason'):
@@ -246,8 +310,74 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
                ego_front_gap_at_ready=front_gap, npc_route_cut_index=k, routes_v2=str(cont2.uri),
                routes_v2_sha256=cont2.sha256, poses={k_: encode_record(v) for k_, v in poses.items()},
                destinations={k_: str(v.destination) for k_, v in routes.items()})
+    out['phase_predicate'] = pred2
     out['status'], out['reason'] = ('BLOCKED_FIXTURE', 'RUNIN_ROOM') if front_gap <= float(G) + 1 else ('PREPARED', None)
     return finish(c, out)
+
+
+def min_station(actor, route):
+    st = [project_route(p, route) for p in world_vertices(actor.body, actor.pose)]
+    return min(float(x) for x in st if not hasattr(x, 'reasons'))
+
+
+def find_light(world, m, rows_arc, exit_index, route, entry_station):
+    """Signal-phase v1 S1 (erratum 1, 59744b3): among the lights World.get_traffic_lights_from_waypoint returns along
+    the role's lane up to the junction exit, the one with a stop waypoint <= 1.0 m laterally from the route and the
+    largest stop station <= the conflict entry station. None = no light for this lane at the conflict junction."""
+    rows, arc = rows_arc
+    r0 = rows[0]
+    wp = m.get_waypoint_xodr(int(r0['road']), int(r0['lane']), float(r0['s']))
+    best = None
+    for light in world.get_traffic_lights_from_waypoint(wp, float(arc[exit_index]) + 1.):
+        for sw in light.get_stop_waypoints():
+            loc = sw.transform.location
+            st = project_route((loc.x, loc.y, loc.z), route)
+            if hasattr(st, 'reasons'):
+                continue
+            i = min(range(len(route.arc)), key=lambda j: abs(float(route.arc[j]) - float(st)))
+            lat = math.dist((loc.x, loc.y), (route.transforms[i].x, route.transforms[i].y))
+            if lat <= 1.0 and float(st) <= entry_station and (best is None or float(st) > best[1]):
+                best = (light, float(st), lat, sw.road_id, sw.lane_id)
+    if best is None:
+        return None
+    light, st, lat, road, lane = best
+    return {'actor': light, 'odr': str(light.get_opendrive_id()), 'actor_id': light.id, 'stop_station': st,
+            'stop_lateral_m': lat, 'stop_lane': [road, lane],
+            'times_s': [light.get_green_time(), light.get_yellow_time(), light.get_red_time()]}
+
+
+_cycles = {}
+
+
+def observe_cycle(world, light, seconds=120):
+    """Signal-phase v1 S2: observe-only, synchronous ticks without actors; run lengths per state; one full cycle
+    sequence of (state, tick_in_state) starting at the first tick of a Green run."""
+    key = str(light.get_opendrive_id())
+    if key in _cycles:
+        return _cycles[key]
+    settings = world.get_settings(); settings.synchronous_mode, settings.fixed_delta_seconds = True, .05
+    world.apply_settings(settings)
+    seq = []
+    for _ in range(int(seconds * 20)):
+        world.tick()
+        seq.append(PhaseObserver.packet_of(light))
+    me = str(light.get_opendrive_id())
+    states = [next(g[1] for g in x['group'] if g[0] == me) for x in seq]
+    starts = [i for i in range(1, len(seq)) if states[i] != states[i - 1]]
+    runs = {}
+    for a, b in zip(starts, starts[1:]):
+        runs.setdefault(states[a], set()).add(b - a)
+    out = {'runs': {k: sorted(v) for k, v in runs.items()}}
+    greens = [i for i in starts if states[i] == 'Green']
+    nxt = [i for i in greens if any(j > i for j in greens)]
+    if any(len(v) != 1 for v in runs.values()) or not {'Green', 'Yellow', 'Red'} <= set(runs) or not nxt:
+        out['reason'] = 'SIGNAL_CYCLE_UNSTABLE'
+    else:
+        g = nxt[0]; g2 = min(j for j in greens if j > g)
+        out.update(N_G=runs['Green'].pop() if False else min(runs['Green']), N_Y=min(runs['Yellow']), N_R=min(runs['Red']),
+                   sequence=seq[g:g2], green_start_index=0, green_first_packet=seq[g], cycle_ticks=g2 - g)
+    _cycles[key] = out
+    return out
 
 
 def plateaus(frames, routes, body, e_entry, G):

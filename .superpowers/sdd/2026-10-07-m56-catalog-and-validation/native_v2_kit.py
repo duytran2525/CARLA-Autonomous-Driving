@@ -88,7 +88,12 @@ class Kit:
         pair = self.fixture.pair
         context = {'pair_hash': pair.hash, 'reference': pair.reference, 'directed_route': self.fixture.routes['EGO'],
                    'uncertainty': {n: UNC for n in pair.names}}
-        return tuple(out), {'metric_context': context}
+        added = {'metric_context': context}
+        predicate = self.fixture.environment.get('phase_predicate')
+        if predicate is not None:  # signal-phase v1 S3: the same observe-only packet as in preparation
+            self.phase = getattr(self, 'phase', None) or PhaseObserver(predicate['light'])
+            added.update(self.phase.frame(backend, frame_id, simtime, ())[1])
+        return tuple(out), added
 
     # -- seal ------------------------------------------------------------------------------------------------
     def initialization_recipe(self, store):
@@ -137,29 +142,33 @@ class Kit:
                                             'recipe_ref': dref, 'recipe_review': dreview, 'lifecycle_ref': lref,
                                             'fence_ref': fref}, (dref,), (why,))
         extra += [dref, lref, fref]
-        # CONTINUOUS_CONTACT + CONTINUOUS_MOTION
+        # CONTINUOUS_CONTACT + CONTINUOUS_MOTION. Recipe source_refs must be JSON sources (consumer _source_json):
+        # a JSON receipt names the drivable-union WKT by hash (A/B 2026-10-24 found the bare .wkt ref rejected).
+        dsrc = self._write(store, 'drivable-source', {'method': 'carla-generate-waypoints-0.5m-lane-quads-union',
+                                                      'wkt': self.drivable_ref})
+        extra.append(dsrc)
         contact_rows, motion_rows = [], []
         for a, b in zip(frames, frames[1:]):
             contact_rows.append(self._contact(a, b))
             motion_rows.append(self._motion(a, b))
         cr = self._write(store, 'contact-intervals', contact_rows)
         crecipe = {'method': 'bounded-contact-interval-v1', 'version': '1',
-                   'quantities': ('body_separation', 'road_edge', 'ground_contact'), 'source_refs': (self.drivable_ref,)}
+                   'quantities': ('body_separation', 'road_edge', 'ground_contact'), 'source_refs': (dsrc,)}
         crr = self._write(store, 'contact-recipe', crecipe)
         added['contact_ref'] = self.proof('CONTINUOUS_CONTACT', 'bounded-contact-interval-v1', (cr,), UNC,
                                           {'fixture_hash': self.fixture_hash, 'trajectory_hash': trajectory_hash,
                                            'recipe_ref': crr, 'recipe_review': self.review(crecipe, 'CONTACT_RECIPE',
-                                                                                           (crr, self.drivable_ref), (why,)),
+                                                                                           (crr, dsrc, self.drivable_ref), (why,)),
                                            'intervals_ref': cr}, (crr,), (why,))
         mr = self._write(store, 'motion-intervals', motion_rows)
         mrecipe = {'method': 'bounded-motion-envelope-v1', 'version': '1',
                    'quantities': ('continuous_body_enclosure', 'reference_lateral_acceleration'),
-                   'source_refs': (self.drivable_ref,)}
+                   'source_refs': (dsrc,)}
         mrr = self._write(store, 'motion-recipe', mrecipe)
         added['motion_ref'] = self.proof('CONTINUOUS_MOTION', 'bounded-motion-envelope-v1', (mr,), UNC,
                                          {'fixture_hash': self.fixture_hash, 'trajectory_hash': trajectory_hash,
                                           'recipe_ref': mrr, 'recipe_review': self.review(mrecipe, 'MOTION_RECIPE',
-                                                                                          (mrr, self.drivable_ref), (why,)),
+                                                                                          (mrr, dsrc, self.drivable_ref), (why,)),
                                           'intervals_ref': mr}, (mrr,), (why,))
         extra += [cr, crr, mr, mrr]
         return added, tuple(dict.fromkeys(extra))
@@ -211,7 +220,7 @@ class Kit:
     def kappa(self, role, actor, window=10.):
         """Max |curvature| of the frozen reference route within +-window m of the actor's station."""
         route = self.fixture.routes[role]
-        s = float(actor.station) if actor.station is not None else 0.
+        s = float(actor.arc) if actor.arc is not None else 0.
         t, arc = route.transforms, [float(x) for x in route.arc]
         k = 0.
         for i in range(1, len(t) - 1):
@@ -224,3 +233,30 @@ class Kit:
 def decode_ref(packet):
     from m56.model import decode_record
     return decode_record('SourceRef', packet)
+
+
+class PhaseObserver:
+    """Signal-phase v1 (prereg b4b6a22) S3: per tick, observe-only packet {light, state, tick_in_state} of the light
+    whose OpenDRIVE id is `light`; tick_in_state = round(20 * get_elapsed_time()). Raw-retained. Never mutates."""
+
+    def __init__(self, light_odr):
+        self.light_odr, self.actor = str(light_odr), None
+
+    @staticmethod
+    def packet_of(light):
+        """Signal-phase v1 erratum 3: L_N plus the whole group's [odr, state, elapsed ticks], sorted by odr."""
+        # tuples: the decoded fixture environment carries tuples, and admission compares with ==
+        group = tuple(sorted((str(t.get_opendrive_id()), str(t.get_state()), int(round(t.get_elapsed_time() * 20)))
+                             for t in light.get_group_traffic_lights()))
+        return {'light': str(light.get_opendrive_id()), 'group': group}
+
+    def packet(self, backend):
+        if self.actor is None:
+            self.actor = next(t for t in backend.world.get_actors().filter('traffic.traffic_light')
+                              if str(t.get_opendrive_id()) == self.light_odr)
+        return self.packet_of(self.actor)
+
+    def frame(self, backend, frame_id, simtime, actors):
+        p = self.packet(backend)
+        backend._raw('g4/phase.json', {**p, 'frame': frame_id, 'simtime': simtime}, frame_id, simtime)
+        return actors, {'phase': p}
