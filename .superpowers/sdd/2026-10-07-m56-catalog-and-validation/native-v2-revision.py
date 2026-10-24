@@ -131,6 +131,8 @@ def main(outdir, *prep_dirs):
                        for a in c.actors)
         status = {'status': 'PREPARED', **pref}
         phase = {'phase_predicate': p['phase_predicate']} if p.get('phase_predicate') else {}  # signal-phase v1 S5
+        if p.get('phase_predicate') and p.get('phase_wait_limit_s') and float(plain(p['phase_wait_limit_s'])) > 60:
+            phase['phase_wait_limit_s'] = F(str(round(float(plain(p['phase_wait_limit_s'])), 3)))  # v4 P2
         responses = c.responses
         if p.get('recipe') == 'v3':  # V3.1 (ab1fb09): same targets/profile/phases, route = the fixture EGO route
             from native_v2_common import v2_routes
@@ -140,7 +142,7 @@ def main(outdir, *prep_dirs):
         done[i] = replace(c, actors=actors, responses=responses,
                           environment={**c.environment, 'readiness': readiness, 'runtime_recipe_v2': status, **phase})
         report.append({'id': c.id, 'status': 'PREPARED', 'markers': {k: str(v) for k, v in markers.items()}})
-    revision = CandidateRevision('retained-23+fill20-v1-minus-F02-F03+recipes+runtime-recipe-v3', tuple(done), 'x' * 64, None)
+    revision = CandidateRevision('retained-23+fill20-v1-minus-F02-F03+recipes+runtime-recipe-v4', tuple(done), 'x' * 64, None)
     # identity ledger exactly as v1 (touching-cross-section-v1)
     ev = (cr.st.ref(EV1, 'IDENTITY_EVIDENCE'), cr.st.ref(EV2, 'IDENTITY_EVIDENCE')); dref = b['decision_ref']
     rules = {'id': 'touching-cross-section-v1', 'rule': 'same physical place iff modelled XODR cross-sections touch/overlap',

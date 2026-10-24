@@ -171,8 +171,11 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
             pick = ([p for p in nxt if (p.road_id, p.lane_id) == (rc, lc)] or [p for p in nxt if (p.road_id, p.lane_id) == (r2, l2)]
                     or [p for p in nxt if (p.road_id, p.lane_id) == (r1, l1)]
                     or [p for p in nxt if (p.road_id, p.lane_id) == (w.road_id, w.lane_id)])
+            reached_out = any((r['road'], r['lane']) == (r2, l2) for r in rows)
+            if not pick and reached_out:  # past the outgoing road: straight-through rule (as V3.3), not a failure
+                pick = [min(nxt, key=lambda q: _yawdiff(q.transform.rotation.yaw, w.transform.rotation.yaw))]
             p = pick[0] if pick else min(nxt, key=off)
-            if (w.road_id, w.lane_id) in ((rc, lc), (r2, l2)) and (p.road_id, p.lane_id) not in ((rc, lc), (r2, l2)):
+            if ((w.road_id, w.lane_id) == (rc, lc) and (p.road_id, p.lane_id) not in ((rc, lc), (r2, l2))):
                 raise ValueError(f'ROUTE_LEFT_NOTATION:{notation}:{p.road_id}/{p.lane_id}')
             if (p.road_id, p.lane_id) == (r2, l2):
                 out += math.dist((p.transform.location.x, p.transform.location.y), (w.transform.location.x, w.transform.location.y))
@@ -181,7 +184,9 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
             if out >= outgoing or len(rows) > 20000:
                 break
         exit_index = next((i for i, r in enumerate(rows) if (r['road'], r['lane']) == (r2, l2)), None)
-        assert exit_index is not None, f'NO_OUTGOING:{notation}'
+        if exit_index is None:
+            seen = sorted({(r['road'], r['lane']) for r in rows})
+            raise AssertionError(f'NO_OUTGOING:{notation}:visited={seen[:12]}')
         return rows, exit_index, {'max_offset_from_v1_m': worst}
     else:
         back, w, d = [], end, 0.
@@ -212,7 +217,9 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
         if exit_index is not None:
             out += math.dist((p.transform.location.x, p.transform.location.y), (w.transform.location.x, w.transform.location.y))
         rows.append(_wp_row(p)); w = p
-    assert exit_index is not None, f'NO_OUTGOING:{notation}'
+    if exit_index is None:
+        seen = sorted({(r['road'], r['lane']) for r in rows})
+        raise AssertionError(f'NO_OUTGOING:{notation}:visited={seen[:12]}')
     return rows, exit_index, d
 
 

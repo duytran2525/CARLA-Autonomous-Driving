@@ -44,7 +44,8 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
     'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B',
     'approvals': ['[chat] 2026-10-24 Duy: v3 prereg ab1fb09 + signal-phase erratum 4 (7374ed7), run C01/C02 once',
                   '[chat] 2026-10-24 Duy: "cho chạy A/B C01, C02 thêm đúng một lần với hai bản sửa harness (cùng '
-                  'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)']},
+                  'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)',
+                  '[chat] 2026-10-24 Duy: v4 bundle P1 P2 P3 P5 (prereg ccea1cc), 1-week partial-native target']},
     'OPERATOR_RECEIPT')
 review = reviewer(authority)
 OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
@@ -92,7 +93,8 @@ def front(route, body, pose):
 def main():
     data = load_json(REVISION)
     scenes = [decode_record('Candidate', c) for c in data['candidates'] if c['town'] == TOWN and c['category'] in ('C', 'L')
-              and (c['environment'].get('runtime_recipe_v2') or {}).get('status') == 'PREPARED']
+              and (c['environment'].get('runtime_recipe_v2') or {}).get('status') == 'PREPARED'
+              and (len(sys.argv) < 4 or c['id'] in sys.argv[3].split(','))]
     log(event='SCENES', town=TOWN, ids=[c.id for c in scenes])
     with own_server(log) as (client, proc, start):
         world = load(client, TOWN)

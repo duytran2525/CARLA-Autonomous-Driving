@@ -203,6 +203,10 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         finish(c, {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': cycle['reason'], 'signal': signal, 'cycle': cycle})
         return
     pred1 = dict(cycle['green_first_packet']) if sig else None
+    # v4 P2: phase-predicate wait limit = max(60 s, observed cycle + 2 s), recorded; the runner reads it from the
+    # fixture environment (product change after suite 9), and preparation probes apply the same value here.
+    wait_s = max(60., cycle['cycle_ticks'] / 20 + 2.) if sig else 60.
+    runtime.PHASE_LIMIT_S = wait_s
     p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'G': G, 'vE': vE, 'vN': vN, 'LrefN': LrefN,
            'e_entry': e_entry, 'n_entry_probe1': n_entry, 'region': region, 'overlap_connected': connected,
@@ -210,13 +214,13 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
            'recipe': 'v3', 'map_hash': identity.map, 'lane_W': lane_W, 'lane_widths': lane_widths,
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
-           'phase_predicate_probe1': pred1}
+           'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)
     boundary_t = float(p1[0].simtime) - .05
     release = boundary_t + float(RELEASE)
-    plat1 = plateaus(p1, routes, body, e_entry, G)
+    plat1 = plateaus(p1, routes, body, e_entry, G, npc_until='last')
     out['probe1'] = plat1
     if plat1.get('reason'):
         out.update(status='BLOCKED_FIXTURE', reason=plat1['reason'])
@@ -389,7 +393,7 @@ def observe_cycle(world, light, seconds=120):
     return out
 
 
-def plateaus(frames, routes, body, e_entry, G):
+def plateaus(frames, routes, body, e_entry, G, npc_until='T_end'):
     """E6.1-2: T_end = first frame with EGO front within G + 1 m of e_entry; plateau = mean speed over
     [T_end - 2 s, T_end]; range > 0.10 m/s -> READINESS_NOT_STEADY."""
     t_end = None
@@ -403,12 +407,34 @@ def plateaus(frames, routes, body, e_entry, G):
     ego = next(x for x in next(f for f in frames if float(f.simtime) == t_end).actors if x.role == 'EGO')
     gap = e_entry - front_station(ego, routes['EGO'])
     out = {'T_end': t_end, 'gap_at_T_end': gap}
-    for role in ('EGO', 'NPC'):
-        v = [float(_speed(next(x for x in f.actors if x.role == role).velocity)) for f in frames
-             if t_end - 2 - 1e-9 <= float(f.simtime) <= t_end + 1e-9]
-        out[role] = sum(v) / len(v); out[role + '_range'] = max(v) - min(v)
-        if max(v) - min(v) > .10:
-            out['reason'] = 'READINESS_NOT_STEADY'
+    v = [float(_speed(next(x for x in f.actors if x.role == 'EGO').velocity)) for f in frames
+         if t_end - 2 - 1e-9 <= float(f.simtime) <= t_end + 1e-9]
+    out['EGO'] = sum(v) / len(v); out['EGO_range'] = max(v) - min(v)
+    if max(v) - min(v) > .10:
+        out['reason'] = 'READINESS_NOT_STEADY'
+    # v4 P1 (ccea1cc): the NPC plateau is the mean of the LATEST 2 s NPC window (unheld, range <= 0.10) ending no
+    # later than `npc_until` (probe 1: its last frame; probe 2: the EGO T_end); none -> READINESS_NOT_STEADY.
+    # The E6 value of the old rule (NPC over the EGO window) is kept for reporting.
+    vo = [float(_speed(next(x for x in f.actors if x.role == 'NPC').velocity)) for f in frames
+          if t_end - 2 - 1e-9 <= float(f.simtime) <= t_end + 1e-9]
+    out['NPC_old_rule'] = sum(vo) / len(vo); out['NPC_old_rule_range'] = max(vo) - min(vo)
+    until = float(frames[-1].simtime) if npc_until == 'last' else t_end
+    rows = [(float(f.simtime), next(x for x in f.actors if x.role == 'NPC')) for f in frames]
+    best = None
+    for t_hi, _ in rows:
+        if t_hi > until + 1e-9:
+            break
+        w = [(t, a) for t, a in rows if t_hi - 2 - 1e-9 <= t <= t_hi + 1e-9]
+        if rows[0][0] > t_hi - 2 + 1e-9:
+            continue
+        sp = [float(_speed(a.velocity)) for _, a in w]
+        held = any(a.commands and a.commands[0].cause == 'NPC_TRAFFIC_HOLD' for _, a in w)
+        if not held and max(sp) - min(sp) <= .10 and min(sp) > .5:
+            best = (t_hi, sum(sp) / len(sp), max(sp) - min(sp))
+    if best is None:
+        out['NPC'] = None; out['reason'] = 'READINESS_NOT_STEADY'
+    else:
+        out['NPC_window_end'], out['NPC'], out['NPC_range'] = best
     return out
 
 
