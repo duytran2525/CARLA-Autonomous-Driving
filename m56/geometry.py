@@ -510,7 +510,18 @@ def _selected_component(intersections, queries, binding):
     matches=[p for p in queries.capabilities if p.kind=='CONFLICT_COMPONENT_SELECTION']
     if len(matches)!=1 or not _proof_valid(matches[0],'CONFLICT_COMPONENT_SELECTION',binding):
         return BlockedFixture(('DISCONNECTED_CONFLICT_REVIEW_REQUIRED',))
-    ego,npc=queries.routes['EGO'],queries.routes['NPC']
+    chosen=select_conflict_component(intersections,queries.routes['EGO'],queries.routes['NPC'])
+    if isinstance(chosen,BlockedFixture):
+        return chosen
+    selected,others=chosen
+    if matches[0].limits['selected_component_hash']!=_digest(selected):
+        return BlockedFixture(('CONFLICT_COMPONENT_SELECTION_MISMATCH',))
+    return selected,others
+
+
+def select_conflict_component(intersections, ego, npc):
+    """v5 C4 selection rule alone (also used by the preparation tooling): (selected boxes, unselected boxes) or
+    BlockedFixture."""
     # ponytail: O(n*m) closest transform pair; 0.25 m sampling bounds the point error at 0.125 m.
     a,b=min(((s,t) for s in ego.transforms for t in npc.transforms),
             key=lambda st:sum((u-v)**2 for u,v in zip((st[0].x,st[0].y,st[0].z),(st[1].x,st[1].y,st[1].z))))
@@ -532,8 +543,6 @@ def _selected_component(intersections, queries, binding):
             olo,ohi=span(comp)
             if max(olo-hi,lo-ohi)<5:
                 return BlockedFixture(('CONFLICT_COMPONENTS_TOO_CLOSE',))
-    if matches[0].limits['selected_component_hash']!=_digest(selected):
-        return BlockedFixture(('CONFLICT_COMPONENT_SELECTION_MISMATCH',))
     return selected,tuple(box for comp in others for box in comp)
 
 
