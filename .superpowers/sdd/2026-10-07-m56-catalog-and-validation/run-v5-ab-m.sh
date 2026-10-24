@@ -9,7 +9,7 @@ until grep -qE 'M preparation finished|STOPPED|NOT RUN' "$S/../tasks/bzmjwr1lm.o
 export M56_CODE='D:/AI/CARLA-Funny-Moments.worktrees/m56-v5-dev'
 [ "$(git -C "$M56_CODE" log -1 --format=%h)" = 8fa9632 ] && [ -z "$(git -C "$M56_CODE" status --short)" ] || { echo "NOT RUN: code not at clean 8fa9632"; exit 2; }
 R=$O/m56_c0_partial_v5b_$(date -u +%Y%m%dT%H%M%SZ)
-PREPS=$(ls -d $O/m56_v2_prepare_Town0*_20261024T17* $O/m56_v2_prepare_Town0*_20261024T18* $O/m56_v2_prepare_Town0*_20261024T19* $O/m56_v2_prepare_Town0*_20261024T2* 2>/dev/null)
+PREPS=$(ls -d $O/m56_v2_prepare_Town0*_20261024T17* $O/m56_v2_prepare_Town0*_20261024T18* $O/m56_v2_prepare_Town0*_20261024T19* $O/m56_v2_prepare_Town0*_20261024T2* $O/m56_v2_prepare_Town0*_20261025T* 2>/dev/null)
 echo "preparations: $PREPS"
 ../../../.venv-m56-v1/Scripts/python.exe -I -X utf8 native-v5-revision.py $R $O/m56_site_identity_v5_20261024T172844Z.json \
   $O/m56_v2_prepare_Town04_20261024T025829Z $O/m56_v2_prepare_Town04_20261024T093306Z $PREPS > "$S/v5b-revision.log" 2>&1
