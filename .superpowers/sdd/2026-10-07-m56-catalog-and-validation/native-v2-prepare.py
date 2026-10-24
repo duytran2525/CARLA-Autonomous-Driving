@@ -104,7 +104,8 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
 
 def main():
     rev = candidates()
-    scenes = [c for c in rev.candidates if c.town == TOWN and c.category in ('C', 'L')
+    rev = candidates(('C', 'L', 'M'))
+    scenes = [c for c in rev.candidates if c.town == TOWN and c.category in ('C', 'L', 'M')
               and (len(sys.argv) < 3 or c.id in sys.argv[2].split(','))]
     log(event='SCENES', town=TOWN, ids=[c.id for c in scenes])
     import carla
@@ -144,7 +145,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     want = {'EGO': float(G + vE ** 2 / (2 * A_REF) + 20), 'NPC': 150.}
     rows, routes, exit_idx, approach = {}, {}, {}, {}
     v1route = next(r for r in c.responses if r.actor_role == 'EGO').route
-    guide = [(t.x, t.y) for t in v1route.transforms]
+    guide = [(t.x, t.y, t.z) for t in v1route.transforms]
     for role in ('EGO', 'NPC'):
         r, ei, got = route_rows(m, c.town, notation[role], want[role], 15. if role == 'EGO' else 15. + 60. * float(vN),
                                 guide if role == 'EGO' else None)
@@ -167,6 +168,14 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     # vertical extent widened by 1 m both ways so the ground-level route crosses the prism cleanly (still encloses
     # every swept conflict box; the xy footprint is exactly the overlap hull)
     region, lane_W, lane_widths = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2
+    if c.category == 'M':  # v4 P3: the domain IS the merge transition box; the conflict = overlap clipped to it
+        from native_v2_common import merge_transition_region
+        from m56.model import Sweep
+        region, lane_widths = merge_transition_region(m, {r_: rows[r_][0] for r_ in rows}, exit_idx['EGO'])
+        lane_W = max(lane_widths.values())
+        overlap = _overlaps(Sweep(overlap, (), ()), Sweep((region,), (), ()))
+        assert overlap, 'M_NO_CONFLICT_IN_TRANSITION'
+        connected = _connected_boxes(overlap)
     if not connected:
         raise AssertionError('DISCONNECTED_CONFLICT_REVIEW_REQUIRED (frozen compiler rule; components logged)')
     sections = {role: _derive_box_sections(routes[role], region) for role in routes}

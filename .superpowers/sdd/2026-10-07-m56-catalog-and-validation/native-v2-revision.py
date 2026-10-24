@@ -106,7 +106,7 @@ def main(outdir, *prep_dirs):
     prereg_sha = hashlib.sha256(PREREG.read_bytes()).hexdigest()
     report = []
     for i, c in enumerate(done):
-        if c.category not in ('C', 'L'):
+        if c.category not in ('C', 'L', 'M'):
             continue
         f, p = preps.get(c.id, (None, None))
         if p is None:

@@ -26,7 +26,7 @@ REV = WORK / 'outputs/m56_c0_partial_20261022T120227Z/c0-partial-frozen-revision
 PREREG = WORK / 'docs/m56/PREREG_M56_RUNTIME_RECIPE_V2_20261023.md'
 REVIEWER, DATE = 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION', '2026-10-23'
 A_REF = F(3, 2)
-NOMINAL = {'C': F(4), 'L': F(2)}
+NOMINAL = {'C': F(4), 'L': F(2), 'M': F(4)}
 RELEASE = F(21, 20)
 
 
@@ -146,13 +146,15 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
         # `start` is the frozen v1 route (list of (x, y)): follow the CARLA lane waypoints closest to it, from 1 m
         # upstream of its arc 0 to its end (prereg 1: EGO keeps the frozen start and path).
         from shapely.geometry import LineString, Point
-        guide = list(start)
+        guide3 = list(start)  # (x, y[, z]) of the frozen v1 polyline; z picks the right level on overpasses (M01)
+        guide = [g[:2] for g in guide3]
         (x0, y0), (x1, y1) = guide[0], guide[1]
         n = math.dist(guide[0], guide[1])
         line = LineString([(x0 - 2 * (x1 - x0) / n, y0 - 2 * (y1 - y0) / n), *guide])  # v1 polyline, 2 m extended upstream
         def off(p):
             return line.distance(Point(p.transform.location.x, p.transform.location.y))
-        w = m.get_waypoint(carla.Location(guide[0][0], guide[0][1], 0.), project_to_road=True, lane_type=carla.LaneType.Driving)
+        z0 = guide3[0][2] if len(guide3[0]) > 2 else 0.
+        w = m.get_waypoint(carla.Location(guide[0][0], guide[0][1], z0), project_to_road=True, lane_type=carla.LaneType.Driving)
         back = 0.
         while back < 1.:
             prev = _step(w, False)
@@ -172,21 +174,40 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
                     or [p for p in nxt if (p.road_id, p.lane_id) == (r1, l1)]
                     or [p for p in nxt if (p.road_id, p.lane_id) == (w.road_id, w.lane_id)])
             reached_out = any((r['road'], r['lane']) == (r2, l2) for r in rows)
-            if not pick and reached_out:  # past the outgoing road: straight-through rule (as V3.3), not a failure
+
+            def ahead(q, dist=8.):  # max deviation from v1 over the next `dist` m along q's lane (branch look-ahead)
+                worst_q, cur, done = off(q), q, 0.
+                while done < dist:
+                    n_ = cur.next(1.)
+                    if not n_:
+                        break
+                    cur = min(n_, key=off); done += 1.; worst_q = max(worst_q, off(cur))
+                return worst_q
+            nearest = min(nxt, key=ahead) if len(nxt) > 1 else nxt[0]
+            if off(nearest) <= .5 and not reached_out:
+                # on the frozen v1 path (it may cross junction connectors the notation does not name, M01 2026-10-24):
+                # follow the lane waypoint closest to it
+                pick = [nearest]
+            elif not pick and reached_out:  # past the outgoing road: straight-through rule (as V3.3), not a failure
                 pick = [min(nxt, key=lambda q: _yawdiff(q.transform.rotation.yaw, w.transform.rotation.yaw))]
-            p = pick[0] if pick else min(nxt, key=off)
-            if ((w.road_id, w.lane_id) == (rc, lc) and (p.road_id, p.lane_id) not in ((rc, lc), (r2, l2))):
+            p = pick[0] if pick else nearest
+            if ((w.road_id, w.lane_id) == (rc, lc) and (p.road_id, p.lane_id) not in ((rc, lc), (r2, l2))
+                    and off(p) > .5):
                 raise ValueError(f'ROUTE_LEFT_NOTATION:{notation}:{p.road_id}/{p.lane_id}')
-            if (p.road_id, p.lane_id) == (r2, l2):
+            if reached_out or (p.road_id, p.lane_id) == (r2, l2):  # outgoing distance counts from the exit onward
                 out += math.dist((p.transform.location.x, p.transform.location.y), (w.transform.location.x, w.transform.location.y))
-            worst = max(worst, off(p))
+            if not reached_out:
+                worst = max(worst, off(p))
             rows.append(_wp_row(p)); w = p
             if out >= outgoing or len(rows) > 20000:
                 break
         exit_index = next((i for i, r in enumerate(rows) if (r['road'], r['lane']) == (r2, l2)), None)
         if exit_index is None:
-            seen = sorted({(r['road'], r['lane']) for r in rows})
-            raise AssertionError(f'NO_OUTGOING:{notation}:visited={seen[:12]}')
+            seen = []
+            for r in rows:
+                if not seen or seen[-1] != (r['road'], r['lane']):
+                    seen.append((r['road'], r['lane']))
+            raise AssertionError(f'NO_OUTGOING:{notation}:visited={seen[:16]}:rows={len(rows)}')
         return rows, exit_index, {'max_offset_from_v1_m': worst}
     else:
         back, w, d = [], end, 0.
@@ -398,3 +419,19 @@ def v2_routes(prep, notation, town, plain):
         rows[role] = (r, a)
         routes[role] = directed(r, a, prep['map_hash'], town, notation[role], cont, F(prep['destinations'][role]))
     return routes, rows, cont
+
+
+def merge_transition_region(m, rows_by_role, exit_index_ego):
+    """v4 P3 (ccea1cc) M01: the transition box around the point where the EGO (branch) connector joins the target lane
+    (first EGO row on the outgoing road), horizontal extents W + 1 m (W = larger CARLA lane width of the two lanes
+    there), vertical from the route z - 1 m to + 3 m."""
+    from itertools import product
+    p = rows_by_role['EGO'][exit_index_ego]
+    widths = {}
+    for role, rows in rows_by_role.items():
+        r = min(rows, key=lambda q: math.dist((q['x'], q['y']), (p['x'], p['y'])))
+        widths[role] = m.get_waypoint_xodr(int(r['road']), int(r['lane']), float(r['s'])).lane_width
+    half = (max(widths.values()) + 1.0) / 2
+    a = (p['x'] - half, p['y'] - half, p['z'] - 1.)
+    b = (p['x'] + half, p['y'] + half, p['z'] + 3.)
+    return tuple(tuple(b[k] if sgn[k] else a[k] for k in range(3)) for sgn in product((0, 1), repeat=3)), widths

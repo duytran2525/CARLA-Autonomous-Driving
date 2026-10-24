@@ -52,8 +52,8 @@ OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DES
 approvals = ApprovalBundle((authority, charter), {}, OPS)
 
 
-def cap(kind, limits, raw, binding, why):
-    packet = dict(kind=kind, method='native-g4-measure-v1', raw_refs=tuple(raw), uncertainty=F(1, 1000),
+def cap(kind, limits, raw, binding, why, method='native-g4-measure-v1'):
+    packet = dict(kind=kind, method=method, raw_refs=tuple(raw), uncertainty=F(1, 1000),
                   limits={'materialization_hash': binding, **limits}, status='CORROBORATED')
     return CapabilityProof(**packet, review=review(packet, 'CAPABILITY:' + kind, raw, (why,)))
 
@@ -92,7 +92,7 @@ def front(route, body, pose):
 
 def main():
     data = load_json(REVISION)
-    scenes = [decode_record('Candidate', c) for c in data['candidates'] if c['town'] == TOWN and c['category'] in ('C', 'L')
+    scenes = [decode_record('Candidate', c) for c in data['candidates'] if c['town'] == TOWN and c['category'] in ('C', 'L', 'M')
               and (c['environment'].get('runtime_recipe_v2') or {}).get('status') == 'PREPARED'
               and (len(sys.argv) < 4 or c['id'] in sys.argv[3].split(','))]
     log(event='SCENES', town=TOWN, ids=[c.id for c in scenes])
@@ -130,6 +130,12 @@ def run_scene(c, client, proc, start, world, m, identity):
     lo = tuple(min(v[k] for b in overlap for v in b) for k in range(3))
     hi = tuple(max(v[k] for b in overlap for v in b) for k in range(3))
     region, _, _ = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2, same rule as preparation
+    merge_caps = ()
+    if c.category == 'M':  # v4 P3: domain = merge transition box (same rule as preparation)
+        from native_v2_common import merge_transition_region
+        ex = next(i for i, r in enumerate(rows['EGO'][0]) if (int(r['road']), int(r['lane'])) == tuple(
+            int(x) for x in notation['EGO'].split('→')[2].split('/')))
+        region, _ = merge_transition_region(m, {r_: rows[r_][0] for r_ in rows}, ex)
     secs = {role: _derive_box_sections(routes[role], region) for role in routes}
     center = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2)
     drivable = drivable_union(m, center)
@@ -171,7 +177,12 @@ def run_scene(c, client, proc, start, world, m, identity):
             cap('DESTINATION_ROOM', {'exit_to_destination_m': q(float(routes['EGO'].destination - e_exit)),
                                      'destination_to_plan_end_m': q(float(routes['EGO'].arc[-1] - routes['EGO'].destination))},
                 (prep_ref,), binding, 'destination = junction exit + 5 m; plan extends to the outgoing end'))
-    packet = {'region': region, 'topology': {'category': c.category, 'kind': 'route-crossing-overlap-box',
+    if c.category == 'M':
+        caps = (*caps, cap('MERGE_TRANSITION', {'transition_region': region}, (prep_ref, cont), binding,
+                           'branch connector joins the target lane; lane-width box (v4 P3)',
+                           method='branch-to-mainflow-geometry-topology'))
+    packet = {'region': region, 'topology': {'category': c.category,
+                                             'kind': 'branch-to-mainflow' if c.category == 'M' else 'route-crossing-overlap-box',
                                              'driving_regions': regions, 'drivable_ref': dref},
               'proof': (prep_ref, cont, dref), 'G': g.values[0],
               'sections': {'DESTINATION': section_at(routes['EGO'], routes['EGO'].destination)},
