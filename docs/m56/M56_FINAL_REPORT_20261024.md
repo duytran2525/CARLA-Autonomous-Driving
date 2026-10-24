@@ -28,16 +28,18 @@ nguyên tắc 6 cấm. Các đề xuất sửa consumer ở §5 dành cho một 
 > Mọi kết quả từ đây mang nhãn "independent review waived by Duy 2026-10-24", tức
 > `CLAUDE_REVIEW_UNDER_DUY_DELEGATION`, không độc lập.
 >
-> **Probe PID native** (chỉ để báo cáo, `outputs/m56_ego_pid_probe_20261024T151157Z.json`, đường thẳng 860 m ở Town06):
+> **Probe PID native** (chỉ để báo cáo, `outputs/m56_ego_pid_probe_20261024T151157Z.json` và `…T152143Z.json`; chỉ đo
+> trên một đoạn thẳng 860 m ở Town06, road 4):
 >
 > | Xe | Tốc độ đích (m/s) | Kết quả |
 > |---|---|---|
-> | EGO, PID gốc | 4; 14,6; 18,3 | ổn định |
-> | EGO, PID gốc | 6; 7,5; 9,375; 11,7 | dao động 0,16–0,40 m/s |
+> | EGO, PID gốc | 3,84; 4; 14,6; 18,3 | ổn định |
+> | EGO, PID gốc | 4,8; 5,0; 5,3; 5,6; 5,9; 6; 7,5; 9,375; 11,7 | dao động 0,14–2,1 m/s |
 > | NPC 8,6 m/s, PID gốc | | dao động 0,28 m/s |
 > | NPC 8,6 m/s, mọi bộ khác trong lưới P-NPC | | ổn định ≈ 0,03 m/s |
 >
-> Hệ quả: theo §6.1, tám cảnh I01–I04 và O01–O04 bị chặn readiness. Quyết định thuộc về Duy.
+> Hệ quả: theo §6.1, mười cảnh I01–I05 và O01–O05 (vE 4,8–11,7) bị chặn readiness. I06/I08 (14,6/18,3) và I07/O07
+> (3,84) không bị chặn theo probe này. Quyết định thuộc về Duy.
 
 ## 1. Chuỗi thẩm quyền
 

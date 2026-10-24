@@ -10,6 +10,7 @@ sys.path.insert(0, 'E:/Carla/PythonAPI/carla')
 
 OUT = WS.parents[2] / 'outputs' / f'm56_ego_pid_probe_{now()}.json'
 EGO_SPEEDS = (4., 6., 7.5, 9.375, 11.71875, 14.6484375, 18.310546875)
+EXTRA = tuple(float(x) for x in sys.argv[1].split(',')) if len(sys.argv) > 1 else None  # EGO-only speeds
 GRID = ((1., .05, 0.), (.5, .05, 0.), (.3, .05, 0.), (.5, .2, 0.), (.3, .2, 0.), (.2, .1, 0.))
 SECONDS = 40.
 rows = []
@@ -84,9 +85,9 @@ with own_server(log) as (client, proc, start):
     world.apply_settings(s)
     m = world.get_map(); pts = straight_start(m)
     log(event='STRETCH', road=pts[0].road_id, lane=pts[0].lane_id, s=pts[0].s, n=len(pts))
-    for v in EGO_SPEEDS:
+    for v in EXTRA or EGO_SPEEDS:
         run(world, m, pts, 'EGO', v, GRID[0])
-    for g in GRID:
+    for g in (() if EXTRA else GRID):
         run(world, m, pts, 'NPC', 8.6, g)
 with open(OUT, 'x', encoding='utf-8') as f:
     json.dump({'note': 'report-only stock PID probe; not catalog/fixture/A-B evidence', 'rows': rows}, f, indent=1)
