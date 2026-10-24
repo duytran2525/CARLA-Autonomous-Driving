@@ -278,13 +278,18 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
             out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, status='BLOCKED_FIXTURE',
                        reason='SIGNAL_TIMING_INFEASIBLE')
             return finish(c, out)
-        pred2 = dict(seq[(g0 - kk) % C])
-        if sum(1 for x in seq if x == pred2) != 1:
-            out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, phase_predicate=pred2,
-                       status='BLOCKED_FIXTURE', reason='SIGNAL_ANCHOR_AMBIGUOUS')
+        unique = lambda j: sum(1 for x in seq if x == seq[(g0 - j) % C]) == 1
+        old_rule = 'UNIQUE' if unique(kk) else 'SIGNAL_ANCHOR_AMBIGUOUS'  # old S4 rule, reported (erratum 4)
+        # erratum 4 (7374ed7): nearest earlier unique tick k' >= k, green still >= 1 s before t_in
+        k2 = next((j for j in range(kk, round(20 * t_in) - 20 + 1) if unique(j)), None)
+        out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, anchor_old_rule=old_rule, anchor_k2=k2)
+        if k2 is None:
+            out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_ANCHOR_AMBIGUOUS' if unique(kk) is False else
+                       'SIGNAL_TIMING_INFEASIBLE')
             return finish(c, out)
-        green_end = (t_in - 2) + (cycle['N_G'] + cycle['N_Y']) / 20
-        out.update(t_in=t_in, t_out=t_out, anchor_ticks_before_green=kk, phase_predicate=pred2, green_window_end=green_end)
+        pred2 = dict(seq[(g0 - k2) % C])
+        green_end = (t_in - 2 - (k2 - kk) / 20) + (cycle['N_G'] + cycle['N_Y']) / 20
+        out.update(phase_predicate=pred2, green_window_end=green_end)
         if t_out > green_end - 1:
             out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_TIMING_INFEASIBLE')
             return finish(c, out)

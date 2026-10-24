@@ -208,8 +208,9 @@ class Kit:
             y = next(z for z in b.actors if z.role == x.role)
             pts = (*world_vertices(x.body, x.pose), *world_vertices(y.body, y.pose))
             pad = 1e-3 + self._displacement(x, y) * .01  # chord-to-arc slack of the small rotation
-            low = tuple(q(min(p[k] for p in pts) - pad) for k in range(3))
-            high = tuple(q_up(max(p[k] for p in pts) + pad) for k in range(3))
+            # VertexSet is binary64 (consumer decoder); the 1 mm pad keeps the float rounding conservative
+            low = tuple(float(q(min(p[k] for p in pts) - pad)) for k in range(3))
+            high = tuple(float(q_up(max(p[k] for p in pts) + pad)) for k in range(3))
             box = tuple(tuple(high[k] if s[k] else low[k] for k in range(3)) for s in product((0, 1), repeat=3))
             target = max(v for v in next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash).targets.values())
             actors[x.role] = {'actor_id': x.id, 'response_hash': y.commands[0].response_hash, 'envelope': box,
