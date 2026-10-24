@@ -47,7 +47,7 @@ Con số 149 nhỏ hơn 166 của fill v2 vì vùng cấm 30 m đã mở rộng 
 | Hạng mục | Kết quả |
 |---|---|
 | Catalog | **42/46** cảnh. Còn trống I08, O08, F05, F06, nên **release §11 vẫn chưa đạt**. |
-| Junction | 24 (16 C/L, M01–M08 trừ không có M nào trống). Cổng cần ≥ 23 junction đủ điều kiện, tức là được hỏng tối đa 1. |
+| Junction | 24 (16 C/L cộng M01–M08; M đã đủ 8). Cổng cần ≥ 23 junction đủ điều kiện, tức là được hỏng tối đa 1. |
 | Junction bị corridor đi qua | J764 (Town04): ghi lại, không tính là junction của catalog |
 
 **Lưu ý cho khâu chuẩn bị:**
