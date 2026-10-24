@@ -443,7 +443,7 @@ def v2_routes(prep, notation, town, plain):
         # at junction exit + 5 m. compile_fixture requires destination >= domain exit + 5 m, so for M the destination
         # is max(junction exit + 5 m, domain exit + 5 m), from the region recorded by the preparation.
         from m56.geometry import _derive_box_sections
-        region = tuple(tuple(float(v) for v in pt) for pt in prep['region'])
+        region = tuple(tuple(float(v) for v in pt) for pt in plain(prep['region']))
         for role in routes:
             secs = _derive_box_sections(routes[role], region)
             if not hasattr(secs, 'reasons'):
