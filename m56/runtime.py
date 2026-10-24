@@ -483,6 +483,9 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
     def _instrument(self, vehicles):
         """One sensor.other.collision per scene vehicle (runner instrumentation, not a scene actor)."""
         import carla
+        # One episode's instrumentation records: the same backend serves A then B (native A/B 2026-10-24: A's
+        # lifecycle/fence rows leaked into B -> 4 channels, DELIVERY_PROOF_INVALID).
+        self.sensor_parents, self.collisions, self.lifecycle, self.fences = {}, [], {}, {}
         bp = self.world.get_blueprint_library().find('sensor.other.collision')
         roles = tuple(vehicles)
         results = self.client.apply_batch_sync([carla.command.SpawnActor(bp, carla.Transform(), vehicles[r]) for r in roles], False)

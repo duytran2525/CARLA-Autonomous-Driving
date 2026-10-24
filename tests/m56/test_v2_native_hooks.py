@@ -72,3 +72,26 @@ def test_explicit_control_consumes_the_stock_session_frame():
                          'WAIT_STOP_AND_CLEAR', 'a' * 64)
     assert backend._materialize(stop) is stop      # explicit controls still pass unchanged
     assert session.last_frame == 10                # ... and consume their issuing frame
+
+
+def test_instrumentation_records_are_per_episode():
+    """Native A/B 2026-10-24 (C01 v3 B): the backend serves A then B, and episode A's sensor lifecycle/fence/collision
+    records leaked into B (4 channels, DELIVERY_PROOF_INVALID). Each instrumentation starts an empty record set."""
+    from m56.runtime import OwnedCarlaBackend
+    backend = object.__new__(OwnedCarlaBackend)
+    backend.lifecycle, backend.fences = {1: {'old': True}}, {1: {'old': True}}
+    backend.collisions, backend.sensor_parents, backend.owned = [{'old': True}], {1: 5}, set()
+    lib = SimpleNamespace(find=lambda name: 'bp')
+    backend.world = SimpleNamespace(get_blueprint_library=lambda: lib)
+    backend.client = SimpleNamespace(apply_batch_sync=lambda batch, cue: [SimpleNamespace(error='', actor_id=9 + i)
+                                                                            for i, _ in enumerate(batch)])
+    backend._raw = lambda *a, **k: None
+    import sys, types
+    carla = types.SimpleNamespace(command=types.SimpleNamespace(SpawnActor=lambda *a: a), Transform=lambda: None)
+    sys.modules['carla'], saved = carla, sys.modules.get('carla')
+    try:
+        assert backend._instrument({'EGO': 101, 'NPC': 102}) == (9, 10)
+    finally:
+        sys.modules.pop('carla') if saved is None else sys.modules.__setitem__('carla', saved)
+    assert backend.lifecycle == {} and backend.fences == {} and backend.collisions == []
+    assert backend.sensor_parents == {9: 101, 10: 102}
