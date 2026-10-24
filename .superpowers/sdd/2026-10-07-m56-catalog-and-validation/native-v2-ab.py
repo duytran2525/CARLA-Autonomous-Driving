@@ -41,7 +41,10 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
     'source': '[chat] 2026-10-23 user self-stated Duy: "tôi là duy bạn hãy tự động bổ sung thêm junction và mở g4/g5 đi"; '
               'v2 approval: "Approve v2 (Recommended)"', 'addendum': 'docs/m56/SPEC_ADDENDUM_G4G5_20261023.md',
     'prereg': {'path': str(PREREG), 'sha256': sha(PREREG)}, 'revision_v2': {'path': str(REVISION), 'sha256': sha(REVISION)},
-    'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B'},
+    'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B',
+    'approvals': ['[chat] 2026-10-24 Duy: v3 prereg ab1fb09 + signal-phase erratum 4 (7374ed7), run C01/C02 once',
+                  '[chat] 2026-10-24 Duy: "cho chạy A/B C01, C02 thêm đúng một lần với hai bản sửa harness (cùng '
+                  'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)']},
     'OPERATOR_RECEIPT')
 review = reviewer(authority)
 OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
