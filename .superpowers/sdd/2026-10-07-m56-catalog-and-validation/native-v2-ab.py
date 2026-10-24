@@ -195,7 +195,7 @@ def run_scene(c, client, proc, start, world, m, identity):
         return
     store = open_run(sd / 'run', c.id, own.writer)
     ctx = RuntimeContext(None, identity, own, approvals, admission, store,
-                         {'tick_s': F(10), 'cleanup_s': F(15), 'outer_s': F(900), 'rpc_s': F(60)}, 'AB_PAIR', 'RUNNING')
+                         {'tick_s': F(5), 'cleanup_s': F(15), 'outer_s': F(300), 'rpc_s': F(60)}, 'AB_PAIR', 'RUNNING')  # spec 7.1
     backend = runtime.bind_owned(ctx)
     qual = SourceRef(str(WORK / 'outputs/m56_native_g4_probe_20261023T135210Z/g4-probe.json'),
                      sha(WORK / 'outputs/m56_native_g4_probe_20261023T135210Z/g4-probe.json'),

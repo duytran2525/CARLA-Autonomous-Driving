@@ -95,3 +95,23 @@ def test_instrumentation_records_are_per_episode():
         sys.modules.pop('carla') if saved is None else sys.modules.__setitem__('carla', saved)
     assert backend.lifecycle == {} and backend.fences == {} and backend.collisions == []
     assert backend.sensor_parents == {9: 101, 10: 102}
+
+
+def test_incremental_event_detection_equals_whole_trace(require):
+    """The C/L kernel resumed tick by tick (online) equals one detection over the whole trace (consumer)."""
+    from tests.m56.test_runtime_ab import ScriptBackend, context, fixture, late_trigger  # noqa: F401
+    import m56.metrics as metrics
+    from m56.runtime import run_episode
+    import tempfile
+    from pathlib import Path
+    fx = fixture()
+    backend = ScriptBackend(Path(tempfile.mkdtemp()) / 'b', late_trigger)
+    ev = run_episode(context(Path(tempfile.mkdtemp()), backend.bind(fx)), fx, 'A')
+    frames = tuple(ev.raw)
+    assert frames
+    metrics._CL_CACHE.clear()
+    whole = metrics.detect_events(frames, fx)
+    metrics._CL_CACHE.clear()
+    for k in range(1, len(frames) + 1):
+        stepped = metrics.detect_events(frames[:k], fx)
+    assert stepped == whole

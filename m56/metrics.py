@@ -1178,6 +1178,9 @@ def _section_corridor_uncached(vertices, section):
     return plane.geom_type=='Polygon' and all(plane.covers(Point(p[others[0]],p[others[1]])) for p in projected)
 
 
+_CL_CACHE={}
+
+
 def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> tuple[EventRecord,...]:
     """Frozen C/L/M and I/O event kernels; events do not certify action completion."""
     if not frames:
@@ -1200,7 +1203,16 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
     if fixture.pair.names!=('d_yield_m','t_entry_s') or fixture.G is None:
         return ()
     events=[];seen=set();derived=[];previous_positions=None;fixture_hash=_digest(fixture)
-    for i,frame in enumerate(frames):
+    # Online detection re-runs this kernel on a growing prefix every tick. Each step depends only on the previous
+    # step's state, so a prefix made of the very same frame objects resumes from its saved state (identical result;
+    # native A/B 2026-10-24 needed it to meet the 300 s outer deadline). ponytail: bounded clear-all cache.
+    key=(id(fixture),id(frames[0]));state=_CL_CACHE.get(key);start=0
+    if (state is not None and state['fixture'] is fixture and state['first'] is frames[0]
+            and state['n']<=len(frames) and frames[state['n']-1] is state['last']):
+        events=list(state['events']);seen=set(state['seen']);derived=list(state['derived'])
+        previous_positions=state['prev'];start=state['n']
+    for i in range(start,len(frames)):
+        frame=frames[i]
         refs=_frame_refs(frame)
         actors={a.role:a for a in frame.actors}
         positions={};vertices={}
@@ -1254,6 +1266,10 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
                       'predicates':{'NPC_WHOLE_BODY_CLEAR':packet(clear),
                                     'EGO_STOP':packet(stopped),'EGO_DESTINATION':packet(arrived)}}))
         previous_positions=positions
+    if len(_CL_CACHE)>256:
+        _CL_CACHE.clear()
+    _CL_CACHE[key]={'fixture':fixture,'first':frames[0],'last':frames[-1],'n':len(frames),'events':tuple(events),
+                    'seen':frozenset(seen),'derived':tuple(derived),'prev':previous_positions}
     for predicate,duration in (('NPC_WHOLE_BODY_CLEAR',Fraction(1,4)),('EGO_STOP',Fraction(1,2)),
                                ('EGO_DESTINATION',Fraction(1,4))):
         confirmed=confirm_hold(tuple(derived),predicate,duration)

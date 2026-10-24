@@ -379,8 +379,10 @@ def lane_width_region(m, rows_by_role, lo, hi):
         widths[role] = m.get_waypoint_xodr(int(r['road']), int(r['lane']), float(r['s'])).lane_width
     W = max(widths.values())
     half = [max((hi[k] - lo[k]) / 2, (W + 1.0) / 2) for k in (0, 1)]
-    a = (cx - half[0], cy - half[1], lo[2] - 1.)
-    b = (cx + half[0], cy + half[1], hi[2] + 1.)
+    # min/max with O itself plus 1 micrometre: centre +- half can round 1e-15 inside O (L01 compile 2026-10-24:
+    # DOMAIN_DOES_NOT_ENCLOSE_SWEPT_CONFLICT on an axis where O is already wider than W + 1 m)
+    a = (min(cx - half[0], lo[0]) - 1e-6, min(cy - half[1], lo[1]) - 1e-6, lo[2] - 1.)
+    b = (max(cx + half[0], hi[0]) + 1e-6, max(cy + half[1], hi[1]) + 1e-6, hi[2] + 1.)
     return tuple(tuple(b[k] if sgn[k] else a[k] for k in range(3)) for sgn in product((0, 1), repeat=3)), W, widths
 
 
