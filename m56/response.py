@@ -29,7 +29,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     from .model import ReviewRecord
     binding=policies.event_specs.get('stock_binding')
     keys={'response_hash','response_record_hash','route_hash','actor_id','source_refs','plan','client_version','server_version','review'}
-    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref'}:
+    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal'}:
         raise ValueError('STOCK_BINDING_MISSING')
     packet={k:v for k,v in binding.items() if k!='review'};review=binding['review']
     if (response.route is None or binding['response_hash']!=response.hash or binding['response_record_hash']!=_digest(response)
@@ -63,7 +63,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     if not ego and response.actor_role!='NPC':
         raise ValueError('STOCK_ROLE_INVALID')
     opt={'dt':.05,'lateral_control_dict':{'K_P':1.95,'K_I':.05,'K_D':.2,'dt':.05},
-         'longitudinal_control_dict':{'K_P':1.,'K_I':.05,'K_D':0.,'dt':.05},
+         'longitudinal_control_dict':_npc_longitudinal(binding,ego),
          'max_throttle':.75,'max_brake':.3,'max_steering':.8,'follow_speed_limits':False}
     if ego:
         opt.update(ignore_traffic_lights=True,ignore_stop_signs=True,ignore_vehicles=True)
@@ -74,6 +74,19 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     backend.set_global_plan(binding['plan'],stop_waypoint_creation=True,clean_queue=True)
     backend.follow_speed_limits(False)
     return StockDriver(_StockSession(backend),config,digest)
+
+
+def _npc_longitudinal(binding,ego):
+    """v5 P-NPC (prereg eda7680): an NPC may carry reviewed longitudinal gains (calibration grid); the EGO keeps the
+    pinned stock PID (spec section 6.1). Absent key = stock gains."""
+    gains=binding.get('npc_longitudinal')
+    if gains is None:
+        return {'K_P':1.,'K_I':.05,'K_D':0.,'dt':.05}
+    if (ego or not isinstance(gains,Mapping) or set(gains)!={'K_P','K_I','K_D','dt'}
+            or any(isinstance(v,bool) or not isinstance(v,Number) for v in gains.values())
+            or gains['dt']!=Number(1,20) or not gains['K_P']>0 or gains['K_I']<0 or gains['K_D']<0):
+        raise ValueError('STOCK_BINDING_INVALID')
+    return {k:float(v) for k,v in gains.items()}
 
 
 def _f32(limit):
@@ -1225,7 +1238,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='O' and response.action_id=='A':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1249,7 +1262,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='O' and response.action_id=='B':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1271,7 +1284,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='I' and response.action_id=='A':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1296,7 +1309,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='I' and response.action_id=='B':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1338,6 +1351,18 @@ def _forward_contract(response,fixture):
         raise ValueError('NORMATIVE_CROSSING_POLICY_INVALID')
 
 
+def _nominal_v5(response):
+    """v5 C2 (prereg eda7680): the normative nominal is the response's own NOMINAL target. OLD RULE (report-only,
+    nominal_old_rule): readiness.targets_mps['EGO'], which E6 sets to the measured stock plateau, so it can never equal
+    6 / 7.5 / 75/8 natively."""
+    return response.targets.get('NOMINAL')
+
+
+def nominal_old_rule(fixture, role='EGO'):
+    """Report-only: the old normative nominal (readiness target)."""
+    return fixture.environment.get('readiness',{}).get('targets_mps',{}).get(role)
+
+
 def _lateral_contract(response, fixture):
     """Analytic offline admission of frozen horizontal parallel references.
 
@@ -1369,7 +1394,7 @@ def _lateral_contract(response, fixture):
     initial=regions[role+'_INITIAL'];center=(Number(min(p[1] for p in initial))+Number(max(p[1] for p in initial)))/2
     if Number(route.transforms[0].y)!=center:
         raise ValueError('LATERAL_REFERENCE_NOT_LANE_CENTER')
-    readiness=fixture.environment.get('readiness',{});nominal=readiness.get('targets_mps',{}).get(role)
+    nominal=_nominal_v5(response)
     if not isinstance(nominal,Number) or nominal<=0:
         raise ValueError('LATERAL_NOMINAL_UNPROVEN')
     switches=response.phases.get('reference_switches',())
