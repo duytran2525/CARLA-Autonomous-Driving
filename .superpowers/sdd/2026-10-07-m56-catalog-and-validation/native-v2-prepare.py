@@ -226,7 +226,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'G': G, 'vE': vE, 'vN': vN, 'LrefN': LrefN,
            'e_entry': e_entry, 'n_entry_probe1': n_entry, 'region': region, 'overlap_connected': connected,
-           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1 + v3',
+           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1 + v3 + v4 (P1, P2, P3) + v5 (P-NPC, C4)',
            'recipe': 'v3', 'map_hash': identity.map, 'lane_W': lane_W, 'lane_widths': lane_widths,
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
