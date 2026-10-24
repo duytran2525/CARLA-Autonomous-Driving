@@ -15,6 +15,30 @@ lập. Mọi kết quả là A/B local.
 consumer đã đóng băng**. Lý do: bên tạo ra kết quả, không độc lập, sửa các bộ kiểm sau khi đã thấy kết quả chính là điều
 nguyên tắc 6 cấm. Các đề xuất sửa consumer ở §5 dành cho một version sau, có review độc lập.
 
+> **ĐÃ BỊ THAY THẾ (24/10/2026, tối):** quyết định "giữ nguyên consumer đã đóng băng" ở trên không còn hiệu lực. Duy
+> chọn "Release đầy đủ §11", duyệt "Consumer v5", "PID tốc độ cao" (hiệu chỉnh PID riêng NPC) và "Bổ sung cảnh tới 46",
+> đồng thời miễn review độc lập ("khỏi cần người khác bạn tự review").
+>
+> Tài liệu và code:
+> - đăng ký trước v5: eda7680; erratum 1 (C3): 22c5cd4, 523c60d;
+> - code v5 trên nhánh feat/m56-v5: 996c35a (C1/C2/P-NPC), 178db1d (C3), a637070 và c8a7d9e (C4);
+> - tooling: 5fe3450, 21f07a1;
+> - bản nháp đăng ký trước fill v2: 409911e, đang chờ Duy duyệt.
+>
+> Mọi kết quả từ đây mang nhãn "independent review waived by Duy 2026-10-24", tức
+> `CLAUDE_REVIEW_UNDER_DUY_DELEGATION`, không độc lập.
+>
+> **Probe PID native** (chỉ để báo cáo, `outputs/m56_ego_pid_probe_20261024T151157Z.json`, đường thẳng 860 m ở Town06):
+>
+> | Xe | Tốc độ đích (m/s) | Kết quả |
+> |---|---|---|
+> | EGO, PID gốc | 4; 14,6; 18,3 | ổn định |
+> | EGO, PID gốc | 6; 7,5; 9,375; 11,7 | dao động 0,16–0,40 m/s |
+> | NPC 8,6 m/s, PID gốc | | dao động 0,28 m/s |
+> | NPC 8,6 m/s, mọi bộ khác trong lưới P-NPC | | ổn định ≈ 0,03 m/s |
+>
+> Hệ quả: theo §6.1, tám cảnh I01–I04 và O01–O04 bị chặn readiness. Quyết định thuộc về Duy.
+
 ## 1. Chuỗi thẩm quyền
 
 Mỗi tài liệu dưới đây đều được commit **trước** mọi lần chạy dùng nó.
