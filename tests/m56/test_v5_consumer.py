@@ -92,3 +92,47 @@ def test_v5_real_route_not_the_fixture_route_blocks(require, lateral_case):
     fixture.routes = {'EGO': lateral_case.response.route}
     with pytest.raises(ValueError, match='LATERAL_GEOMETRY_UNSUPPORTED'):
         require('m56.response', '_lateral_contract')(response, fixture)
+
+
+def _c4_case(gap_x, proof_hash=None):
+    """EGO +x on y=0; the NPC crosses it at the origin, then turns and comes back within 1.5 m of it at x=gap_x. Two
+    disconnected overlap boxes: one at the crossing, one at x=gap_x."""
+    from itertools import product
+    from m56.catalog import _digest
+    def route(points):
+        return DirectedRoute((), tuple(Transform6(x, y, 0., 0., 0., 0.) for x, y in points),
+                             tuple(F(i, 4) for i in range(len(points))), 'b' * 64, (REF,), F(len(points) // 2, 4))
+    ego = route([(-50 + i / 4, 0.) for i in range(401)])
+    legs = [(0., -50 + i / 4) for i in range(221)] + [(i / 4, 5.) for i in range(1, int(gap_x * 4) + 1)]
+    legs += [(gap_x, 5 - i / 4) for i in range(1, 15)] + [(gap_x + i / 4, 1.5) for i in range(1, 161)]
+    npc = route(legs)
+    def box(cx, cy):
+        return tuple(product((cx - 1, cx + 1), (cy - 1, cy + 1), (0., 2.)))
+    selected = (box(0., 0.),); other = (box(gap_x, 0.),)
+    proof = SimpleNamespace(kind='CONFLICT_COMPONENT_SELECTION', method='m', raw_refs=(), uncertainty=F(0), status='PROPOSED', review=None,
+                            limits={'selected_component_hash': proof_hash or _digest(selected)})
+    queries = SimpleNamespace(capabilities=(proof,), routes={'EGO': ego, 'NPC': npc})
+    return selected + other, queries, selected, other
+
+
+def test_v5_disconnected_conflict_selects_the_crossing_component(monkeypatch):
+    import m56.geometry as g
+    monkeypatch.setattr(g, '_proof_valid', lambda p, kind, binding: kind == p.kind)
+    boxes, queries, selected, other = _c4_case(20.)
+    assert g.disconnected_old_rule(boxes)
+    assert g._selected_component(boxes, queries, 'x') == (selected, other)
+
+
+@pytest.mark.parametrize('gap,hash_,error', [(6., None, 'CONFLICT_COMPONENTS_TOO_CLOSE'),
+                                              (20., 'f' * 64, 'CONFLICT_COMPONENT_SELECTION_MISMATCH')])
+def test_v5_disconnected_conflict_faults_block(monkeypatch, gap, hash_, error):
+    import m56.geometry as g
+    monkeypatch.setattr(g, '_proof_valid', lambda p, kind, binding: kind == p.kind)
+    boxes, queries, _, _ = _c4_case(gap, hash_)
+    assert g._selected_component(boxes, queries, 'x').reasons == (error,)
+
+
+def test_v5_disconnected_conflict_without_review_keeps_old_reason():
+    import m56.geometry as g
+    boxes, queries, _, _ = _c4_case(20.)
+    assert g._selected_component(boxes, queries, 'x').reasons == ('DISCONNECTED_CONFLICT_REVIEW_REQUIRED',)
