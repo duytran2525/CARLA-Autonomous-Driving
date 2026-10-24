@@ -56,3 +56,19 @@ def test_instrumented_spawn_registers_runner_sensors_not_scene_actors(tmp_path):
     assert len(registry.spawn_responses) == 2  # scene actors only: roles map stays {EGO, NPC}
     assert calls[0] == {'EGO': 101, 'NPC': 102}
     assert ('listen', 201) in calls and ('listen', 202) in calls
+
+
+def test_explicit_control_consumes_the_stock_session_frame():
+    """Native A/B 2026-10-24 (C01 v3): an explicit stop control bypassed the stock session, so the RESUME intent after
+    CLEAR_N failed COMMAND_ORDER. An explicit command issued for an actor with a stock driver consumes that frame."""
+    from m56.model import CommandRecord, ControlPacket
+    from m56.response import _StockSession
+    from m56.runtime import OwnedCarlaBackend
+    backend = object.__new__(OwnedCarlaBackend)
+    backend.fixture = object()
+    session = _StockSession(None); session.last_frame = 9
+    backend.drivers = {7: SimpleNamespace(handle=session)}
+    stop = CommandRecord(7, 10, 11, 'CONTROL', F(0), F(0), ControlPacket(0., 0., .3, False, False, False, 1), None,
+                         'WAIT_STOP_AND_CLEAR', 'a' * 64)
+    assert backend._materialize(stop) is stop      # explicit controls still pass unchanged
+    assert session.last_frame == 10                # ... and consume their issuing frame

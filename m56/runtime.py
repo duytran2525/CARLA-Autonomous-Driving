@@ -511,6 +511,10 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         """Stock intent (control None) -> the reviewed stock driver's control; explicit controls pass unchanged."""
         from m56.response import apply_intent, create_stock_driver
         if c.control is not None or not hasattr(self, 'fixture'):
+            # An explicit control (e.g. the stop hold) also consumes its issuing frame in the actor's stock session,
+            # so a later stock intent (RESUME) is still consecutive (native A/B 2026-10-24: COMMAND_ORDER after CLEAR_N).
+            if c.control is not None and c.actor in getattr(self, 'drivers', {}):
+                self.drivers[c.actor].handle.last_frame = c.frame
             return c
         if c.actor not in self.drivers:
             response = next(r for r in self.fixture.responses if r.hash == c.response_hash)
