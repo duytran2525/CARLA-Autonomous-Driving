@@ -109,21 +109,13 @@ def run_scene(c, client, proc, start, world, m, identity):
     v2['prepare_json'] = str(WORK / v2['prepare_json']) if not Path(v2['prepare_json']).is_absolute() else v2['prepare_json']
     raw_prep = json.loads(Path(v2['prepare_json']).read_text(encoding='utf-8'))
     prep = {k: (v if k == 'poses' else plain(v)) for k, v in raw_prep.items()}
-    rows_all = plain(json.loads(Path(prep['routes_v2']).read_text(encoding='utf-8')))
     sd = root / c.id; sd.mkdir()
     prep_ref = SourceRef(str(Path(v2['prepare_json'])), sha(v2['prepare_json']), Path(v2['prepare_json']).stat().st_size, '1',
                          'claude-g4', 'G4_PREPARATION')
-    cont = SourceRef(prep['routes_v2'], prep['routes_v2_sha256'], Path(prep['routes_v2']).stat().st_size, '1', 'claude-g4',
-                     'NATIVE_ROUTE')
     notation = {a.role: a.route_recipe['route'] for a in c.actors}
-    routes, rows = {}, {}
-    from native_v2_common import arcs
-    for role in ('EGO', 'NPC'):
-        r = rows_all[role]
-        r = r['rows'] if isinstance(r, dict) else r
-        a = arcs(r)
-        rows[role] = (r, a)
-        routes[role] = directed(r, a, identity.map, c.town, notation[role], cont, F(prep['destinations'][role]))
+    from native_v2_common import v2_routes, lane_width_region
+    routes, rows, cont = v2_routes(prep, notation, c.town, plain)
+    assert prep['map_hash'] == identity.map, 'MAP_HASH_CHANGED'
     body_ref = write_ref(sd / 'a2-bbox.json', prep['bbox'], 'NATIVE_BODY')
     body = body_record(prep['bbox'], body_ref)
     poses = {k: decode_record('Transform6', v) for k, v in prep['poses'].items()}
@@ -132,8 +124,7 @@ def run_scene(c, client, proc, start, world, m, identity):
     overlap = _overlaps(sweeps['EGO'], sweeps['NPC'])
     lo = tuple(min(v[k] for b in overlap for v in b) for k in range(3))
     hi = tuple(max(v[k] for b in overlap for v in b) for k in range(3))
-    lo, hi = (lo[0], lo[1], lo[2] - 1.), (hi[0], hi[1], hi[2] + 1.)  # same rule as the preparation step
-    region = tuple(tuple(hi[k] if s[k] else lo[k] for k in range(3)) for s in product((0, 1), repeat=3))
+    region, _, _ = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2, same rule as preparation
     secs = {role: _derive_box_sections(routes[role], region) for role in routes}
     center = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2)
     drivable = drivable_union(m, center)

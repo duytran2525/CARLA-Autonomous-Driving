@@ -202,11 +202,14 @@ def route_rows(m, town, notation, approach, outgoing, start=None):
         pick = ([p for p in nxt if p.road_id == rc and p.lane_id == lc] or [p for p in nxt if p.road_id == r2 and p.lane_id == l2]
                 or [p for p in nxt if p.road_id == on and p.lane_id == w.lane_id])
         if not pick:
-            raise ValueError(f'ROUTE_BREAK:{notation}:{on}/{w.lane_id}->{[(p.road_id, p.lane_id) for p in nxt]}')
+            if exit_index is None:
+                raise ValueError(f'ROUTE_BREAK:{notation}:{on}/{w.lane_id}->{[(p.road_id, p.lane_id) for p in nxt]}')
+            # v3.3: beyond the outgoing road, continue by the straight-through rule (least heading change)
+            pick = [min(nxt, key=lambda q: _yawdiff(q.transform.rotation.yaw, w.transform.rotation.yaw))]
         p = pick[0]
         if p.road_id == r2 and exit_index is None:
             exit_index = len(rows)
-        if p.road_id == r2:
+        if exit_index is not None:
             out += math.dist((p.transform.location.x, p.transform.location.y), (w.transform.location.x, w.transform.location.y))
         rows.append(_wp_row(p)); w = p
     assert exit_index is not None, f'NO_OUTGOING:{notation}'
@@ -355,3 +358,34 @@ def driving_boxes(drivable, route, z_lo, z_hi, corridor=6., cell=.5):
             if j is not None:
                 start = prev = j
     return tuple(boxes)
+
+
+def lane_width_region(m, rows_by_role, lo, hi):
+    """V3.2 (prereg ab1fb09): widen the overlap AABB symmetrically about its centre so each horizontal extent is at least
+    W + 1.0 m, W = the larger CARLA lane_width of the EGO and NPC lanes at their route points nearest the centre.
+    Vertical extent +-1 m as in v2. Returns (region vertices, W, widths)."""
+    from itertools import product
+    cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+    widths = {}
+    for role, rows in rows_by_role.items():
+        r = min(rows, key=lambda q: math.dist((q['x'], q['y']), (cx, cy)))
+        widths[role] = m.get_waypoint_xodr(int(r['road']), int(r['lane']), float(r['s'])).lane_width
+    W = max(widths.values())
+    half = [max((hi[k] - lo[k]) / 2, (W + 1.0) / 2) for k in (0, 1)]
+    a = (cx - half[0], cy - half[1], lo[2] - 1.)
+    b = (cx + half[0], cy + half[1], hi[2] + 1.)
+    return tuple(tuple(b[k] if sgn[k] else a[k] for k in range(3)) for sgn in product((0, 1), repeat=3)), W, widths
+
+
+def v2_routes(prep, notation, town, plain):
+    """The fixture routes exactly as the A/B compiles them (also the V3.1 EGO response route)."""
+    rows_all = plain(json.loads(Path(prep['routes_v2']).read_text(encoding='utf-8')))
+    cont = SourceRef(prep['routes_v2'], prep['routes_v2_sha256'], Path(prep['routes_v2']).stat().st_size, '1', 'claude-g4',
+                     'NATIVE_ROUTE')
+    rows, routes = {}, {}
+    for role in ('EGO', 'NPC'):
+        r = rows_all[role]
+        a = arcs(r)
+        rows[role] = (r, a)
+        routes[role] = directed(r, a, prep['map_hash'], town, notation[role], cont, F(prep['destinations'][role]))
+    return routes, rows, cont

@@ -29,6 +29,7 @@ from m56.model import (ActorRecipe, ApprovalBundle, CompiledFixture, Domain, Fro
                        SourceRef, Transform6, encode_record)
 from m56.response import _f32
 from native_v2_kit import PhaseObserver
+from native_v2_common import lane_width_region
 
 TOWN = sys.argv[1]
 root = WORK / f'outputs/m56_v2_prepare_{TOWN}_{now()}'
@@ -103,7 +104,8 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
 
 def main():
     rev = candidates()
-    scenes = [c for c in rev.candidates if c.town == TOWN and c.category in ('C', 'L')]
+    scenes = [c for c in rev.candidates if c.town == TOWN and c.category in ('C', 'L')
+              and (len(sys.argv) < 3 or c.id in sys.argv[2].split(','))]
     log(event='SCENES', town=TOWN, ids=[c.id for c in scenes])
     import carla
     with own_server(log) as (client, proc, start):
@@ -144,7 +146,8 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     v1route = next(r for r in c.responses if r.actor_role == 'EGO').route
     guide = [(t.x, t.y) for t in v1route.transforms]
     for role in ('EGO', 'NPC'):
-        r, ei, got = route_rows(m, c.town, notation[role], want[role], 15., guide if role == 'EGO' else None)
+        r, ei, got = route_rows(m, c.town, notation[role], want[role], 15. if role == 'EGO' else 15. + 60. * float(vN),
+                                guide if role == 'EGO' else None)
         a = arcs(r)
         rows[role], exit_idx[role], approach[role] = (r, a), ei, got
     cont = write_ref(root / c.id / 'routes-probe1.json', {k: v[0] for k, v in rows.items()}, 'NATIVE_ROUTE')
@@ -163,8 +166,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     from itertools import product
     # vertical extent widened by 1 m both ways so the ground-level route crosses the prism cleanly (still encloses
     # every swept conflict box; the xy footprint is exactly the overlap hull)
-    lo, hi = (lo[0], lo[1], lo[2] - 1.), (hi[0], hi[1], hi[2] + 1.)
-    region = tuple(tuple(hi[k] if s[k] else lo[k] for k in range(3)) for s in product((0, 1), repeat=3))
+    region, lane_W, lane_widths = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2
     if not connected:
         raise AssertionError('DISCONNECTED_CONFLICT_REVIEW_REQUIRED (frozen compiler rule; components logged)')
     sections = {role: _derive_box_sections(routes[role], region) for role in routes}
@@ -204,7 +206,9 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'G': G, 'vE': vE, 'vN': vN, 'LrefN': LrefN,
            'e_entry': e_entry, 'n_entry_probe1': n_entry, 'region': region, 'overlap_connected': connected,
-           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1',
+           'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1 + v3',
+           'recipe': 'v3', 'map_hash': identity.map, 'lane_W': lane_W, 'lane_widths': lane_widths,
+           'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
            'phase_predicate_probe1': pred1}
     if not p1:

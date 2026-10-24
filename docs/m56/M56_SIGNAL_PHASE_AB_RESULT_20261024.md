@@ -103,3 +103,33 @@ luồng review/proof mới. Muốn đánh giá lại offline thì phải tự th
   - một lần chạy mới, sau khi đã sửa kit.
 - **Full suite 8:** đang chạy trên `4a82570`, 338/1177 test qua, 0 lỗi lúc viết báo cáo. Các thay đổi sau đó
   chỉ nằm ở tooling của WS, không đụng tới các byte mà suite đang kiểm. Chưa push gì.
+
+## 5. Runtime-recipe v3 (24/10/2026)
+
+**Đăng ký trước:** `PREREG_M56_RUNTIME_RECIPE_V3_20261024.md`, commit ab1fb09, trước mọi lần chạy. Gồm ba điểm:
+- V3.1: response EGO dùng route waypoint của fixture;
+- V3.2: vùng xung đột rộng ≥ W + 1 m, với W = 3,5 m;
+- V3.3: route NPC kéo dài phía hạ nguồn thêm 15 + 60·vN m.
+
+**Chuẩn bị v3:** `outputs/m56_v2_prepare_Town04_20261024T024739Z`, chỉ C01 và C02. Cả hai bị chặn **trước A/B**:
+
+| Cảnh | Kết quả | Chi tiết |
+|---|---|---|
+| C01 | `SIGNAL_ANCHOR_AMBIGUOUS` | Vùng rộng hơn đẩy `n_entry` lùi 1,3 m, nên t_in = 4,03 s và k = 41 tick trước lúc xanh. Tick đó là tick **đầu tiên** của khoảng đỏ toàn bộ: cả 4 đèn Đỏ, mọi đồng hồ = 0, và trạng thái này lặp lại ở mỗi lần chuyển trong chu kỳ. Với k = 40, gói pha đã là duy nhất. |
+| C02 | `BLOCKED_SIGNAL_ADMISSION` ở probe 1 | Vị từ "đèn 1622 vừa xanh" không xuất hiện trong 60 s, vì chu kỳ 60,4 s dài hơn giới hạn chờ 60 s của spec §484. Lúc bắt đầu chờ, chu kỳ đang ở vị trí bất lợi. |
+
+**Quyết định:**
+- Không chạy lại, không dịch điểm neo, không nới thời gian chờ (spec §484, prereg v3).
+- Không đóng băng C0 partial v3, vì không còn cảnh v3 nào chạy được.
+- Không có A/B v3 nào được chạy.
+
+**Kết luận cho M56:**
+- Vẫn **0 số A/B hợp lệ**.
+- Lần A/B duy nhất của C01 và C02 là lần v2.1 (§3).
+- Với đèn tín hiệu, cửa sổ khả thi rất hẹp:
+  - chu kỳ 60,4 s nhỉnh hơn 60 s;
+  - khoảng đỏ toàn bộ dài 41 tick không phân biệt được ở tick đầu tiên.
+- Muốn có số A/B thì cần Duy quyết một trong các hướng sau, đều là đổi quy tắc:
+  - cho phép neo ở tick gần nhất mà gói pha là duy nhất;
+  - thời gian chờ dài hơn một chu kỳ;
+  - chọn site C không có đèn.
