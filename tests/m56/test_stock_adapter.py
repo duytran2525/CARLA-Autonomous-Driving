@@ -190,10 +190,10 @@ def test_v5_npc_longitudinal_gains_come_from_the_reviewed_binding(stock_case):
     s = stock_case
     gains = {'K_P': F(1, 2), 'K_I': F(1, 20), 'K_D': F(0), 'dt': F(1, 20)}
 
-    def with_gains(response):
+    def with_gains(response, key='npc_longitudinal'):
         policy = s.policy_for(response, {})
         binding = {k: v for k, v in policy.event_specs['stock_binding'].items() if k != 'review'}
-        binding['npc_longitudinal'] = gains
+        binding[key] = gains
         review = replace(policy.event_specs['stock_binding']['review'], object_hash=_digest(binding))
         return replace(policy, event_specs={'stock_binding': {**binding, 'review': review}})
     npc = response_case(role='NPC', action='NPC_COMMON', events=()).response
@@ -202,3 +202,8 @@ def test_v5_npc_longitudinal_gains_come_from_the_reviewed_binding(stock_case):
     ego = s.c.response
     with pytest.raises(ValueError, match='STOCK_BINDING_INVALID'):
         s.create(s.actor, ego, with_gains(ego))
+    # v5 erratum 2 (2d27616): the EGO's own reviewed key is accepted; the NPC cannot carry it.
+    s.create(s.actor, ego, with_gains(ego, 'ego_longitudinal'))
+    assert s.captured[-1][1]['opt_dict']['longitudinal_control_dict'] == {'K_P': .5, 'K_I': .05, 'K_D': 0., 'dt': .05}
+    with pytest.raises(ValueError, match='STOCK_BINDING_INVALID'):
+        s.create(s.actor, npc, with_gains(npc, 'ego_longitudinal'))

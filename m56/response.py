@@ -29,7 +29,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     from .model import ReviewRecord
     binding=policies.event_specs.get('stock_binding')
     keys={'response_hash','response_record_hash','route_hash','actor_id','source_refs','plan','client_version','server_version','review'}
-    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal'}:
+    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal','ego_longitudinal'}:
         raise ValueError('STOCK_BINDING_MISSING')
     packet={k:v for k,v in binding.items() if k!='review'};review=binding['review']
     if (response.route is None or binding['response_hash']!=response.hash or binding['response_record_hash']!=_digest(response)
@@ -63,7 +63,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     if not ego and response.actor_role!='NPC':
         raise ValueError('STOCK_ROLE_INVALID')
     opt={'dt':.05,'lateral_control_dict':{'K_P':1.95,'K_I':.05,'K_D':.2,'dt':.05},
-         'longitudinal_control_dict':_npc_longitudinal(binding,ego),
+         'longitudinal_control_dict':_longitudinal(binding,ego),
          'max_throttle':.75,'max_brake':.3,'max_steering':.8,'follow_speed_limits':False}
     if ego:
         opt.update(ignore_traffic_lights=True,ignore_stop_signs=True,ignore_vehicles=True)
@@ -76,13 +76,17 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     return StockDriver(_StockSession(backend),config,digest)
 
 
-def _npc_longitudinal(binding,ego):
-    """v5 P-NPC (prereg eda7680): an NPC may carry reviewed longitudinal gains (calibration grid); the EGO keeps the
-    pinned stock PID (spec section 6.1). Absent key = stock gains."""
-    gains=binding.get('npc_longitudinal')
+def _longitudinal(binding,ego):
+    """v5 P-NPC (prereg eda7680): an NPC may carry reviewed longitudinal gains 'npc_longitudinal' (calibration grid).
+    v5 erratum 2 (2d27616): an EGO may carry 'ego_longitudinal' only where the stock PID is not steady. OLD RULE (spec
+    6.1): the EGO always keeps the pinned stock PID. Absent key = stock gains; a key of the other role is invalid."""
+    own,other=('ego_longitudinal','npc_longitudinal') if ego else ('npc_longitudinal','ego_longitudinal')
+    gains=binding.get(own)
+    if other in binding:
+        raise ValueError('STOCK_BINDING_INVALID')
     if gains is None:
         return {'K_P':1.,'K_I':.05,'K_D':0.,'dt':.05}
-    if (ego or not isinstance(gains,Mapping) or set(gains)!={'K_P','K_I','K_D','dt'}
+    if (not isinstance(gains,Mapping) or set(gains)!={'K_P','K_I','K_D','dt'}
             or any(isinstance(v,bool) or not isinstance(v,Number) for v in gains.values())
             or gains['dt']!=Number(1,20) or not gains['K_P']>0 or gains['K_I']<0 or gains['K_D']<0):
         raise ValueError('STOCK_BINDING_INVALID')
