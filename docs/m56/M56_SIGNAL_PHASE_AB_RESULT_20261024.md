@@ -133,3 +133,49 @@ luồng review/proof mới. Muốn đánh giá lại offline thì phải tự th
   - cho phép neo ở tick gần nhất mà gói pha là duy nhất;
   - thời gian chờ dài hơn một chu kỳ;
   - chọn site C không có đèn.
+
+## 6. v3 cùng signal-phase erratum 4: A/B native, mỗi cảnh một lần (24/10/2026)
+
+**Thẩm quyền:** erratum 4 (commit 7374ed7) được đặt sau khi thấy kết quả chuẩn bị v3 và báo theo cả hai quy tắc. Theo
+quy tắc cũ, C01 là `SIGNAL_ANCHOR_AMBIGUOUS` và không có A/B. C02 được chuẩn bị lại một lần theo quyết định của Duy.
+
+**Đầu vào:**
+- Chuẩn bị: `outputs/m56_v2_prepare_Town04_20261024T025829Z`. Cả C01 và C02 PREPARED, NPC không bị đèn giữ.
+- C0 partial v3: `outputs/m56_c0_partial_v3_20261024T031543Z` (sha `ba365ef7…`).
+- A/B: `outputs/m56_v2_ab_Town04_20261024T031822Z`.
+
+**Lần đầu M56 có số đo native.** Các số dưới đây là **số đo thô, chưa được nhận** cho một cặp A/B hợp lệ.
+
+| Cảnh, action | Trục sau W05 | Event | `d_yield_m` | `t_entry_s` | Lý do còn lại |
+|---|---|---|---|---|---|
+| C01 A | CONFIRMED / INCOMPLETE / UNCERTAIN | TRIGGER, NPC_ENTRY, CLEAR_N_CONFIRMED | 2,046 (VALID) | INCOMPLETE | `TICK_ERROR` `COMMAND_ORDER` khi RESUME; thiếu E_ENTRY, DESTINATION |
+| C01 B | CONFIRMED / UNKNOWN / INVALID | TRIGGER, NPC_ENTRY, CLEAR_N, E_ENTRY, **DESTINATION_CONFIRMED** | 10,557 (VALID) | 9,60 (VALID) | **chỉ** `DELIVERY_PROOF_INVALID` |
+| C02 A | CONFIRMED / INCOMPLETE / INVALID | TRIGGER, STOP, NPC_ENTRY, CLEAR_N_CONFIRMED | 2,048 (VALID) | INCOMPLETE | `COMMAND_ORDER`; contact; fit |
+| C02 B | CONFIRMED / UNKNOWN / INVALID | đủ tới DESTINATION_CONFIRMED | 9,421 (VALID) | 8,35 (VALID) | delivery; contact; fit |
+
+### Đã được giải quyết
+
+- **Vùng xung đột rộng theo làn (V3.2):** CLEAR_N giờ được xác nhận.
+- **Route response EGO (V3.1):** hết `OFFSET_ROUTE_MISMATCH` và `PLAN_SOURCE_WITNESS_INVALID`.
+- **Phần còn lại:** kit (contact/motion trên C01), initialization (E3/E5), W01, mặt đất, metric context và W05 đều qua.
+
+### Lỗi harness đã sửa sau lần chạy (chưa chạy lại)
+
+1. **`COMMAND_ORDER`** (commit 962febb): lệnh dừng tường minh không ghi frame vào phiên stock, nên RESUME bị coi là
+   ngắt quãng.
+2. **`DELIVERY_PROOF_INVALID` ở B** (commit 153678a): lifecycle và fence của cảm biến từ episode A còn lại khi chạy B
+   (4 kênh thay vì 2).
+
+### Giới hạn đo ở C02 (chưa chứng minh, không phải phán quyết)
+
+- Cận dưới khoảng cách tới mép đường âm tới −0,106 m trong 99 frame đầu, trùng nhau ở A và B, trong pha tiếp cận. Thân
+  xe nhô ra ngoài đa giác vùng lái mà Claude dựng từ waypoint 0,5 m.
+- `CONTINUOUS_FIT_UNPROVEN` cũng đến từ các hộp vùng lái dựng bằng lưới. Có thể là lỗi của công cụ đo, cũng có thể là xe
+  thật sự sát mép; chưa phân biệt được.
+
+### Kết luận
+
+- **Chưa có cặp A/B hợp lệ nào**, nên không làm được phép so D09.
+- Hiệu số thô (**không được nhận**, chỉ để định hướng) của `d_yield_m` giữa A và B: C01 0,806; C02 0,783.
+- Muốn có cặp hợp lệ thì cần Duy cho chạy thêm **một** lần với hai bản sửa harness (v3.1, cùng fixture và recipe).
+- Riêng C02 vẫn có thể bị chặn bởi giới hạn đo mép đường.
