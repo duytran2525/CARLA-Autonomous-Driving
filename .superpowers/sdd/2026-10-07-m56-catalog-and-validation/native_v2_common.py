@@ -7,9 +7,13 @@ from itertools import product
 from pathlib import Path
 import hashlib, json, math, socket, subprocess, sys, time
 
+import os
 WORK = Path('D:/AI/CARLA-Funny-Moments.worktrees/m56-v1')
 WS = WORK / '.superpowers/sdd/2026-10-07-m56-catalog-and-validation'
-for p in (str(WORK), str(WS)):
+# M56_CODE: optional checkout whose m56 package is imported (v5 native work before the merge: m56-v5-dev at a recorded
+# commit, byte-identical to the post-merge product). Default = WORK (unchanged behaviour for every existing chain).
+CODE = Path(os.environ.get('M56_CODE', str(WORK)))
+for p in (str(WORK), str(WS), str(CODE)):
     if p not in sys.path:
         sys.path.insert(0, p)
 import xodr_routes as xr  # noqa: E402
@@ -22,7 +26,7 @@ from m56.model import (BodyRecord, BoundCertificate, CandidateRevision, Directed
 
 EXE, RPC, WRITER = Path('E:/Carla/CarlaUE4.exe'), 2610, 'm56-claude'
 OPS = (*runtime.READ_OPS, 'SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
-REV = WORK / 'outputs/m56_c0_partial_20261022T120227Z/c0-partial-frozen-revision.json'
+REV = Path(os.environ.get('M56_REV', str(WORK / 'outputs/m56_c0_partial_20261022T120227Z/c0-partial-frozen-revision.json')))
 PREREG = WORK / 'docs/m56/PREREG_M56_RUNTIME_RECIPE_V2_20261023.md'
 REVIEWER, DATE = 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION', '2026-10-23'
 A_REF = F(3, 2)
