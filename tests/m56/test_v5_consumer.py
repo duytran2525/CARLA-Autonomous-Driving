@@ -1,6 +1,10 @@
 """M56 v5 consumer changes (prereg eda7680), both rules kept: C1 route-distance run-in, C2 response nominal."""
+from dataclasses import replace
 from fractions import Fraction as F
 from types import SimpleNamespace
+
+import pytest
+from tests.m56.test_lateral_contract import lateral_case  # noqa: F401 (fixture)
 
 from m56.model import BodyRecord, DirectedRoute, Section, SourceRef, Transform6
 
@@ -36,3 +40,55 @@ def test_normative_nominal_is_the_response_target():
     assert _nominal_v5(response) == 6
     assert nominal_old_rule(fixture) == F(5793, 1000)
 
+
+
+def _real_lateral(lateral_case, yaw=0., sep=3.5, target_shift=0., box_sep=None):
+    """v5 C3 + erratum 1 (22c5cd4): a 0.25 m CARLA-like lane-centre route rotated by yaw, its target-lane switch route
+    and axis lane boxes; sep is the reviewed right-vector separation."""
+    from math import cos, sin, radians
+    from itertools import product
+    from m56.model import Transform6
+    c = lateral_case; r = radians(yaw); f, rt = (cos(r), sin(r)), (-sin(r), cos(r))
+    def route(offset):
+        pts = tuple(Transform6(f[0]*i/4 + rt[0]*offset, f[1]*i/4 + rt[1]*offset, 0., 0., yaw, 0.) for i in range(401))
+        return replace(c.response.route, transforms=pts, arc=tuple(F(i, 4) for i in range(401)))
+    base = route(0.); target = route(sep + target_shift)
+    b = sep if box_sep is None else box_sep
+    def box(offset):  # axis box of the lane centred at offset (only valid for axis yaws)
+        cx, cy = rt[0]*offset, rt[1]*offset
+        xs = (min(0., f[0]*100) - 1 + cx, max(0., f[0]*100) + 1 + cx); ys = (min(0., f[1]*100) - 1 + cy, max(0., f[1]*100) + 1 + cy)
+        xs = xs if abs(f[0]) > .5 else (cx - 1.75, cx + 1.75); ys = ys if abs(f[1]) > .5 else (cy - 1.75, cy + 1.75)
+        return tuple(product(xs, ys, (-1., 1.)))
+    switch = {**c.response.phases['reference_switches'][0], 'route': target}
+    profile = c.profile(10, 18, 0, sep)
+    response = replace(c.response, route=base, profile=profile, phases={**c.response.phases, 'reference_switches': (switch,)})
+    topology = {**c.fixture.domain.topology, 'action_regions': {'EGO_INITIAL': box(0.), 'EGO_TARGET': box(b)},
+                'lane_geometry': {'EGO': {'separation_m': F(sep), 'lane_width_m': {'initial': F(7, 2), 'target': F(7, 2)}}}}
+    fixture = SimpleNamespace(domain=SimpleNamespace(topology=topology), environment=c.fixture.environment,
+                              routes={'EGO': base})
+    return response, fixture
+
+
+@pytest.mark.parametrize('yaw,sep', [(0., 3.5), (0., -3.5), (90., 3.5), (180., 3.5), (270., -3.5)])
+def test_v5_real_axis_route_lane_change_is_admitted(require, lateral_case, yaw, sep):
+    response, fixture = _real_lateral(lateral_case, yaw, sep)
+    assert require('m56.response', '_lateral_contract')(response, fixture) is None
+
+
+@pytest.mark.parametrize('kw,error', [
+    (dict(yaw=37.), 'LATERAL_GEOMETRY_UNSUPPORTED'),
+    (dict(box_sep=-3.5), 'LATERAL_SEPARATION_INVALID'),
+    (dict(box_sep=3.6), 'LATERAL_SEPARATION_INVALID'),
+    (dict(target_shift=.2), 'REFERENCE_SWITCH_DISCONTINUOUS'),
+])
+def test_v5_real_route_faults_block(require, lateral_case, kw, error):
+    response, fixture = _real_lateral(lateral_case, **kw)
+    with pytest.raises(ValueError, match=error):
+        require('m56.response', '_lateral_contract')(response, fixture)
+
+
+def test_v5_real_route_not_the_fixture_route_blocks(require, lateral_case):
+    response, fixture = _real_lateral(lateral_case)
+    fixture.routes = {'EGO': lateral_case.response.route}
+    with pytest.raises(ValueError, match='LATERAL_GEOMETRY_UNSUPPORTED'):
+        require('m56.response', '_lateral_contract')(response, fixture)
