@@ -289,7 +289,7 @@ def npc_gains_binding(gains):
         'K_P': F(gains[0]), 'K_I': F(gains[1]), 'K_D': F(gains[2]), 'dt': F(1, 20)}
 
 
-def policy_maker(fixture, rows_by_role, review, source, npc_gains=None):
+def policy_maker(fixture, rows_by_role, review, source, npc_gains=None, ego_gains=None):
     """Reviewed stock binding per actor, made after spawn (names the real actor id). Plan = the role's own route lane
     waypoints (road/lane/s) every 2 m from 2 m ahead of the actor's current station. npc_gains (v5 P-NPC): the NPC's
     reviewed longitudinal gains; None or the stock entry = no binding key (byte-identical binding to v4)."""
@@ -307,6 +307,8 @@ def policy_maker(fixture, rows_by_role, review, source, npc_gains=None):
                    'client_version': '0.9.16', 'server_version': '0.9.16'}
         if role == 'NPC' and npc_gains_binding(npc_gains) is not None:
             binding['npc_longitudinal'] = npc_gains_binding(npc_gains)
+        if role == 'EGO' and npc_gains_binding(ego_gains) is not None:  # v5 erratum 2: same grid, EGO's own key
+            binding['ego_longitudinal'] = npc_gains_binding(ego_gains)
         r = review(binding, 'STOCK_FORWARD_BINDING', (source,))
         return PolicyBundle('m56-v2', 'f' * 64, {}, {'stock_binding': {**binding, 'review': r}}, {}, (source,))
     return policy_for
@@ -435,6 +437,19 @@ def v2_routes(prep, notation, town, plain):
         a = arcs(r)
         rows[role] = (r, a)
         routes[role] = directed(r, a, prep['map_hash'], town, notation[role], cont, F(prep['destinations'][role]))
+    if prep.get('category') == 'M':
+        # Fix 2026-10-25 (found when every M fixture blocked DESTINATION_ROOM_UNPROVEN before any episode): the M domain
+        # is the merge transition box, which extends past the junction exit, while the recipe rule put the destination
+        # at junction exit + 5 m. compile_fixture requires destination >= domain exit + 5 m, so for M the destination
+        # is max(junction exit + 5 m, domain exit + 5 m), from the region recorded by the preparation.
+        from m56.geometry import _derive_box_sections
+        region = tuple(tuple(float(v) for v in pt) for pt in prep['region'])
+        for role in routes:
+            secs = _derive_box_sections(routes[role], region)
+            if not hasattr(secs, 'reasons'):
+                need = F(math.ceil((F(secs[1].route_station) + 5) * 1000), 1000)  # rounded UP to 1/1000 m
+                if need > routes[role].destination:
+                    routes[role] = replace(routes[role], destination=need)
     return routes, rows, cont
 
 

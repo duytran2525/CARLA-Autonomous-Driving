@@ -230,7 +230,9 @@ def run_scene(c, client, proc, start, world, m, identity):
                       ('dt 1/20; observed consecutive frames of owned actors; not independent',))
     npc_gains = raw_prep.get('npc_longitudinal')  # v5 P-NPC; absent in v3/v4 preparations = stock (unchanged)
     npc_gains = None if npc_gains is None else tuple(F(g) for g in npc_gains)
-    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains), geometry_review, kit)
+    ego_gains = raw_prep.get('ego_longitudinal')  # v5 erratum 2; absent = stock (unchanged)
+    ego_gains = None if ego_gains is None else tuple(F(g) for g in ego_gains)
+    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains, ego_gains), geometry_review, kit)
     out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)
     result = {'scene': c.id, 'fixture_sha256': fref.sha256, 'episodes': {}}
     for action, ev in zip('AB', out if isinstance(out, tuple) else ()):

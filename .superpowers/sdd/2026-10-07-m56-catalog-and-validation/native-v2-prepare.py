@@ -71,7 +71,8 @@ def steady_time(frames, role, target, span=1.0, tol=.05):
     return None
 
 
-def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label, predicate=None, npc_gains=None):
+def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label, predicate=None, npc_gains=None,
+          ego_gains=None):
     own = ownership(proc, start, world)
     store = open_run(root / scene / label, f'{scene}-{label}', own.writer)
     actors = tuple(ActorRecipe(r, 'vehicle.audi.a2', F(0), poses[r], {'probe': label}, {'probe': label},
@@ -91,7 +92,7 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
     backend = runtime.bind_owned(ctx)
     source = write_ref(root / scene / f'{label}-plan-source.json', {'rows': {k: len(v[0]) for k, v in rows.items()},
                                                                     'rule': 'route lane waypoints every 2 m'}, 'G4_STOCK_SOURCE')
-    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains))
+    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains, ego_gains))
     if predicate:
         backend.seal_kit = PhaseObserver(predicate['light'])  # observe-only phase packets, no instrumentation
     ev = runtime.run_episode(replace(ctx, backend=backend), fixture, 'A')
@@ -237,11 +238,26 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     # v5 P-NPC (prereg eda7680): the first grid entry (entry 0 = stock, probe 1 itself) whose probe 1 has an NPC
     # 2 s window (unheld, > 0.5 m/s, range <= 0.10) that is steady before the NPC must be present (need). EGO keeps
     # the stock PID: an EGO window failure is final. Every grid probe is recorded.
+    # v5 erratum 2 (2d27616): when the stock EGO window of probe 1 is not steady, the first EGO grid entry whose probe-1
+    # E6 window has range <= 0.10 (NPC stock); then the NPC grid runs with that EGO entry. Every probe is recorded.
+    ego_gains, ego_grid = None, []
+    plat0 = plateaus(p1, routes, body, e_entry, G, npc_until='last')
+    ego_grid.append({'gains': [str(g) for g in NPC_PID_GRID[0]], 'EGO_range': plat0.get('EGO_range')})
+    if plat0.get('EGO_range', 1.) > .10:
+        for ei, eg in enumerate(NPC_PID_GRID[1:], 1):
+            q = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, f'probe1-egopid{ei}', pred1,
+                      None, eg)
+            pq = plateaus(q, routes, body, e_entry, G, npc_until='last') if q else {}
+            ego_grid.append({'gains': [str(g) for g in eg], 'EGO_range': pq.get('EGO_range')})
+            if q and pq.get('EGO_range', 1.) <= .10:
+                ego_gains, p1 = eg, q; break
+    out['ego_pid_grid'] = ego_grid
+    out['ego_longitudinal'] = None if ego_gains is None else [str(g) for g in ego_gains]
     npc_gains, grid = None, []
     for gi, gains in enumerate(NPC_PID_GRID):
         if gi:
             p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, f'probe1-pid{gi}',
-                       pred1, gains)
+                       pred1, gains, ego_gains)
             if not p1:
                 grid.append({'gains': [str(g) for g in gains], 'reason': 'PROBE1_NO_FRAMES'}); continue
         boundary_t = float(p1[0].simtime) - .05
@@ -338,7 +354,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         if t_out > green_end - 1:
             out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_TIMING_INFEASIBLE')
             return finish(c, out)
-    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2', pred2, npc_gains)
+    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2', pred2, npc_gains, ego_gains)
     holds2 = sum(1 for f in p2 for a in f.actors if a.role == 'NPC' and a.commands and a.commands[0].cause == 'NPC_TRAFFIC_HOLD')
     out['npc_hold_frames_probe2'] = holds2
     if sig and not p2:
