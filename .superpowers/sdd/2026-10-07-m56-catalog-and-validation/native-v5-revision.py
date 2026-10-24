@@ -13,6 +13,7 @@ from dataclasses import replace
 from fractions import Fraction as F
 from pathlib import Path
 import hashlib, importlib.util, json, sys
+from collections.abc import Mapping
 
 here = Path(__file__).resolve().parent
 sys.path[:0] = [str(here), 'D:/AI/CARLA-Funny-Moments.worktrees/m56-v1']
@@ -194,6 +195,15 @@ def main(outdir, identity_path, *prep_dirs):
                           environment={**c.environment, 'readiness': readiness, 'runtime_recipe_v2': status, **phase})
         report.append({'id': c.id, 'status': 'PREPARED', 'markers': {k: str(v) for k, v in markers.items()},
                        'npc_longitudinal': p.get('npc_longitudinal')})
+    # The CATEGORY:M review binds (id, category, actors); applying a preparation replaces the actors (destination, route
+    # recipe), so the same review (same evidence, reviewer, reasons) is re-bound to the final actors.
+    for i, c in enumerate(done):
+        raw = c.environment.get('category_review')
+        if c.category == 'M' and isinstance(raw, Mapping):
+            want = _digest((c.id, c.category, c.actors))
+            if raw.get('object_hash') != want:
+                rv = {**raw, 'object_hash': want, 'reasons': [*raw['reasons'], 're-bound to the actors after the runtime recipe']}
+                done[i] = replace(c, environment={**c.environment, 'category_review': rv})
     revision = CandidateRevision('c0-partial-v5: retained-23+fill20-v1-minus-F02-F03+fill-v2/v3+recipes+runtime-recipe-v5',
                                  tuple(done), 'x' * 64, None)
     ev = (cr.st.ref(rev2.EV1, 'IDENTITY_EVIDENCE'), cr.st.ref(rev2.EV2, 'IDENTITY_EVIDENCE'), cr.st.ref(identity_path, 'IDENTITY_EVIDENCE'))
@@ -219,6 +229,10 @@ def main(outdir, identity_path, *prep_dirs):
     review = ReviewRecord(_digest({'revision': revision, 'sites': ledger}), 'C0', (addendum, pref, dref), REVIEWER, '2026-10-25',
                           'APPROVED', ('C0 partial v5 = v4 + fill v2/v3 additions with complete recipes + runtime-recipe v5; '
                                        'review by Claude under Duy delegation, independent review waived by Duy 2026-10-24',), dref)
+    from m56.catalog import _category_proven
+    unproven = [c.id for c in done if c.category == 'M' and not _category_proven(c, 'M')]
+    if unproven:
+        print('M_UNPROVEN', unproven)
     frozen = freeze_c0(revision, ledger, review, partial=addendum)
     summary = {'candidates': len(done), 'sites': len(sites), 'junction_sites': sum(x.kind == 'JUNCTION' for x in sites.values())}
     (out / 'v5-report.json').write_text(json.dumps({'summary': summary, 'rows': report}, indent=1, default=str, ensure_ascii=False),
