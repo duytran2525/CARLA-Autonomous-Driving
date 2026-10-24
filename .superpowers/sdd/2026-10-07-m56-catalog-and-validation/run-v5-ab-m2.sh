@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# The single A/B (P5) of each PREPARED new M scene on C0 partial v5b (outputs/m56_c0_partial_v5b_20261024T184341Z,
-# sha256 b0cdf5fc...), code m56-v5-dev 8fa9632. Stops before a town once full suite 9 has finished (v3.1 A/B first).
+# The single A/B (P5) of each PREPARED new M scene on C0 partial v5c (outputs/m56_c0_partial_v5c_20261024T184604Z,
+# sha256 e5ac9b9b...; v5b had relative prepare paths: harness defect, no episode ran), code m56-v5-dev 8fa9632. Stops before a town once full suite 9 has finished (v3.1 A/B first).
 cd "$(dirname "$0")"
 S='C:/Users/ADMIN/AppData/Local/Temp/claude/D--AI-CARLA-Funny-Moments-worktrees/c504d458-feeb-4c2b-a56c-62ae1fb312ee/scratchpad'
 export M56_CODE='D:/AI/CARLA-Funny-Moments.worktrees/m56-v5-dev'
 [ "$(git -C "$M56_CODE" log -1 --format=%h)" = 8fa9632 ] && [ -z "$(git -C "$M56_CODE" status --short)" ] || { echo "NOT RUN: code not at clean 8fa9632"; exit 2; }
-REVF='../../../outputs/m56_c0_partial_v5b_20261024T184341Z/c0-partial-v5-frozen-revision.json'
+REVF='../../../outputs/m56_c0_partial_v5c_20261024T184604Z/c0-partial-v5-frozen-revision.json'
 for spec in "Town04 M56-P-M02" "Town05 M56-P-M03,M56-P-M06,M56-P-M07" "Town06 M56-P-M05" "Town07 M56-P-M08"; do
   set -- $spec
   [ -f m56-full-suite-9-20261024.run.json ] && { echo "STOPPED before $1: suite 9 finished (v3.1 A/B goes first)"; exit 0; }
