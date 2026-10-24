@@ -57,3 +57,9 @@ hơn ngưỡng contact nhỏ nhất (0,05/0,15/0,20) và nhỏ hơn nhiều so v
 Mọi kết quả I/O được báo theo cả hai quy tắc:
 - quy tắc cũ: route trục +x, nghĩa là mọi cảnh I/O trên route thật đều `LATERAL_GEOMETRY_UNSUPPORTED`;
 - quy tắc mới: quy tắc của erratum này.
+
+## Bổ sung (cùng ngày, trước code C3): làm tròn float
+
+Phép kiểm "mỗi bước ≤ 0,25 m" (C3 gốc và E1-c) cho phép thêm 1e-6 m. Lý do: các waypoint cách đúng 0,25 m trên một đường
+xoay vẫn có thể đo ra 0,25000000000000006 m do làm tròn float. Đây là cùng loại dung sai 1e-6 đã dùng cho làm tròn vùng ở
+V3.2.
