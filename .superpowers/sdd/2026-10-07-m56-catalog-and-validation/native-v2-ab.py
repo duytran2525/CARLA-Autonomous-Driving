@@ -127,6 +127,12 @@ def run_scene(c, client, proc, start, world, m, identity):
     certs = {role: certificates(routes[role], body, review, cont) for role in routes}
     sweeps = {role: swept_volume(routes[role], body, certs[role]) for role in routes}
     overlap = _overlaps(sweeps['EGO'], sweeps['NPC'])
+    selection = None
+    if raw_prep.get('conflict_component'):  # v5 C4: same selection rule as preparation, on the final routes
+        from m56.geometry import select_conflict_component, _connected_boxes
+        selection = select_conflict_component(overlap, routes['EGO'], routes['NPC']) if not _connected_boxes(overlap) else None
+        assert not hasattr(selection, 'reasons'), f'C4_SELECTION_BLOCKED:{getattr(selection, "reasons", None)}'
+        overlap = selection[0] if selection else overlap
     lo = tuple(min(v[k] for b in overlap for v in b) for k in range(3))
     hi = tuple(max(v[k] for b in overlap for v in b) for k in range(3))
     region, _, _ = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2, same rule as preparation
@@ -177,6 +183,10 @@ def run_scene(c, client, proc, start, world, m, identity):
             cap('DESTINATION_ROOM', {'exit_to_destination_m': q(float(routes['EGO'].destination - e_exit)),
                                      'destination_to_plan_end_m': q(float(routes['EGO'].arc[-1] - routes['EGO'].destination))},
                 (prep_ref,), binding, 'destination = junction exit + 5 m; plan extends to the outgoing end'))
+    if selection:
+        caps = (*caps, cap('CONFLICT_COMPONENT_SELECTION', {'selected_component_hash': _digest(selection[0])},
+                           (prep_ref, cont), binding, 'component holding the closest centreline point; others >= 5 m '
+                           'along both routes (v5 C4)', method='closest-centreline-component-v1'))
     if c.category == 'M':
         caps = (*caps, cap('MERGE_TRANSITION', {'transition_region': region}, (prep_ref, cont), binding,
                            'branch connector joins the target lane; lane-width box (v4 P3)',
@@ -218,7 +228,9 @@ def run_scene(c, client, proc, start, world, m, identity):
     def geometry_review(p):
         return review(p, 'CAPABILITY:CONTINUOUS_GEOMETRY', tuple(p['raw_refs']),
                       ('dt 1/20; observed consecutive frames of owned actors; not independent',))
-    backend.bind(fixture, policy_maker(fixture, rows, review, source), geometry_review, kit)
+    npc_gains = raw_prep.get('npc_longitudinal')  # v5 P-NPC; absent in v3/v4 preparations = stock (unchanged)
+    npc_gains = None if npc_gains is None else tuple(F(g) for g in npc_gains)
+    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains), geometry_review, kit)
     out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)
     result = {'scene': c.id, 'fixture_sha256': fref.sha256, 'episodes': {}}
     for action, ev in zip('AB', out if isinstance(out, tuple) else ()):

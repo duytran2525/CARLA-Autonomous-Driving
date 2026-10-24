@@ -71,7 +71,7 @@ def steady_time(frames, role, target, span=1.0, tol=.05):
     return None
 
 
-def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label, predicate=None):
+def probe(client, proc, start, world, identity, scene, routes, rows, poses, responses, label, predicate=None, npc_gains=None):
     own = ownership(proc, start, world)
     store = open_run(root / scene / label, f'{scene}-{label}', own.writer)
     actors = tuple(ActorRecipe(r, 'vehicle.audi.a2', F(0), poses[r], {'probe': label}, {'probe': label},
@@ -91,7 +91,7 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
     backend = runtime.bind_owned(ctx)
     source = write_ref(root / scene / f'{label}-plan-source.json', {'rows': {k: len(v[0]) for k, v in rows.items()},
                                                                     'rule': 'route lane waypoints every 2 m'}, 'G4_STOCK_SOURCE')
-    backend.bind(fixture, policy_maker(fixture, rows, review, source))
+    backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains))
     if predicate:
         backend.seal_kit = PhaseObserver(predicate['light'])  # observe-only phase packets, no instrumentation
     ev = runtime.run_episode(replace(ctx, backend=backend), fixture, 'A')
@@ -162,6 +162,13 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     overlap = _overlaps(sweeps['EGO'], sweeps['NPC'])
     assert overlap, 'NO_3D_CONFLICT'
     connected = _connected_boxes(overlap)
+    component = None
+    if not connected and c.category in ('C', 'L'):  # v5 C4 (prereg eda7680): the reviewed component selection rule
+        from m56.geometry import select_conflict_component
+        chosen = select_conflict_component(overlap, routes['EGO'], routes['NPC'])
+        assert not hasattr(chosen, 'reasons'), f'C4_SELECTION_BLOCKED:{chosen.reasons}'
+        component = {'selected_boxes': len(chosen[0]), 'unselected_boxes': len(chosen[1]), 'all_boxes': len(overlap)}
+        overlap, connected = chosen[0], True
     lo = tuple(min(v[k] for b in overlap for v in b) for k in range(3))
     hi = tuple(max(v[k] for b in overlap for v in b) for k in range(3))
     from itertools import product
@@ -223,16 +230,41 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
            'recipe': 'v3', 'map_hash': identity.map, 'lane_W': lane_W, 'lane_widths': lane_widths,
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
-           'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s}
+           'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s, 'conflict_component': component}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)
-    boundary_t = float(p1[0].simtime) - .05
-    release = boundary_t + float(RELEASE)
-    plat1 = plateaus(p1, routes, body, e_entry, G, npc_until='last')
+    # v5 P-NPC (prereg eda7680): the first grid entry (entry 0 = stock, probe 1 itself) whose probe 1 has an NPC
+    # 2 s window (unheld, > 0.5 m/s, range <= 0.10) that is steady before the NPC must be present (need). EGO keeps
+    # the stock PID: an EGO window failure is final. Every grid probe is recorded.
+    npc_gains, grid = None, []
+    for gi, gains in enumerate(NPC_PID_GRID):
+        if gi:
+            p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, f'probe1-pid{gi}',
+                       pred1, gains)
+            if not p1:
+                grid.append({'gains': [str(g) for g in gains], 'reason': 'PROBE1_NO_FRAMES'}); continue
+        boundary_t = float(p1[0].simtime) - .05
+        release = boundary_t + float(RELEASE)
+        plat1 = plateaus(p1, routes, body, e_entry, G, npc_until='last')
+        row = {'gains': [str(g) for g in gains], 'EGO_range': plat1.get('EGO_range'), 'NPC': plat1.get('NPC'),
+               'NPC_range': plat1.get('NPC_range'), 'reason': plat1.get('reason')}
+        grid.append(row)
+        if plat1.get('EGO_range', 1.) > .10:
+            break  # EGO stock PID not steady: no NPC gain can fix it
+        if plat1.get('NPC') is None:
+            continue
+        t_E = plat1['T_end'] + plat1['gap_at_T_end'] / plat1['EGO']
+        need = t_E - float(LrefN + 5) / (2 * plat1['NPC']) - release
+        st = steady_at(p1, 'NPC', plat1['NPC'])
+        row['npc_steady_s'], row['need_s'] = (None if st is None else st - release), need
+        if st is not None and need >= st - release:
+            npc_gains = gains; break
+    out['npc_pid_grid'] = grid
+    out['npc_longitudinal'] = None if npc_gains is None else [str(g) for g in npc_gains]
     out['probe1'] = plat1
-    if plat1.get('reason'):
-        out.update(status='BLOCKED_FIXTURE', reason=plat1['reason'])
+    if plat1.get('reason') or npc_gains is None:
+        out.update(status='BLOCKED_FIXTURE', reason=plat1.get('reason') or 'PHASING_INFEASIBLE')
         return finish(c, out)
     vEp, vNp, T_end = plat1['EGO'], plat1['NPC'], plat1['T_end']
     t_E = T_end + plat1['gap_at_T_end'] / vEp  # = T_end + (G + 1)/v_E when T_end is reached
@@ -306,7 +338,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         if t_out > green_end - 1:
             out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_TIMING_INFEASIBLE')
             return finish(c, out)
-    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2', pred2)
+    p2 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe2', pred2, npc_gains)
     holds2 = sum(1 for f in p2 for a in f.actors if a.role == 'NPC' and a.commands and a.commands[0].cause == 'NPC_TRAFFIC_HOLD')
     out['npc_hold_frames_probe2'] = holds2
     if sig and not p2:

@@ -49,8 +49,8 @@ Route 2 điểm trục +x vẫn đi theo quy tắc cũ, giữ nguyên văn và s
 
 ## Dung sai 0,05 m
 
-Đây là dung sai đo, không phải ngưỡng metric. Nó bao sai số float của vị trí tâm làn CARLA, vốn cỡ 1e-6 đến 1e-3 m. Nó nhỏ
-hơn ngưỡng contact nhỏ nhất (0,05/0,15/0,20) và nhỏ hơn nhiều so với bề rộng làn (≈ 3,5 m).
+Đây là dung sai đo, không phải ngưỡng metric. Nó bao sai số float của vị trí tâm làn CARLA, vốn cỡ 1e-6 đến 1e-3 m. Nó không
+lớn hơn ngưỡng contact nhỏ nhất (0,05/0,15/0,20) và nhỏ hơn nhiều so với bề rộng làn (≈ 3,5 m).
 
 ## Báo cáo
 

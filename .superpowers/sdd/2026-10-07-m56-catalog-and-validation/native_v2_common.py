@@ -275,9 +275,20 @@ def plan_rows(rows, arc, start_station, every=2.):
     return tuple(out)
 
 
-def policy_maker(fixture, rows_by_role, review, source):
+# v5 P-NPC (prereg eda7680): fixed-order NPC longitudinal grid (K_P, K_I, K_D); entry 0 = stock (no binding key).
+NPC_PID_GRID = ((F(1), F(1, 20), F(0)), (F(1, 2), F(1, 20), F(0)), (F(3, 10), F(1, 20), F(0)), (F(1, 2), F(1, 5), F(0)),
+                (F(3, 10), F(1, 5), F(0)), (F(1, 5), F(1, 10), F(0)))
+
+
+def npc_gains_binding(gains):
+    return None if gains is None or tuple(gains) == NPC_PID_GRID[0] else {
+        'K_P': F(gains[0]), 'K_I': F(gains[1]), 'K_D': F(gains[2]), 'dt': F(1, 20)}
+
+
+def policy_maker(fixture, rows_by_role, review, source, npc_gains=None):
     """Reviewed stock binding per actor, made after spawn (names the real actor id). Plan = the role's own route lane
-    waypoints (road/lane/s) every 2 m from 2 m ahead of the actor's current station."""
+    waypoints (road/lane/s) every 2 m from 2 m ahead of the actor's current station. npc_gains (v5 P-NPC): the NPC's
+    reviewed longitudinal gains; None or the stock entry = no binding key (byte-identical binding to v4)."""
     from m56.metrics import _metric_station
 
     def policy_for(response, actor):
@@ -290,6 +301,8 @@ def policy_maker(fixture, rows_by_role, review, source):
         binding = {'response_hash': response.hash, 'response_record_hash': _digest(response),
                    'route_hash': _digest(response.route), 'actor_id': actor.id, 'source_refs': (source,), 'plan': plan,
                    'client_version': '0.9.16', 'server_version': '0.9.16'}
+        if role == 'NPC' and npc_gains_binding(npc_gains) is not None:
+            binding['npc_longitudinal'] = npc_gains_binding(npc_gains)
         r = review(binding, 'STOCK_FORWARD_BINDING', (source,))
         return PolicyBundle('m56-v2', 'f' * 64, {}, {'stock_binding': {**binding, 'review': r}}, {}, (source,))
     return policy_for
