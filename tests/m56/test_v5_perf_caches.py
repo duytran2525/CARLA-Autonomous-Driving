@@ -25,3 +25,13 @@ def test_route_digest_memo_and_source_decode_memo(tmp_path):
     assert first == route and second is first
     bad = SourceRef(str(path), 'c' * 64, len(data), '1', 'literal', 'SYNTHETIC_TEST')
     assert _decode_source_record('DirectedRoute', bad) is None
+
+
+def test_source_ok_reverifies_a_rewritten_file(tmp_path):
+    import os
+    from m56.evidence import _source_ok
+    path = tmp_path / 'blob.bin'; path.write_bytes(b'abc')
+    ref = SourceRef(str(path), hashlib.sha256(b'abc').hexdigest(), 3, '1', 'literal', 'SYNTHETIC_TEST')
+    assert _source_ok(ref) and _source_ok(ref)
+    path.write_bytes(b'abd'); os.utime(path, ns=(10 ** 18, 10 ** 18))
+    assert not _source_ok(ref)
