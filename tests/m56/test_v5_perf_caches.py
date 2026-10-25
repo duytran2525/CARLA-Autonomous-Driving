@@ -68,3 +68,45 @@ def test_safe_path_cache_still_rejects_a_directory_swapped_for_a_junction(tmp_pa
         pytest.skip('junction creation unavailable')
     with pytest.raises(ValueError, match='PATH_REJECTED'):
         _safe_path(root, 'native/c.json')
+
+
+def _encode_reference(record):
+    """The pre-2026-10-25 encode_record chain (reference for the fast paths)."""
+    import math, types
+    from dataclasses import fields, is_dataclass
+    from collections.abc import Mapping
+    from pathlib import Path
+    from m56.model import _encode_typed, _type_hints
+    if isinstance(record, F):
+        return {'numerator': record.numerator, 'denominator': record.denominator}
+    if is_dataclass(record):
+        hints = _type_hints(type(record))
+        return {f.name: _encode_typed(getattr(record, f.name), hints[f.name]) for f in fields(record)}
+    if isinstance(record, Mapping):
+        return {k: encode_record(v) for k, v in record.items()}
+    if isinstance(record, (tuple, list)):
+        return [encode_record(v) for v in record]
+    if isinstance(record, float):
+        if not math.isfinite(record):
+            raise ValueError('NONFINITE')
+        return {'binary64': record.hex()}
+    if isinstance(record, Path):
+        return str(record)
+    if record is None or isinstance(record, (str, int, bool)):
+        return record
+    raise ValueError('UNSERIALIZABLE_RUNTIME_OBJECT')
+
+
+def test_encode_record_fast_paths_match_the_reference():
+    import types
+    ref0 = SourceRef('synthetic://e', 'a' * 64, 1, '1', 'literal', 'SYNTHETIC_TEST', 3, F(1, 20))
+    route = DirectedRoute((), tuple(Transform6(i / 4, -0.0, 1e-300, 0., 90., 0.) for i in range(5)),
+                          tuple(F(i, 4) for i in range(5)), 'b' * 64, (ref0,), F(1))
+    samples = [route, ref0, F(-7, 3), 1.5, -0.0, 0, True, None, 'x', [1, 2.5, F(1, 2)], (ref0, 'y'),
+               {'a': route, 'b': [F(1), {'c': 2.25}]}, types.MappingProxyType({'k': (1, 2)})]
+    for x in samples:
+        assert encode_record(x) == _encode_reference(x)
+    from m56.geometry import _route_shape_ok
+    assert _route_shape_ok(route) and _route_shape_ok(route)
+    bad = DirectedRoute((), route.transforms, (F(0), F(1), F(1), F(2), F(3)), 'b' * 64, (ref0,), F(1))
+    assert not _route_shape_ok(bad)

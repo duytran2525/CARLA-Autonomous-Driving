@@ -97,14 +97,29 @@ def _route_floats(route):
     return _ROUTE_FLOATS[id(route)][1]
 
 
+_ROUTE_SHAPES = {}
+
+
+def _route_shape_ok(route):
+    """len(transforms) == len(arc) >= 2 and arc strictly increasing; a pure function of the frozen route, cached by
+    identity (perf 2026-10-25: 9.4 M Fraction comparisons per evaluation). ponytail: bounded clear-all cache."""
+    hit=_ROUTE_SHAPES.get(id(route))
+    if hit is not None and hit[0] is route:
+        return hit[1]
+    ok=(len(route.transforms)==len(route.arc) and len(route.arc)>=2
+        and not any(b<=a for a,b in zip(route.arc,route.arc[1:])))
+    if len(_ROUTE_SHAPES)>4096:
+        _ROUTE_SHAPES.clear()
+    _ROUTE_SHAPES[id(route)]=(route,ok)
+    return ok
+
+
 def _project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
     """Exact nearest-segment station, computed exactly (rational) only on the segments whose float distance is within
     a conservative margin of the float minimum; every other segment provably cannot hold the exact minimum. Results are
     identical to _project_route_exact (test_v5_projection). Harness performance fix 2026-10-25: the full rational scan
     cost 24-79 ms per call on 0.25 m CARLA routes (OUTER_TIMEOUT at ~1.7 s/tick)."""
-    if (len(point)!=3 or not all(isfinite(v) for v in point)
-            or len(route.transforms)!=len(route.arc) or len(route.arc)<2
-            or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
+    if len(point)!=3 or not all(isfinite(v) for v in point) or not _route_shape_ok(route):
         return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
     import numpy as np
     px,py,pz=point

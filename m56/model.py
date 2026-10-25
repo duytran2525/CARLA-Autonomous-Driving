@@ -895,8 +895,25 @@ def decode_revision(payload: dict[str, object]) -> CandidateRevision | SchemaErr
     return decode_record('CandidateRevision', payload)
 
 
+@_lru_cache(maxsize=None)
+def _kind_parts_cached(kind):
+    return get_origin(kind),get_args(kind)
+
+
+def _kind_parts(kind):
+    try:
+        return _kind_parts_cached(kind)
+    except TypeError:  # unhashable annotation: no cache
+        return get_origin(kind),get_args(kind)
+
+
+@_lru_cache(maxsize=None)
+def _field_names(cls):
+    return tuple(f.name for f in fields(cls))
+
+
 def _encode_typed(value, kind):
-    origin,args=get_origin(kind),get_args(kind)
+    origin,args=_kind_parts(kind)  # perf 2026-10-25: cached typing introspection
     if kind is float:
         if isinstance(value,bool) or not isinstance(value,(int,float,Fraction,Decimal)):
             raise ValueError('INVALID_FLOAT_FIELD')
@@ -921,11 +938,24 @@ def _encode_typed(value, kind):
 
 
 def encode_record(record: object) -> dict[str, object]:
+    # perf 2026-10-25: exact-type fast paths first (same results as the generic chain below, which they cannot reach
+    # differently: none of these exact types is a Fraction, dataclass, Mapping or sequence of another kind).
+    t=type(record)
+    if t is str or t is int or t is bool or record is None:
+        return record
+    if t is float:
+        if not math.isfinite(record):
+            raise ValueError('NONFINITE')
+        return {'binary64': record.hex()}
+    if t is tuple or t is list:
+        return [encode_record(v) for v in record]
+    if t is dict or t is types.MappingProxyType:
+        return {k: encode_record(v) for k, v in record.items()}
     if isinstance(record, Fraction):
         return {'numerator': record.numerator, 'denominator': record.denominator}
     if is_dataclass(record):
-        hints=_type_hints(type(record))
-        return {f.name: _encode_typed(getattr(record,f.name),hints[f.name]) for f in fields(record)}
+        hints=_type_hints(t)
+        return {name: _encode_typed(getattr(record,name),hints[name]) for name in _field_names(t)}
     if isinstance(record, Mapping):
         return {k: encode_record(v) for k, v in record.items()}
     if isinstance(record, (tuple, list)):
