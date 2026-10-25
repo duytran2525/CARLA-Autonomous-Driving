@@ -53,3 +53,18 @@ def test_vectorized_c4_helpers_equal_the_python_reference():
     ref = min(((a, b) for a in route.transforms for b in other.transforms),
               key=lambda st: sum((u - v) ** 2 for u, v in zip((st[0].x, st[0].y, st[0].z), (st[1].x, st[1].y, st[1].z))))
     assert _closest_transform_pair(route, other) == ref
+
+
+def test_safe_path_cache_still_rejects_a_directory_swapped_for_a_junction(tmp_path):
+    import os, shutil, subprocess, pytest
+    from m56.evidence import _safe_path
+    root = tmp_path / 'run'; (root / 'native').mkdir(parents=True)
+    assert _safe_path(root, 'native/a.json') == root / 'native' / 'a.json'
+    assert _safe_path(root, 'native/b.json') == root / 'native' / 'b.json'  # cached ancestors
+    outside = tmp_path / 'outside'; outside.mkdir()
+    shutil.rmtree(root / 'native')
+    made = subprocess.run(['cmd', '/c', 'mklink', '/J', str(root / 'native'), str(outside)], capture_output=True)
+    if made.returncode != 0:
+        pytest.skip('junction creation unavailable')
+    with pytest.raises(ValueError, match='PATH_REJECTED'):
+        _safe_path(root, 'native/c.json')

@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from functools import lru_cache
 from types import MappingProxyType
-import hashlib
+import hashlib, stat
 import json
 import os
 import re
@@ -1447,6 +1447,9 @@ def _payload(record: object) -> bytes:
                        ensure_ascii=False, allow_nan=False)+'\n').encode('utf-8')
 
 
+_SAFE_DIRS = {}
+
+
 def _safe_path(root: Path, relative: str) -> Path:
     if not isinstance(relative,str) or not relative or '\\' in relative:
         raise ValueError('PATH_REJECTED')
@@ -1457,13 +1460,33 @@ def _safe_path(root: Path, relative: str) -> Path:
                    or part.endswith('.') or part.split('.')[0].upper() in reserved for part in parts)):
         raise ValueError('PATH_REJECTED')
     path=root.joinpath(*parts)
+    # perf 2026-10-25: one lstat per ancestor (symlink or Windows reparse point = junction) instead of is_symlink +
+    # is_junction, and the resolve() containment check only when an ancestor is new or changed identity since its
+    # last full verification (identity = st_dev, st_ino, st_mode, reparse flag). A directory swapped for a link
+    # changes identity and is fully re-verified. ponytail: bounded clear-all cache.
+    identities=[]
     for parent in (path,*path.parents):
         if parent==root.parent:
             break
-        if parent.is_symlink() or (hasattr(parent,'is_junction') and parent.is_junction()):
+        try:
+            st=os.lstat(parent)
+        except FileNotFoundError:
+            identities.append((str(parent),None));continue
+        except OSError:
             raise ValueError('PATH_REJECTED_LINK')
-    if not path.resolve().is_relative_to(root.resolve()):
-        raise ValueError('PATH_REJECTED')
+        reparse=bool(getattr(st,'st_file_attributes',0) & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+        if stat.S_ISLNK(st.st_mode) or reparse:
+            raise ValueError('PATH_REJECTED_LINK')
+        identities.append((str(parent),(st.st_dev,st.st_ino,st.st_mode)))
+    ancestors=identities[1:]
+    if any(i is None for _,i in ancestors) or any(_SAFE_DIRS.get(k)!=i for k,i in ancestors):
+        if not path.resolve().is_relative_to(root.resolve()):
+            raise ValueError('PATH_REJECTED')
+        if len(_SAFE_DIRS)>4096:
+            _SAFE_DIRS.clear()
+        for k,i in ancestors:
+            if i is not None:
+                _SAFE_DIRS[k]=i
     return path
 
 
