@@ -78,7 +78,64 @@ def project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
     return result
 
 
+_ROUTE_FLOATS = {}
+
+
+def _route_floats(route):
+    """Per-route float segment table (start, direction, |d|^2), keyed by identity with a strong reference."""
+    hit=_ROUTE_FLOATS.get(id(route))
+    if hit is not None and hit[0] is route:
+        return hit[1]
+    if len(_ROUTE_FLOATS)>4096:
+        _ROUTE_FLOATS.clear()
+    table=[(a.x,a.y,a.z,b.x-a.x,b.y-a.y,b.z-a.z) for a,b in zip(route.transforms,route.transforms[1:])]
+    _ROUTE_FLOATS[id(route)]=(route,table)
+    return table
+
+
 def _project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
+    """Exact nearest-segment station, computed exactly (rational) only on the segments whose float distance is within
+    a conservative margin of the float minimum; every other segment provably cannot hold the exact minimum. Results are
+    identical to _project_route_exact (test_v5_projection). Harness performance fix 2026-10-25: the full rational scan
+    cost 24-79 ms per call on 0.25 m CARLA routes (OUTER_TIMEOUT at ~1.7 s/tick)."""
+    if (len(point)!=3 or not all(isfinite(v) for v in point)
+            or len(route.transforms)!=len(route.arc) or len(route.arc)<2
+            or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
+        return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
+    px,py,pz=point;dists=[]
+    for sx,sy,sz,dx,dy,dz in _route_floats(route):
+        if not all(isfinite(v) for v in (sx,sy,sz,dx,dy,dz,sx+dx,sy+dy,sz+dz)):
+            return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
+        n=dx*dx+dy*dy+dz*dz
+        if dx==0 and dy==0 and dz==0:
+            return BlockedFixture(('DEGENERATE_ROUTE_SEGMENT',))
+        u=((px-sx)*dx+(py-sy)*dy+(pz-sz)*dz)/n if n>0 else 0.
+        u=0. if u<0 else 1. if u>1 else u
+        qx,qy,qz=sx+u*dx-px,sy+u*dy-py,sz+u*dz-pz
+        dists.append(qx*qx+qy*qy+qz*qz)
+    m=min(dists)
+    # Float error of a squared distance here is ~1e-10 for CARLA coordinates; the margin is orders of magnitude wider.
+    margin=1e-6*(1.+m)+1e-6
+    keep=[i for i,d in enumerate(dists) if d<=m+margin]
+    p=tuple(Fraction(v) for v in point)
+    candidates=[]
+    for i in keep:
+        a,b=route.transforms[i],route.transforms[i+1]
+        start=tuple(Fraction(v) for v in (a.x,a.y,a.z))
+        direction=tuple(Fraction(v)-w for v,w in zip((b.x,b.y,b.z),start))
+        length2=sum(v*v for v in direction)
+        u=max(Fraction(0),min(Fraction(1),sum((v-w)*d for v,w,d in zip(p,start,direction))/length2))
+        projected=tuple(w+u*d for w,d in zip(start,direction))
+        candidates.append((sum((v-q)**2 for v,q in zip(p,projected)),route.arc[i]+u*(route.arc[i+1]-route.arc[i])))
+    minimum=min(d for d,_ in candidates)
+    stations={st for d,st in candidates if d==minimum}
+    if len(stations)!=1:
+        return BlockedFixture(('NONUNIQUE_PROJECTION',))
+    return stations.pop()
+
+
+def _project_route_exact(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
+    """Reference: the full rational scan (pre-2026-10-25 behaviour), kept for the equivalence test."""
     if (len(point)!=3 or not all(isfinite(v) for v in point)
             or len(route.transforms)!=len(route.arc) or len(route.arc)<2
             or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
