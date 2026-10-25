@@ -1,6 +1,7 @@
 # M56 v5, erratum 4: route NPC dừng trước khúc cua vượt ngân sách ngang — BẢN NHÁP (25/10/2026)
 
-**Trạng thái:** `DRAFT_AWAITING_DUY_APPROVAL`. Quy tắc này đặt **sau khi thấy** kết quả A/B v5 của C01 và C05. Kết quả
+**Trạng thái:** `APPROVED`. [chat] 25/10/2026, Duy chọn "Duyệt c49d79d (Recommended)". Nội dung được duyệt là đúng commit
+c49d79d; dòng trạng thái này được thêm vào sau. Code: 552c610. Quy tắc này đặt **sau khi thấy** kết quả A/B v5 của C01 và C05. Kết quả
 được báo theo cả recipe cũ lẫn recipe mới.
 
 **Nhãn:** independent review waived by Duy 2026-10-24 (`CLAUDE_REVIEW_UNDER_DUY_DELEGATION`).
