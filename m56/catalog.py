@@ -24,7 +24,7 @@ _FIXTURE_DIGESTS = {}
 def _digest(record: object) -> str:
     # A CompiledFixture is deeply frozen at construction (model._freeze), so its digest is memoized by identity
     # (strong ref kept) for per-tick online detection. ponytail: bounded clear-all cache.
-    if type(record).__name__ == 'CompiledFixture':
+    if type(record).__name__ in ('CompiledFixture', 'DirectedRoute'):  # DirectedRoute: frozen tuples (perf 2026-10-25)
         hit = _FIXTURE_DIGESTS.get(id(record))
         if hit is not None and hit[0] is record:
             return hit[1]

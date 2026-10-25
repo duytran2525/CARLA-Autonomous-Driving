@@ -1309,7 +1309,29 @@ def _sealed_source(ref,root,entries):
     return entry is not None and entry['hash']==ref.sha256 and entry['size']==ref.bytes
 
 
+_SOURCE_RECORDS = {}
+
+
 def _decode_source_record(kind,ref):
+    # A verified source decodes to the same immutable record every time: memoized by (kind, SourceRef) for successful
+    # decodes (perf 2026-10-25: per-frame plan-route decoding dominated offline evaluation). ponytail: assumes sealed
+    # sources are not rewritten in place during one process; bounded clear-all cache.
+    key=(kind,ref)
+    try:
+        hit=_SOURCE_RECORDS.get(key)
+    except TypeError:
+        return _decode_source_record_uncached(kind,ref)
+    if hit is not None:
+        return hit
+    result=_decode_source_record_uncached(kind,ref)
+    if result is not None and not hasattr(result,'errors'):
+        if len(_SOURCE_RECORDS)>4096:
+            _SOURCE_RECORDS.clear()
+        _SOURCE_RECORDS[key]=result
+    return result
+
+
+def _decode_source_record_uncached(kind,ref):
     data=_source_bytes(ref)
     if data is None:
         return None

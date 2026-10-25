@@ -8,6 +8,13 @@ from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 from typing import Protocol, Union, get_args, get_origin, get_type_hints
+from functools import lru_cache as _lru_cache
+
+
+@_lru_cache(maxsize=None)
+def _type_hints(kind):
+    """get_type_hints is a pure function of the class; cached (perf 2026-10-25: ~45% of offline evaluation)."""
+    return get_type_hints(kind)
 import json
 import math
 import re
@@ -755,7 +762,7 @@ def _decode(kind, value, path):
         unknown = set(value)-definitions.keys()
         if unknown:
             raise _DecodeError(f'{path}.{sorted(unknown)[0]}'.lstrip('.'), 'UNKNOWN_FIELD')
-        hints = get_type_hints(kind)
+        hints = _type_hints(kind)
         output = {}
         for name, field in definitions.items():
             fieldpath = f'{path}.{name}'.lstrip('.')
@@ -917,7 +924,7 @@ def encode_record(record: object) -> dict[str, object]:
     if isinstance(record, Fraction):
         return {'numerator': record.numerator, 'denominator': record.denominator}
     if is_dataclass(record):
-        hints=get_type_hints(type(record))
+        hints=_type_hints(type(record))
         return {f.name: _encode_typed(getattr(record,f.name),hints[f.name]) for f in fields(record)}
     if isinstance(record, Mapping):
         return {k: encode_record(v) for k, v in record.items()}
