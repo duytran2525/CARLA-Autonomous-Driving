@@ -1,7 +1,7 @@
 # M56 v5 erratum 5: bỏ kiểm mặt cắt ở STOP_CONFIRMED và lúc vào hộp (ĐÃ DUYỆT)
 
 **Trạng thái:** APPROVED. [chat] 25/10/2026, Duy: "duyệt erratum 5 phương án 1 tại b52a166; sửa consumer, kiểm C01-B, rồi chạy
-lại đúng một lần các cảnh đã chứng minh". Dòng trạng thái này được thêm sau; phần còn lại giữ nguyên byte của b52a166.
+lại đúng một lần các cảnh đã chứng minh". Tiêu đề và dòng trạng thái được sửa sau; phần còn lại giữ nguyên byte của b52a166.
 Code nằm trên nhánh `feat/m56-e5`; các lần chạy lại dùng nó qua `M56_CODE`.
 
 **Nguồn gốc:** đề xuất này đặt **sau khi thấy** kết quả A/B M (erratum 3) và L (v5f), nên theo nguyên tắc 6 phải được Duy duyệt
