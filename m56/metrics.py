@@ -1232,9 +1232,10 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
                 events.append(event);newly.append(event);seen.add(name)
         if previous_positions is not None:
             for role,name,section in (('EGO','E_ENTRY',fixture.domain.e_entry),('NPC','NPC_ENTRY',fixture.domain.n_entry)):
+                # Erratum 5 (Duy 2026-10-25): spec 7.3 entry = front crossing on a valid route; no face-corridor
+                # conjunct (an actor turning into the box meets a face parallel to its heading and never fits it).
                 if (role in positions and role in previous_positions
-                        and previous_positions[role]<section.route_station<=positions[role]
-                        and _section_corridor(vertices[role],section)):
+                        and previous_positions[role]<section.route_station<=positions[role]):
                     emit(name)
             if 'EGO' in previous_positions and 'EGO' in positions:
                 before=fixture.domain.e_entry.route_station-previous_positions['EGO']
@@ -1254,9 +1255,9 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
         if 'EGO' in positions and refs and (i==0 or proof is not None):
             error=proof.uncertainty if proof is not None else Fraction(0)
             speed=_speed(actors['EGO'].velocity)
+            # Erratum 5: spec 5.3 stop = speed + front margin before entry; no face-corridor conjunct.
             stopped=(speed is not None and speed<=Fraction(1,10)
-                     and fixture.domain.e_entry.route_station-positions['EGO']-error>=Fraction(1,2)
-                     and _section_corridor(vertices['EGO'],fixture.domain.e_entry))
+                     and fixture.domain.e_entry.route_station-positions['EGO']-error>=Fraction(1,2))
             destination=fixture.sections.get('DESTINATION')
             if destination is not None and destination.route_station==fixture.routes['EGO'].destination:
                 margins=_section_margin(vertices['EGO'],destination)

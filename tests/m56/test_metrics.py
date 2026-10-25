@@ -107,6 +107,36 @@ def test_first_bracketed_crossings_and_wholebody_confirmation(require,crossing_t
     assert events['CLEAR_N_CONFIRMED'].time==F(2,5)
 
 
+def _offset(frames,y,ego_v=None):
+    out=[]
+    for f in frames:
+        actors=tuple(replace(a,pose=replace(a.pose,y=y),
+                             velocity=ego_v if ego_v is not None and a.role=='EGO' else a.velocity) for a in f.actors)
+        out.append(replace(f,actors=actors))
+    return tuple(out)
+
+
+def test_erratum5_entry_beside_the_face_still_counts(require,crossing_trace,rebind_trace):
+    # Erratum 5 (Duy 2026-10-25): an actor turning into the box meets a face parallel to its heading; spec 7.3 entry is
+    # the front crossing on a valid route. The face y-range is [-1, 1]; bodies at y = 1.2 stick out (0.95..1.45).
+    detect=require('m56.metrics','detect_events');c=crossing_trace
+    events={e.name:e for e in detect(rebind_trace(_offset(c.frames,1.2),c.fixture),c.fixture)}
+    assert events['NPC_ENTRY'].frame==101 and events['E_ENTRY'].frame==104
+    assert 'CLEAR_N_CONFIRMED' not in events  # spec 5.2 keeps "correct corridor" for the whole-body clear
+
+
+def test_erratum5_stop_beside_the_entry_face_is_confirmed(require,crossing_trace,rebind_trace):
+    detect=require('m56.metrics','detect_events');c=crossing_trace
+    first=c.frames[0];raw=first.integrity['frame_refs'][0];frames=[]
+    for i in range(12):  # EGO parked at x = 7 (front 7.5, 2.5 m before entry), NPC parked behind it
+        actors=(replace(first.actors[0],pose=replace(first.actors[0].pose,x=7.)),first.actors[1])
+        frames.append(replace(first,frame=100+i,simtime=F(i,20),actors=actors,
+                              integrity={**first.integrity,'frame_refs':(replace(raw,frame=100+i,time=F(i,20)),)}))
+    frames=_offset(frames,1.2,ego_v=(0.,0.,0.))
+    events={e.name:e for e in detect(rebind_trace(frames,c.fixture),c.fixture)}
+    assert events['STOP_CONFIRMED'].frame==110  # 0.50 s hold = 11 samples from frame 100
+
+
 def test_missing_bracket_no_trigger(require,crossing_trace):
     detect=require('m56.metrics','detect_events')
     c=crossing_trace
