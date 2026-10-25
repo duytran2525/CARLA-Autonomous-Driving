@@ -617,7 +617,10 @@ def _target_integrity(evidence,fixture):
                 targets=responses[0].targets
                 if not targets:
                     uncertain.append('TARGET_PROGRAM_MISSING');continue
-                target=targets.get(command.cause)
+                # Erratum 6: the producer's own NPC traffic hold (response.step_response, stock contract
+                # apply_intent) has cause NPC_TRAFFIC_HOLD at 0 km/h; its witness is audited in _phase_integrity.
+                target=(Fraction(0) if command.cause=='NPC_TRAFFIC_HOLD' and actor.role=='NPC'
+                        else targets.get(command.cause))
                 if (isinstance(target,bool) or not isinstance(target,(int,Fraction)) or target<0
                         or isinstance(command.target_kmh,bool) or not isinstance(command.target_kmh,(int,Fraction))
                         or command.target_kmh!=Fraction(18,5)*target):
@@ -1003,7 +1006,18 @@ def _phase_integrity(evidence,fixture):
                 continue
             prior=state
             state=_advance_program(observed,state,response,known)
-            if command.cause!=state.phase:
+            if command.cause=='NPC_TRAFFIC_HOLD' and response.actor_role=='NPC':
+                # Erratum 6: a hold is valid only at 0 km/h on a frame whose sealed npc_controls witness is not CLEAR.
+                try:
+                    npc=next(a for a in observed.actors if a.role=='NPC')
+                    traffic=_reverse_priority(observed,npc,require_clear=False)
+                    held=(traffic['status']!='CLEAR' and command.target_kmh==0
+                          and all(_admitted_source(evidence,r) for r in traffic['witness_refs']))
+                except (ValueError,TypeError,KeyError,AttributeError,StopIteration):
+                    held=False
+                if not held:
+                    invalid.append('PHASE_PROGRAM_MISMATCH')
+            elif command.cause!=state.phase:
                 invalid.append('PHASE_PROGRAM_MISMATCH')
             if (response.actor_role=='EGO' and response.action_id in ('A','B')
                     and fixture.domain.topology.get('mechanism')=='F04'):
