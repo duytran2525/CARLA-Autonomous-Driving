@@ -88,9 +88,13 @@ def _route_floats(route):
         return hit[1]
     if len(_ROUTE_FLOATS)>4096:
         _ROUTE_FLOATS.clear()
+    import numpy as np
     table=[(a.x,a.y,a.z,b.x-a.x,b.y-a.y,b.z-a.z) for a,b in zip(route.transforms,route.transforms[1:])]
-    _ROUTE_FLOATS[id(route)]=(route,table)
-    return table
+    arr=np.array(table,dtype=float).reshape(-1,6)
+    finite=bool(np.isfinite(arr).all()) and all(isfinite(v) for t in route.transforms for v in (t.x,t.y,t.z))
+    degenerate=[i for i,(_,_,_,dx,dy,dz) in enumerate(table) if dx==0 and dy==0 and dz==0]
+    _ROUTE_FLOATS[id(route)]=(route,(table,arr,finite,degenerate))
+    return _ROUTE_FLOATS[id(route)][1]
 
 
 def _project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
@@ -102,21 +106,26 @@ def _project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture
             or len(route.transforms)!=len(route.arc) or len(route.arc)<2
             or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
         return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
-    px,py,pz=point;dists=[]
-    for sx,sy,sz,dx,dy,dz in _route_floats(route):
-        if not all(isfinite(v) for v in (sx,sy,sz,dx,dy,dz,sx+dx,sy+dy,sz+dz)):
-            return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
-        n=dx*dx+dy*dy+dz*dz
-        if dx==0 and dy==0 and dz==0:
-            return BlockedFixture(('DEGENERATE_ROUTE_SEGMENT',))
-        u=((px-sx)*dx+(py-sy)*dy+(pz-sz)*dz)/n if n>0 else 0.
-        u=0. if u<0 else 1. if u>1 else u
-        qx,qy,qz=sx+u*dx-px,sy+u*dy-py,sz+u*dz-pz
-        dists.append(qx*qx+qy*qy+qz*qz)
-    m=min(dists)
-    # Float error of a squared distance here is ~1e-10 for CARLA coordinates; the margin is orders of magnitude wider.
+    import numpy as np
+    px,py,pz=point
+    table,arr,finite,degenerate=_route_floats(route)
+    if not finite:  # same first-failure order as the scalar scan: the first bad segment decides
+        for i,(sx,sy,sz,dx,dy,dz) in enumerate(table):
+            if not all(isfinite(v) for v in (sx,sy,sz,dx,dy,dz,sx+dx,sy+dy,sz+dz)):
+                return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
+            if dx==0 and dy==0 and dz==0:
+                return BlockedFixture(('DEGENERATE_ROUTE_SEGMENT',))
+    if degenerate:
+        return BlockedFixture(('DEGENERATE_ROUTE_SEGMENT',))
+    S,D=arr[:,:3],arr[:,3:]
+    n=D[:,0]*D[:,0]+D[:,1]*D[:,1]+D[:,2]*D[:,2]
+    u=np.clip(((px-S[:,0])*D[:,0]+(py-S[:,1])*D[:,1]+(pz-S[:,2])*D[:,2])/n,0.,1.)
+    dists=(S[:,0]+u*D[:,0]-px)**2+(S[:,1]+u*D[:,1]-py)**2+(S[:,2]+u*D[:,2]-pz)**2
+    m=float(dists.min())
+    # Float error of a squared distance here is ~1e-10 for CARLA coordinates; the margin is orders of magnitude wider,
+    # so the numpy prefilter (perf 2026-10-25) keeps every segment that can hold the exact minimum.
     margin=1e-6*(1.+m)+1e-6
-    keep=[i for i,d in enumerate(dists) if d<=m+margin]
+    keep=np.nonzero(dists<=m+margin)[0].tolist()
     p=tuple(Fraction(v) for v in point)
     candidates=[]
     for i in keep:

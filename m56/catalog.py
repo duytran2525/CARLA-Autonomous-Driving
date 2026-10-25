@@ -21,14 +21,24 @@ from .model import (CandidateRevision, SiteLedger, CatalogAudit, ComparisonRecor
 _FIXTURE_DIGESTS = {}
 
 
+def _frozen_record(record: object) -> bool:
+    """m56.model records are deeply frozen at construction (model.dataclass -> _freeze: tuples, MappingProxyType), so a
+    record or a tuple of records never changes after creation."""
+    if type(record).__module__ == 'm56.model' and hasattr(record, '__dataclass_fields__'):
+        return True
+    return type(record) is tuple and bool(record) and all(type(x).__module__ == 'm56.model'
+                                                           and hasattr(x, '__dataclass_fields__') for x in record)
+
+
 def _digest(record: object) -> str:
-    # A CompiledFixture is deeply frozen at construction (model._freeze), so its digest is memoized by identity
-    # (strong ref kept) for per-tick online detection. ponytail: bounded clear-all cache.
-    if type(record).__name__ in ('CompiledFixture', 'DirectedRoute'):  # DirectedRoute: frozen tuples (perf 2026-10-25)
+    # Deeply frozen records (model._freeze) are memoized by identity with a strong reference (no id reuse): online
+    # detection and offline evaluation digest the same frames/actors/fixture many times (perf 2026-10-25: ~35% of
+    # offline evaluation). ponytail: bounded clear-all cache.
+    if _frozen_record(record):
         hit = _FIXTURE_DIGESTS.get(id(record))
         if hit is not None and hit[0] is record:
             return hit[1]
-        if len(_FIXTURE_DIGESTS) > 256:
+        if len(_FIXTURE_DIGESTS) > 65536:
             _FIXTURE_DIGESTS.clear()
         _FIXTURE_DIGESTS[id(record)] = (record, _encode_digest(record))
         return _FIXTURE_DIGESTS[id(record)][1]
