@@ -1,6 +1,7 @@
 # M56 v5, erratum 3: G và LrefN của các cảnh M mới theo spec §6.2 — BẢN NHÁP (25/10/2026)
 
-**Trạng thái:** `DRAFT_AWAITING_DUY_APPROVAL`. Spec §6.2 ghi: "Changing LrefN/assumptions/G needs independent
+**Trạng thái:** `APPROVED`. [chat] 25/10/2026, Duy chọn "Duyệt 06144be (Recommended)". Bản được duyệt là đúng nội
+dung của commit 06144be; dòng trạng thái này là phần duy nhất được thêm vào sau. Spec §6.2 ghi: "Changing LrefN/assumptions/G needs independent
 rationale/version approval before an attempt, never outcome tuning". Vì vậy chưa chạy gì theo file này.
 
 **Nhãn:** independent review waived by Duy 2026-10-24 (`CLAUDE_REVIEW_UNDER_DUY_DELEGATION`).
