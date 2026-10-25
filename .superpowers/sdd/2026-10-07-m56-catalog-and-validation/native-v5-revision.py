@@ -40,10 +40,24 @@ def lane(x):
     return f'{x:+d}'
 
 
+E3 = WORK / 'docs/m56/PREREG_M56_V5_ERRATUM3_M_G_20261025.md'
+
+
+def spec_g(town, connector, vN, vE=F(4)):
+    """Spec 6.2: G0 = vE^2/(2 a) + vE tau + vE (LrefN + 4.5 + 0.5)/(2 vN) + 0.5, G = ceil(G0/0.5)*0.5, exact;
+    LrefN = road/@length of the NPC (branch) connector, from the pinned XODR."""
+    import math, xml.etree.ElementTree as ET
+    root = ET.parse(f'E:/Carla/CarlaUE4/Content/Carla/Maps/OpenDrive/{town}.xodr').getroot()
+    lref = F(next(r.get('length') for r in root.findall('road') if int(r.get('id')) == int(connector)))
+    g0 = vE ** 2 / (2 * F(3, 2)) + vE * F(1, 2) + vE * (lref + F(9, 2) + F(1, 2)) / (2 * vN) + F(1, 2)
+    return lref, F(math.ceil(g0 * 2), 2)
+
+
 def additions(out, decision_ref, xodr, weather, identity_pairs):
     adds, report = [], []
     for tag, (fill_path, prereg_path, commit) in FILLS.items():
         fill_ref, prereg_ref = cr.st.ref(fill_path, 'M56_SELECTION_RECEIPT'), cr.st.ref(prereg_path, 'PREREGISTRATION')
+        e3_ref = cr.st.ref(E3, 'PREREGISTRATION')
 
         def attest(digest, scope, why):
             return ReviewRecord(digest, scope, (fill_ref, prereg_ref), 'CLAUDE_MECHANICAL_ATTESTATION_UNDER_DUY_DELEGATION',
@@ -66,7 +80,10 @@ def additions(out, decision_ref, xodr, weather, identity_pairs):
                                             'notation': 'road/lane→connector/lane→outgoing/lane', 'route': notation[r]}, None)
                                for r in ('EGO', 'NPC'))
                 why = f"fill {tag} ({commit}) series k={p['k']}; {e.get('k_rule', 'registered k')}"
-                params = {'G': ParameterProposal('G', (F(str(p['GL_m'])),), 'm', why + '; G = GL (fill20 section 3/4)', (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY'),
+                lref, g = spec_g(s['town'], br['connecting'], F(str(p['vN'])))
+                e3 = (e3_ref,)
+                params = {'G': ParameterProposal('G', (g,), 'm', why + '; spec 6.2 G0 with LrefN, ceil to 0.50 m (erratum 3, 06144be)', (prereg_ref, fill_ref, *e3), 'PROPOSED_PREREG_NOT_READY'),
+                          'LrefN': ParameterProposal('LrefN', (lref,), 'm', 'spec 6.2: NPC connector road/@length (erratum 3)', (prereg_ref, *e3), 'PROPOSED_PREREG_NOT_READY'),
                           'vN': ParameterProposal('vN', (F(str(p['vN'])),), 'm/s', why, (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY'),
                           'vE': ParameterProposal('vE', (F(4),), 'm/s', 'mainflow E = 4 m/s (fill20 section 4)', (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY')}
             else:  # F03
