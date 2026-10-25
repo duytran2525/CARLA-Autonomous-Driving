@@ -144,7 +144,11 @@ def run_scene(c, client, proc, start, world, m, identity):
         region, _ = merge_transition_region(m, {r_: rows[r_][0] for r_ in rows}, ex)
     secs = {role: _derive_box_sections(routes[role], region) for role in routes}
     center = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2)
-    drivable = drivable_union(m, center)
+    # Fix 2026-10-25: the union must cover the start footprints. v5 phasing (route cut, C1 run-in) puts NPC starts
+    # 92-146 m from the conflict centre, outside the old fixed 90 m radius, so BODY_FIT failed (edge = -1) before any
+    # episode for C03, L04, L05, L06 (and M05). Radius = max(90 m, farthest start + 20 m).
+    radius = max(90., max(math.dist((poses[r].x, poses[r].y), center) for r in poses) + 20.)
+    drivable = drivable_union(m, center, radius)
     dpath = sd / 'drivable-union.wkt'
     dpath.write_text(drivable.wkt, encoding='utf-8')
     dref = SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')
