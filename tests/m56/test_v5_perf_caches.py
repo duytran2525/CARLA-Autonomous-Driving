@@ -35,3 +35,21 @@ def test_source_ok_reverifies_a_rewritten_file(tmp_path):
     assert _source_ok(ref) and _source_ok(ref)
     path.write_bytes(b'abd'); os.utime(path, ns=(10 ** 18, 10 ** 18))
     assert not _source_ok(ref)
+
+
+def test_vectorized_c4_helpers_equal_the_python_reference():
+    import math, random
+    from m56.geometry import _float_station, _float_stations, _closest_transform_pair
+    rnd = random.Random(4)
+    pts = tuple(Transform6(300 + 40 * math.cos(i / 160), -200 + 40 * math.sin(i / 160), .1 * math.sin(i / 50), 0., 0., 0.) for i in range(700))
+    arc = [F(0)]
+    for a, b in zip(pts, pts[1:]):
+        arc.append(arc[-1] + F(str(round(math.dist((a.x, a.y, a.z), (b.x, b.y, b.z)), 6))))
+    route = DirectedRoute((), pts, tuple(arc), 'b' * 64, (), arc[-1])
+    probe = [(t.x + rnd.uniform(-5, 5), t.y + rnd.uniform(-5, 5), t.z) for t in rnd.sample(pts, 300)]
+    # selection-only floats compared with a 5 m gap: equal up to float rounding (1 ulp observed), not bitwise
+    assert all(abs(x - y) <= 1e-9 for x, y in zip(_float_stations(probe, route), [_float_station(p, route) for p in probe]))
+    other = DirectedRoute((), tuple(Transform6(t.x + 3., t.y - 2., t.z, 0., 0., 0.) for t in pts[::3]), tuple(arc[::3]), 'b' * 64, (), arc[-1])
+    ref = min(((a, b) for a in route.transforms for b in other.transforms),
+              key=lambda st: sum((u - v) ** 2 for u, v in zip((st[0].x, st[0].y, st[0].z), (st[1].x, st[1].y, st[1].z))))
+    assert _closest_transform_pair(route, other) == ref
