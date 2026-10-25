@@ -43,6 +43,7 @@ def trial(client, render):
     import carla
     from agents.navigation.basic_agent import BasicAgent
     from agents.navigation.local_planner import LocalPlanner, RoadOption
+    client.set_timeout(120.)
     world = client.load_world('Town04')
     for _ in range(3):
         world.wait_for_tick(30)
@@ -88,7 +89,6 @@ def trial(client, render):
         row['lights'] = tuple((l.id, str(l.get_state()), round(l.get_elapsed_time() * 20)) for l in lights)
         rows.append(row)
     ego.destroy(); npc.destroy(); world.tick()
-    s = world.get_settings(); s.synchronous_mode = False; s.no_rendering_mode = False; world.apply_settings(s)
     return rows
 
 
@@ -101,10 +101,13 @@ def diff(a, b):
     return out
 
 
-with own_server(log) as (client, proc, start):
-    on1 = trial(client, True)
-    on2 = trial(client, True)
-    off = trial(client, False)
+# One fresh server per trial, the map loaded once per server (as the preparation and A/B tools do): reloading Town04
+# inside one server crashed CARLA twice on 2026-10-25 (EXCEPTION_ACCESS_VIOLATION, same call stack).
+trials = []
+for render in (True, True, False):
+    with own_server(log) as (client, proc, start):
+        trials.append(trial(client, render))
+on1, on2, off = trials
 base, test = diff(on1, on2), diff(on1, off)
 ok = (all(test[k] <= base[k] + 1e-6 for k in test if k != 'light_ticks_differing')
       and test['light_ticks_differing'] == 0 and base['light_ticks_differing'] == 0)
