@@ -124,3 +124,24 @@ def test_driver_hash_memo_is_per_object_and_rejects_a_tampered_hash():
     assert _driver_hash_ok(good) and _driver_hash_ok(good)
     bad = replace(good, hash='0' * 64)
     assert not _driver_hash_ok(bad) and _driver_hash_ok(good)
+
+
+def test_partial_spawn_failure_destroys_the_spawned_actors(tmp_path):
+    """Native 2026-10-25: EGO spawn collided, the spawned NPC stayed in the world and the next scene saw
+    FOREIGN_ACTOR. A partial spawn now cleans its own successes before the episode stops."""
+    from tests.m56.test_runtime_ab import ScriptBackend, fixture, context
+    from m56.model import SpawnResponse
+    from m56.runtime import run_episode
+    from tests.m56.test_runtime_ab import META
+
+    class Backend(ScriptBackend):
+        def spawn(self, actors, due_tick_cue):
+            self.ids = {a.role: 101 + i for i, a in enumerate(actors)}
+            return tuple(SpawnResponse(None, 'Spawn failed because of collision at spawn position', META) if a.role == 'EGO'
+                         else SpawnResponse(self.ids[a.role], None, META) for a in actors)
+    fx = fixture()
+    backend = Backend(tmp_path / 'native', lambda t: {'EGO': (F(6), 0), 'NPC': (F(20), 0)}).bind(fx)
+    ev = run_episode(context(tmp_path, backend), fx, 'A')
+    assert 'SPAWN_ERROR:EGO' in ev.verdict.reasons
+    npc = next(i for i, a in zip((101, 102), fx.actors) if a.role == 'NPC')
+    assert any(c[0] == 'destroy' and npc in c[1] for c in backend.calls if isinstance(c, tuple)), backend.calls

@@ -280,6 +280,14 @@ def spawn_owned(context, fixture):
     registry = OwnedRegistry(live.boot, live.world, tuple(vehicles), tuple(sensors), tuple(responses))
     _record_registry(context, registry)
     if reasons:  # no movement, no respawn, no fallback actor
+        if registry.owned_vehicle_ids or registry.owned_sensor_ids:
+            # Native 2026-10-25: a partial spawn left its successful actors in the world, so the next scene of the same
+            # server stopped on FOREIGN_ACTOR. The owned successes are destroyed now, with the same bounded cleanup.
+            receipt = cleanup_owned(context, registry)
+            append_record(context.store, 'runner/partial_spawn_cleanup.json',
+                          {'status': receipt.status, 'destroyed': list(receipt.destroyed), 'survivors': list(receipt.survivors)})
+            if receipt.status != 'CLEANED':
+                reasons.append('PARTIAL_SPAWN_CLEANUP_' + receipt.status)
         return _verdict('FAILED', 'NOT_RUN', 'UNKNOWN', reasons)
     for sensor_id in sensors:
         context.backend.listen(sensor_id, lambda packet, i=sensor_id: append_record(
