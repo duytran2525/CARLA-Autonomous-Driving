@@ -17,8 +17,16 @@ grep -E 'C0_PARTIAL|FREEZE|Traceback' $LOG/revision-v5f.log | cut -c1-300
 REVF=$R/c0-partial-v5-frozen-revision.json
 [ -f $REVF ] || { echo "NOT RUN: v5f not frozen"; exit 3; }
 N=$(python -I -c "import json,sys;d=json.load(open(sys.argv[1],encoding='utf-8'));print(','.join(c['id'] for c in d['candidates'] if c['id'] in ('M56-P-C01','M56-P-C02') and (c['environment'].get('runtime_recipe_v2') or {}).get('status')=='PREPARED'))" $REVF)
-[ -z "$N" ] && { echo "C01/C02 not prepared: no A/B"; exit 0; }
-while busy; do sleep 30; done
-$PY -I -X utf8 native-v2-ab.py $REVF Town04 $N > $LOG/ab-Town04.log 2>&1
-grep -v "^INFO" $LOG/ab-Town04.log | grep -E '"event": "(FIXTURE|ADMISSION|SCENE_ERROR)"|^DONE|^Traceback' | cut -c1-300
-echo "C01/C02 v5 finished $(date -u) logs=$LOG"
+if [ -n "$N" ]; then
+  while busy; do sleep 30; done
+  $PY -I -X utf8 native-v2-ab.py $REVF Town04 $N > $LOG/ab-Town04.log 2>&1
+  grep -v "^INFO" $LOG/ab-Town04.log | grep -E '"event": "(FIXTURE|ADMISSION|SCENE_ERROR)"|^DONE|^Traceback' | cut -c1-300
+else echo "C01/C02 not prepared: no A/B"; fi
+# The day chain's shell died with the session after Town04: the FIRST v5 A/B of the remaining prepared C/L scenes
+# (same preparations, revision v5f) runs here.
+for spec in "Town05 M56-P-C05,M56-P-L04,M56-P-L05" "Town07 M56-P-L06,M56-P-L07"; do
+  set -- $spec; while busy; do sleep 30; done
+  $PY -I -X utf8 native-v2-ab.py $REVF $1 $2 > $LOG/abCL-$1.log 2>&1
+  grep -v "^INFO" $LOG/abCL-$1.log | grep -E '"event": "(FIXTURE|ADMISSION|SCENE_ERROR)"|^DONE|^Traceback' | cut -c1-300
+done
+echo "C01/C02 + C/L v5 finished $(date -u) logs=$LOG"
