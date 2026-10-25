@@ -124,6 +124,8 @@ Chạy ngày 25/10, 02:35 UTC, trên đúng revision v3 và byte của suite 9. 
 | 962febb | lệnh tường minh ghi nhận frame vào phiên stock |
 | 153678a | bản ghi thiết bị đo theo từng episode |
 | 5188358 | dò event C/L tiếp tục từ trạng thái đã lưu: kết quả y hệt, nhanh ~50 lần (đối chiếu trên quỹ đạo native 521 frame) |
+| 6dc46b7 | phép chiếu route chính xác có lọc float trước: nhanh 28–40 lần, kết quả y hệt. Runner từ 1,7 s/tick xuống 0,26 s/tick, hết `OUTER_TIMEOUT` |
+| bd2fbed, e521680, 2120e0b…(perf 3–7) | cache type hint, digest theo danh tính, nguồn đã kiểm, trajectory, chỉ mục nguồn admitted, `_safe_path` bằng lstat, đường nhanh `encode_record`, numpy cho C4 và lượt lọc float. Đánh giá offline một episode 1156 frame: > 1470 s → 118 s (lần đầu), 34 s (cache ấm); kết quả y hệt (test so với bản tham chiếu) |
 
 **Full suite:**
 - suite 7: 1174/1174 qua, trên e9d48a1;
