@@ -116,7 +116,7 @@ cần một ngoại lệ P5.
 |---|---|---|---|
 | a | Erratum 4a: NPC dừng hẳn sau CLEAR_N, trước khi hết plan | TICK_ERROR ở C01-A, C05-A, C05-B | C01: B đã COMPLETE/VALID sau W05, còn A chỉ thiếu DESTINATION |
 | b | Vùng drivable gồm cả `Shoulder`, `Parking` và mặt giao lộ (hoặc lấy từ nhãn `Roads`), kèm đóng khe | probe nhãn bề mặt; phân tích mép | CONTACT và phần lớn FIT ở C02, M03/M06/M07, L01–L05, C05 |
-| c | Đo mặt đất nhiều tia (bỏ hit `NONE` khi có `Roads` trong vòng ±5 cm) | probe mặt đất: tia lọt khe mesh | GROUND_PROOF ở M05, L02, L06, L07, C03 |
+| c | Đo mặt đất nhiều tia (bỏ hit `NONE` khi có `Roads` trong vòng ±5 cm) | probe mặt đất: tia lọt khe mesh (mới kiểm ở M05) | GROUND_PROOF ở M05; L02, L06, L07, C03 có cùng lý do nhưng chưa probe |
 | d | Tốc độ NPC khi rẽ (để v²κ ≤ 2,5) | phân rã LATERAL | LATERAL ở M03, C02-A, L04–L07 |
 | e | PID/brake của EGO ở YIELD | L01-B (v rơi 1,23 → 0,30 m/s) | mọi L-B |
 | f | Erratum 6 (xác nhận hoặc bác) | đã kiểm | bỏ TARGET/PHASE mismatch ở 4 episode |
