@@ -231,7 +231,8 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
            'recipe': 'v3', 'map_hash': identity.map, 'lane_W': lane_W, 'lane_widths': lane_widths,
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
-           'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s, 'conflict_component': component}
+           'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s, 'conflict_component': component,
+           'carla_no_rendering_mode': NO_RENDER}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)

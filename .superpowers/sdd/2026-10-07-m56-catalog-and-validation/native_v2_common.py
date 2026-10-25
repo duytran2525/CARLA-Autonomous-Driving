@@ -102,9 +102,17 @@ def own_server(log):
         log(event='SERVER_STOPPED', pid=proc.pid, port_still_open=port_open())
 
 
+# Duy [chat] 2026-10-25: CARLA no_rendering_mode for the runs from now on (no camera: no metric depends on rendering),
+# disclosed in every run receipt, after a probe showed physics and traffic lights unchanged (native-render-probe.py).
+NO_RENDER = os.environ.get('M56_NO_RENDER', '0') == '1'
+
+
 def load(client, town):
     world = client.load_world(town)
     for _ in range(3):
+        world.wait_for_tick(30)
+    if NO_RENDER:
+        s = world.get_settings(); s.no_rendering_mode = True; world.apply_settings(s)
         world.wait_for_tick(30)
     return world
 

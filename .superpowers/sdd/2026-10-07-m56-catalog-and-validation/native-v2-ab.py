@@ -14,7 +14,7 @@ from pathlib import Path
 import json, math, sys, traceback
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from native_v2_common import (NOMINAL, WORK, WS, PREREG, body_record, certificates, directed, drivable_union, load,
+from native_v2_common import (NO_RENDER, NOMINAL, WORK, WS, PREREG, body_record, certificates, directed, drivable_union, load,
                               now, own_server, ownership, policy_maker, reviewer, sha, write_ref, npc_response, up)
 from native_v2_kit import Kit, q
 from m56 import runtime
@@ -42,6 +42,7 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
               'v2 approval: "Approve v2 (Recommended)"', 'addendum': 'docs/m56/SPEC_ADDENDUM_G4G5_20261023.md',
     'prereg': {'path': str(PREREG), 'sha256': sha(PREREG)}, 'revision_v2': {'path': str(REVISION), 'sha256': sha(REVISION)},
     'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B',
+    'carla_no_rendering_mode': NO_RENDER,
     'approvals': ['[chat] 2026-10-24 Duy: v3 prereg ab1fb09 + signal-phase erratum 4 (7374ed7), run C01/C02 once',
                   '[chat] 2026-10-24 Duy: "cho chạy A/B C01, C02 thêm đúng một lần với hai bản sửa harness (cùng '
                   'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)',
