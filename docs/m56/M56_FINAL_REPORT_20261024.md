@@ -98,7 +98,23 @@ hai cách đọc.
 
 ### v3.1 (sau suite 9, một lần, với đủ các bản sửa harness)
 
-*(điền sau khi chạy)*
+Chạy ngày 25/10, 02:35 UTC, trên đúng revision v3 và byte của suite 9. Suite 9 đã qua 1179/1179.
+
+Đáng lẽ v3.1 tự chạy ngay khi suite 9 xong (22:02 UTC), nhưng script đã từ chối vì lúc đó A/B M ở Town05 đang dùng CARLA.
+Đây là lỗi lập lịch của Claude. Output: `outputs/m56_v2_ab_Town04_20261025T023524Z`.
+
+| Cảnh, action | Event | `d_yield_m` | `t_entry_s` | Chặn |
+|---|---|---|---|---|
+| C01 A | TRIGGER, NPC_ENTRY | — | — | `OUTER_TIMEOUT` trước CLEAR_N |
+| C01 B | TRIGGER, NPC_ENTRY, CLEAR_N_CONFIRMED | 10,556 | — | `OUTER_TIMEOUT` trước E_ENTRY |
+| C02 A | không có | — | — | `OUTER_TIMEOUT`; contact/fit |
+| C02 B | TRIGGER, NPC_ENTRY, CLEAR_N_CONFIRMED | 9,421 | — | `OUTER_TIMEOUT` trước E_ENTRY; contact/fit |
+
+- **Hai lỗi harness của v3 đã hết:** `COMMAND_ORDER` và delivery không còn xuất hiện.
+- **Lỗi còn lại là `OUTER_TIMEOUT`:** runner tốn khoảng 0,85–1,7 s thời gian thật mỗi tick, trong khi CARLA chỉ tốn khoảng
+  0,06 s. Điểm nóng là phép chiếu route bằng số hữu tỉ, đã sửa ở `6dc46b7` (nhanh 28–40 lần, kết quả giống hệt).
+- **Theo chỉ thị của Duy** ("thêm đúng một lần … ghi nguyên kết quả"), C01/C02 không được chạy lại theo recipe v3 khi chưa
+  có quyết định mới.
 
 ## 4. Thay đổi sản phẩm và kiểm chứng
 
