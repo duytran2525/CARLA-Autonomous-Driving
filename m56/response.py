@@ -29,7 +29,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     from .model import ReviewRecord
     binding=policies.event_specs.get('stock_binding')
     keys={'response_hash','response_record_hash','route_hash','actor_id','source_refs','plan','client_version','server_version','review'}
-    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref'}:
+    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal','ego_longitudinal'}:
         raise ValueError('STOCK_BINDING_MISSING')
     packet={k:v for k,v in binding.items() if k!='review'};review=binding['review']
     if (response.route is None or binding['response_hash']!=response.hash or binding['response_record_hash']!=_digest(response)
@@ -63,7 +63,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     if not ego and response.actor_role!='NPC':
         raise ValueError('STOCK_ROLE_INVALID')
     opt={'dt':.05,'lateral_control_dict':{'K_P':1.95,'K_I':.05,'K_D':.2,'dt':.05},
-         'longitudinal_control_dict':{'K_P':1.,'K_I':.05,'K_D':0.,'dt':.05},
+         'longitudinal_control_dict':_longitudinal(binding,ego),
          'max_throttle':.75,'max_brake':.3,'max_steering':.8,'follow_speed_limits':False}
     if ego:
         opt.update(ignore_traffic_lights=True,ignore_stop_signs=True,ignore_vehicles=True)
@@ -74,6 +74,23 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     backend.set_global_plan(binding['plan'],stop_waypoint_creation=True,clean_queue=True)
     backend.follow_speed_limits(False)
     return StockDriver(_StockSession(backend),config,digest)
+
+
+def _longitudinal(binding,ego):
+    """v5 P-NPC (prereg eda7680): an NPC may carry reviewed longitudinal gains 'npc_longitudinal' (calibration grid).
+    v5 erratum 2 (2d27616): an EGO may carry 'ego_longitudinal' only where the stock PID is not steady. OLD RULE (spec
+    6.1): the EGO always keeps the pinned stock PID. Absent key = stock gains; a key of the other role is invalid."""
+    own,other=('ego_longitudinal','npc_longitudinal') if ego else ('npc_longitudinal','ego_longitudinal')
+    gains=binding.get(own)
+    if other in binding:
+        raise ValueError('STOCK_BINDING_INVALID')
+    if gains is None:
+        return {'K_P':1.,'K_I':.05,'K_D':0.,'dt':.05}
+    if (not isinstance(gains,Mapping) or set(gains)!={'K_P','K_I','K_D','dt'}
+            or any(isinstance(v,bool) or not isinstance(v,Number) for v in gains.values())
+            or gains['dt']!=Number(1,20) or not gains['K_P']>0 or gains['K_I']<0 or gains['K_D']<0):
+        raise ValueError('STOCK_BINDING_INVALID')
+    return {k:float(v) for k,v in gains.items()}
 
 
 def _f32(limit):
@@ -206,24 +223,25 @@ def _reference_response(response, cause):
         if index==0 or row['event'] not in (program['transitions'][index-1]['after_event'],*program['transitions'][index-1]['requires']):
             raise ValueError('REFERENCE_SWITCH_GUARD_MISSING')
         old=effective.route
-        if old is None or len(old.transforms)!=2 or len(new.transforms)!=2 or old.arc!=new.arc or old.map_hash!=new.map_hash:
+        if old is None:
             raise ValueError('REFERENCE_SWITCH_UNSUPPORTED')
-        for route in (old,new):
-            a,b=route.transforms
-            if (not route.continuity or b.x<=a.x or a.y!=b.y or a.z!=b.z
-                    or any((t.pitch,t.yaw,t.roll)!=(0.,0.,0.) for t in route.transforms)):
+        axis=len(old.transforms)==2 and len(new.transforms)==2
+        if axis:
+            if old.arc!=new.arc or old.map_hash!=new.map_hash or not _axis_route(old) or not _axis_route(new):
                 raise ValueError('REFERENCE_SWITCH_UNSUPPORTED')
-        if any((a.x,a.z)!=(b.x,b.z) for a,b in zip(old.transforms,new.transforms)):
-            raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
+            if any((a.x,a.z)!=(b.x,b.z) for a,b in zip(old.transforms,new.transforms)):
+                raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
         marker=row['marker_arc_m'];segments=effective.profile.get('segments',())
         if (not segments or marker<segments[-1]['start_arc_m']+segments[-1]['length_m']
                 or not old.arc[0]<=marker<=old.arc[-1]):
             raise ValueError('REFERENCE_SWITCH_BEFORE_PROFILE_END')
         old_offset=desired_offset(marker,effective)
+        if not axis:
+            _switch_real_v5(old,new,marker,old_offset)
         effective=replace(response,route=new,profile=row['profile'])
         new_offset=desired_offset(marker,effective)
-        if (new_offset!=0 or Number(old.transforms[0].y)+old_offset!=Number(new.transforms[0].y)
-                or effective.profile['segments'][0]['start_offset_m']!=0):
+        if (new_offset!=0 or effective.profile['segments'][0]['start_offset_m']!=0
+                or (axis and Number(old.transforms[0].y)+old_offset!=Number(new.transforms[0].y))):
             raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
         if index<=phases.index(cause):
             selected=effective
@@ -1225,7 +1243,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='O' and response.action_id=='A':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1249,7 +1267,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='O' and response.action_id=='B':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1271,7 +1289,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='I' and response.action_id=='A':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1296,7 +1314,7 @@ def _forward_contract(response,fixture):
         return
     if response.actor_role=='EGO' and category=='I' and response.action_id=='B':
         program=_program(response);rows=program['transitions']
-        nominal=fixture.environment.get('readiness',{}).get('targets_mps',{}).get('EGO')
+        nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
         if nominal not in (Number(6),Number(15,2),Number(75,8)):
@@ -1338,6 +1356,18 @@ def _forward_contract(response,fixture):
         raise ValueError('NORMATIVE_CROSSING_POLICY_INVALID')
 
 
+def _nominal_v5(response):
+    """v5 C2 (prereg eda7680): the normative nominal is the response's own NOMINAL target. OLD RULE (report-only,
+    nominal_old_rule): readiness.targets_mps['EGO'], which E6 sets to the measured stock plateau, so it can never equal
+    6 / 7.5 / 75/8 natively."""
+    return response.targets.get('NOMINAL')
+
+
+def nominal_old_rule(fixture, role='EGO'):
+    """Report-only: the old normative nominal (readiness target)."""
+    return fixture.environment.get('readiness',{}).get('targets_mps',{}).get(role)
+
+
 def _lateral_contract(response, fixture):
     """Analytic offline admission of frozen horizontal parallel references.
 
@@ -1357,19 +1387,25 @@ def _lateral_contract(response, fixture):
             and (category!='F' or mechanism=='F04')) or (npc and category=='I' and response.action_id=='NPC_COMMON')):
         raise ValueError('LATERAL_ACTION_UNSUPPORTED')
     route=response.route
-    if (route is None or len(route.transforms)!=2 or not route.continuity
-            or route.transforms[0].x>=route.transforms[1].x
-            or route.transforms[0].y!=route.transforms[1].y or route.transforms[0].z!=route.transforms[1].z
-            or any((t.pitch,t.yaw,t.roll)!=(0.,0.,0.) for t in route.transforms)):
+    if route is None or not route.continuity:
         raise ValueError('LATERAL_GEOMETRY_UNSUPPORTED')
+    axis=(len(route.transforms)==2 and route.transforms[0].x<route.transforms[1].x
+          and route.transforms[0].y==route.transforms[1].y and route.transforms[0].z==route.transforms[1].z
+          and all((t.pitch,t.yaw,t.roll)==(0.,0.,0.) for t in route.transforms))
     regions=fixture.domain.topology.get('npc_regions' if npc else 'action_regions')
     required={role+'_INITIAL',role+'_TARGET'} if category in ('I','O') else {role+'_INITIAL'}
     if not isinstance(regions,Mapping) or not required.issubset(regions) or any(not _is_box(regions[k]) for k in required):
         raise ValueError('LATERAL_WIDTH_UNPROVEN')
-    initial=regions[role+'_INITIAL'];center=(Number(min(p[1] for p in initial))+Number(max(p[1] for p in initial)))/2
-    if Number(route.transforms[0].y)!=center:
-        raise ValueError('LATERAL_REFERENCE_NOT_LANE_CENTER')
-    readiness=fixture.environment.get('readiness',{});nominal=readiness.get('targets_mps',{}).get(role)
+    if axis:
+        initial=regions[role+'_INITIAL'];center=(Number(min(p[1] for p in initial))+Number(max(p[1] for p in initial)))/2
+        if Number(route.transforms[0].y)!=center:
+            raise ValueError('LATERAL_REFERENCE_NOT_LANE_CENTER')
+        if category in ('I','O'):
+            target=regions[role+'_TARGET']
+            separation=(Number(min(p[1] for p in target))+Number(max(p[1] for p in target)))/2-center
+    else:
+        separation=_lateral_route_v5(response,fixture)
+    nominal=_nominal_v5(response)
     if not isinstance(nominal,Number) or nominal<=0:
         raise ValueError('LATERAL_NOMINAL_UNPROVEN')
     switches=response.phases.get('reference_switches',())
@@ -1377,7 +1413,6 @@ def _lateral_contract(response, fixture):
     if category in ('I','O'):
         if nominal not in ((Number(5),Number(13,2),Number(67,8)) if npc else (Number(6),Number(15,2),Number(75,8))):
             raise ValueError('LATERAL_NOMINAL_INVALID')
-        target=regions[role+'_TARGET'];separation=(Number(min(p[1] for p in target))+Number(max(p[1] for p in target)))/2-center
         if not separation or moving[0]['start_offset_m']!=0 or moving[0]['end_offset_m']!=separation:
             raise ValueError('LATERAL_SEPARATION_INVALID')
         if not switches or switches[0]['event']!=('NPC_TARGET_LANE_CONFIRMED' if npc else 'TARGET_LANE_CONFIRMED'):
@@ -1401,6 +1436,8 @@ def _lateral_contract(response, fixture):
             raise ValueError('LATERAL_F04_PROFILE_INVALID')
         if moving[0]['start_offset_m']!=0 or segments[-1]['end_offset_m']!=0 or len(moving)!=2:
             raise ValueError('LATERAL_F04_RETURN_MISSING')
+    if not axis:
+        _lateral_axis_v5(route,moving,regions,role,separation)
     for s in moving:
         if not route.arc[0]<=s['start_arc_m']<s['start_arc_m']+s['length_m']<=route.arc[-1]:
             raise ValueError('LATERAL_MARKER_OUTSIDE_ROUTE')
@@ -1409,6 +1446,106 @@ def _lateral_contract(response, fixture):
         delta=s['end_offset_m']-s['start_offset_m']
         if Number(100,3)*delta**2*nominal**4/s['length_m']**4>Number(25,4):
             raise ValueError('LATERAL_ACCELERATION_BUDGET_UNPROVEN')
+
+
+def _lateral_route_v5(response, fixture):
+    """v5 C3 (prereg eda7680): a real CARLA route reference (I/O only). It must be the fixture's own route for the role
+    (CARLA lane-centre waypoints, every step <= 0.25 m); the lane separation is the reviewed CARLA lane-centre distance
+    recorded in topology.lane_geometry[role] = {'separation_m': signed Number, 'lane_width_m': {'initial','target'}}.
+    OLD RULE: only the 2-point +x route was accepted (any other route -> LATERAL_GEOMETRY_UNSUPPORTED)."""
+    from math import dist
+    from .catalog import _digest
+    route=response.route;role=response.actor_role;routes=getattr(fixture,'routes',None)
+    if (fixture.domain.topology.get('category') not in ('I','O') or not isinstance(routes,Mapping) or role not in routes
+            or _digest(routes[role])!=_digest(route) or len(route.transforms)<2
+            or any(dist((a.x,a.y,a.z),(b.x,b.y,b.z))>.25+1e-6 for a,b in zip(route.transforms,route.transforms[1:]))):
+        raise ValueError('LATERAL_GEOMETRY_UNSUPPORTED')
+    geo=fixture.domain.topology.get('lane_geometry',{})
+    geo=geo.get(role) if isinstance(geo,Mapping) else None
+    widths=geo.get('lane_width_m') if isinstance(geo,Mapping) else None
+    if (not isinstance(geo,Mapping) or not isinstance(geo.get('separation_m'),Number)
+            or not isinstance(widths,Mapping) or set(widths)!={'initial','target'}
+            or any(not isinstance(w,Number) or w<=0 for w in widths.values())):
+        raise ValueError('LATERAL_WIDTH_UNPROVEN')
+    return geo['separation_m']
+
+
+def _axis_right(yaw):
+    """v5 erratum 1 E1-a: (lateral world index, sign of the CARLA right vector on it) when yaw is within 1 degree of a
+    world axis, else None. CARLA right vector = (-sin yaw, cos yaw)."""
+    a=yaw%360.
+    for k,axis in ((0.,(1,1)),(90.,(0,-1)),(180.,(1,-1)),(270.,(0,1)),(360.,(1,1))):
+        if abs(a-k)<=1.:
+            return axis
+    return None
+
+
+def _lateral_axis_v5(route, moving, regions, role, separation):
+    """v5 C3 + erratum 1 (22c5cd4): the stretch holding every lane-change segment is straight (total heading variation
+    <= 1 degree) and world-axis aligned (each yaw within 1 degree of one axis), because the frozen metric lane boxes are
+    world-axis aligned (metrics._in_action_region). INITIAL/TARGET boxes are disjoint on the lateral axis, the route
+    stretch lies inside the INITIAL lateral range, and the reviewed separation matches the box centres within 0.05 m."""
+    lo=min(s['start_arc_m'] for s in moving);hi=max(s['start_arc_m']+s['length_m'] for s in moving)
+    first=max((i for i,a in enumerate(route.arc) if a<=lo),default=0)
+    last=min((i for i,a in enumerate(route.arc) if a>=hi),default=len(route.arc)-1)
+    stretch=route.transforms[first:last+1];yaws=[t.yaw for t in stretch]
+    axes={_axis_right(y) for y in yaws}
+    if (len(axes)!=1 or None in axes
+            or sum(abs((b-a+180.)%360.-180.) for a,b in zip(yaws,yaws[1:]))>1.):
+        raise ValueError('LATERAL_GEOMETRY_UNSUPPORTED')
+    (k,sign),=axes
+    def span(box):
+        return min(p[k] for p in box),max(p[k] for p in box)
+    (li,hi_),(lt,ht)=span(regions[role+'_INITIAL']),span(regions[role+'_TARGET'])
+    if not (hi_<=lt or ht<=li) or any(not li<=(t.x,t.y)[k]<=hi_ for t in stretch):
+        raise ValueError('LATERAL_WIDTH_UNPROVEN')
+    if abs(float(separation)-((lt+ht)/2-(li+hi_)/2)*sign)>.05:
+        raise ValueError('LATERAL_SEPARATION_INVALID')
+
+
+def _axis_route(route):
+    a,b=route.transforms
+    return (route.continuity and b.x>a.x and a.y==b.y and a.z==b.z
+            and all((t.pitch,t.yaw,t.roll)==(0.,0.,0.) for t in route.transforms))
+
+
+def _at_arc(route, arc):
+    """Float linear interpolation (x, y, yaw) of a waypoint route at an arc."""
+    arc=float(arc);arcs=[float(a) for a in route.arc]
+    i=max(0,min(len(arcs)-2,max((n for n,a in enumerate(arcs) if a<=arc),default=0)))
+    a,b=route.transforms[i],route.transforms[i+1];f=(arc-arcs[i])/(arcs[i+1]-arcs[i])
+    return a.x+f*(b.x-a.x),a.y+f*(b.y-a.y),a.yaw
+
+
+def _station(x, y, route):
+    """Float horizontal projection station of (x, y) on a waypoint route."""
+    best=None
+    for a,b,sa,sb in zip(route.transforms,route.transforms[1:],route.arc,route.arc[1:]):
+        dx,dy=b.x-a.x,b.y-a.y;n=dx*dx+dy*dy
+        f=0. if n==0 else max(0.,min(1.,((x-a.x)*dx+(y-a.y)*dy)/n))
+        d=(a.x+f*dx-x)**2+(a.y+f*dy-y)**2
+        if best is None or d<best[0]:
+            best=(d,float(sa)+f*(float(sb)-float(sa)))
+    return best[1]
+
+
+def _switch_real_v5(old, new, marker, old_offset):
+    """v5 erratum 1 E1-c (22c5cd4): a CARLA waypoint switch route (<= 0.25 m steps, same map, continuity) whose arc frame
+    is aligned with the old route (|arc - projected old station| <= 0.05 m for every point), continuous at the marker
+    (old point + old_offset along the CARLA right vector within 0.05 m of the new point). OLD RULE: 2-point +x routes
+    with identical arc tuples and exact y + offset == new y."""
+    from math import dist,sin,cos,radians
+    if (not new.continuity or new.map_hash!=old.map_hash or len(new.transforms)<2 or len(new.arc)!=len(new.transforms)
+            or any(b<=a for a,b in zip(new.arc,new.arc[1:]))
+            or any(dist((a.x,a.y,a.z),(b.x,b.y,b.z))>.25+1e-6 for a,b in zip(new.transforms,new.transforms[1:]))
+            or not (old.arc[0]<=marker<=old.arc[-1] and new.arc[0]<=marker<=new.arc[-1])):
+        raise ValueError('REFERENCE_SWITCH_UNSUPPORTED')
+    # ponytail: O(n_new * n_old) float projection; window it if switch routes grow past a few thousand points.
+    if any(abs(float(a)-_station(t.x,t.y,old))>.05 for t,a in zip(new.transforms,new.arc)):
+        raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
+    x,y,yaw=_at_arc(old,marker);nx,ny,_=_at_arc(new,marker);o=float(old_offset);r=radians(yaw)
+    if dist((x-sin(r)*o,y+cos(r)*o),(nx,ny))>.05:
+        raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
 
 
 def desired_offset(arc: Number, response: FrozenResponse) -> Number:

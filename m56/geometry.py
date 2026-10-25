@@ -78,7 +78,64 @@ def project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
     return result
 
 
+_ROUTE_FLOATS = {}
+
+
+def _route_floats(route):
+    """Per-route float segment table (start, direction, |d|^2), keyed by identity with a strong reference."""
+    hit=_ROUTE_FLOATS.get(id(route))
+    if hit is not None and hit[0] is route:
+        return hit[1]
+    if len(_ROUTE_FLOATS)>4096:
+        _ROUTE_FLOATS.clear()
+    table=[(a.x,a.y,a.z,b.x-a.x,b.y-a.y,b.z-a.z) for a,b in zip(route.transforms,route.transforms[1:])]
+    _ROUTE_FLOATS[id(route)]=(route,table)
+    return table
+
+
 def _project_route(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
+    """Exact nearest-segment station, computed exactly (rational) only on the segments whose float distance is within
+    a conservative margin of the float minimum; every other segment provably cannot hold the exact minimum. Results are
+    identical to _project_route_exact (test_v5_projection). Harness performance fix 2026-10-25: the full rational scan
+    cost 24-79 ms per call on 0.25 m CARLA routes (OUTER_TIMEOUT at ~1.7 s/tick)."""
+    if (len(point)!=3 or not all(isfinite(v) for v in point)
+            or len(route.transforms)!=len(route.arc) or len(route.arc)<2
+            or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
+        return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
+    px,py,pz=point;dists=[]
+    for sx,sy,sz,dx,dy,dz in _route_floats(route):
+        if not all(isfinite(v) for v in (sx,sy,sz,dx,dy,dz,sx+dx,sy+dy,sz+dz)):
+            return BlockedFixture(('INVALID_ROUTE_PROJECTION_INPUT',))
+        n=dx*dx+dy*dy+dz*dz
+        if dx==0 and dy==0 and dz==0:
+            return BlockedFixture(('DEGENERATE_ROUTE_SEGMENT',))
+        u=((px-sx)*dx+(py-sy)*dy+(pz-sz)*dz)/n if n>0 else 0.
+        u=0. if u<0 else 1. if u>1 else u
+        qx,qy,qz=sx+u*dx-px,sy+u*dy-py,sz+u*dz-pz
+        dists.append(qx*qx+qy*qy+qz*qz)
+    m=min(dists)
+    # Float error of a squared distance here is ~1e-10 for CARLA coordinates; the margin is orders of magnitude wider.
+    margin=1e-6*(1.+m)+1e-6
+    keep=[i for i,d in enumerate(dists) if d<=m+margin]
+    p=tuple(Fraction(v) for v in point)
+    candidates=[]
+    for i in keep:
+        a,b=route.transforms[i],route.transforms[i+1]
+        start=tuple(Fraction(v) for v in (a.x,a.y,a.z))
+        direction=tuple(Fraction(v)-w for v,w in zip((b.x,b.y,b.z),start))
+        length2=sum(v*v for v in direction)
+        u=max(Fraction(0),min(Fraction(1),sum((v-w)*d for v,w,d in zip(p,start,direction))/length2))
+        projected=tuple(w+u*d for w,d in zip(start,direction))
+        candidates.append((sum((v-q)**2 for v,q in zip(p,projected)),route.arc[i]+u*(route.arc[i+1]-route.arc[i])))
+    minimum=min(d for d,_ in candidates)
+    stations={st for d,st in candidates if d==minimum}
+    if len(stations)!=1:
+        return BlockedFixture(('NONUNIQUE_PROJECTION',))
+    return stations.pop()
+
+
+def _project_route_exact(point: Vec3, route: DirectedRoute) -> Number | BlockedFixture:
+    """Reference: the full rational scan (pre-2026-10-25 behaviour), kept for the equivalence test."""
     if (len(point)!=3 or not all(isfinite(v) for v in point)
             or len(route.transforms)!=len(route.arc) or len(route.arc)<2
             or any(b<=a for a,b in zip(route.arc,route.arc[1:]))):
@@ -165,7 +222,7 @@ def swept_volume(route: DirectedRoute, body: BodyRecord,
 
 def compile_fixture(candidate: Candidate, queries: QueryBundle,
                     policies: PolicyBundle) -> CompiledFixture | BlockedFixture:
-    reasons=[];sweeps={}
+    reasons=[];sweeps={};unselected=()
     binding=_digest({'candidate':candidate,'policy':policies,'routes':queries.routes,
                      'bodies':queries.bodies,'poses':queries.poses,'map':queries.map,
                      'boot':queries.boot,'world':queries.world})
@@ -194,7 +251,13 @@ def compile_fixture(candidate: Candidate, queries: QueryBundle,
         elif not intersections:
             reasons.append('NO_3D_CONFLICT')
         elif not _connected_boxes(intersections):
-            reasons.append('DISCONNECTED_CONFLICT_REVIEW_REQUIRED')
+            # v5 C4 (prereg eda7680): a reviewed CONFLICT_COMPONENT_SELECTION admits one component. OLD RULE: always
+            # DISCONNECTED_CONFLICT_REVIEW_REQUIRED (report-only via disconnected_old_rule).
+            chosen=_selected_component(intersections,queries,binding)
+            if isinstance(chosen,BlockedFixture):
+                reasons.extend(chosen.reasons)
+            else:
+                intersections,unselected=chosen
     review_payload=queries.physics.get('fixture_review')
     materialized=queries.physics.get('fixture')
     compilation=queries.physics.get('compilation')
@@ -253,6 +316,10 @@ def compile_fixture(candidate: Candidate, queries: QueryBundle,
         for box in intersections:
             if any(not region.covers(Point(v[0],v[1])) or not zmin<=v[2]<=zmax for v in box):
                 return BlockedFixture(('DOMAIN_DOES_NOT_ENCLOSE_SWEPT_CONFLICT',))
+        for box in unselected:  # v5 C4: the domain bounds exactly the selected component
+            hull=MultiPoint([(v[0],v[1]) for v in box]).convex_hull
+            if (region.intersection(hull).area>0 and min(v[2] for v in box)<zmax and max(v[2] for v in box)>zmin):
+                return BlockedFixture(('DOMAIN_ENCLOSES_UNSELECTED_CONFLICT',))
     for role,entry,exit in (('EGO',domain.e_entry,domain.e_exit),('NPC',domain.n_entry,domain.n_exit)):
         route=queries.routes[role]
         if not route.arc[0]<=entry.route_station<exit.route_station<route.arc[-1]:
@@ -375,6 +442,9 @@ def _proof_valid(proof: CapabilityProof, kind: str, binding: str) -> bool:
             or proof.limits.get('materialization_hash')!=binding
             or not _review_binds(proof.review,_digest(packet),('CAPABILITY:'+kind,))):
         return False
+    if kind=='CONFLICT_COMPONENT_SELECTION':
+        return (proof.method=='closest-centreline-component-v1'
+                and isinstance(proof.limits.get('selected_component_hash'),str))
     if kind=='MERGE_TRANSITION':
         region=proof.limits.get('transition_region')
         return (proof.method=='branch-to-mainflow-geometry-topology'
@@ -454,17 +524,83 @@ def _overlaps(a: Sweep, b: Sweep) -> tuple[VertexSet,...]:
 
 
 def _connected_boxes(boxes: tuple[VertexSet,...]) -> bool:
-    if not boxes:
-        return False
+    return len(_components(boxes))==1
+
+
+def _components(boxes: tuple[VertexSet,...]) -> list[tuple[VertexSet,...]]:
+    """Connected components of closed boxes (touching counts as connected), in first-box order."""
     extents=[(tuple(min(p[k] for p in box) for k in range(3)),
               tuple(max(p[k] for p in box) for k in range(3))) for box in boxes]
-    remaining=set(range(1,len(boxes)));queue=[0]
-    while queue:
-        i=queue.pop()
-        neighbors=[j for j in remaining if all(extents[i][0][k]<=extents[j][1][k] and
-                    extents[j][0][k]<=extents[i][1][k] for k in range(3))]
-        remaining.difference_update(neighbors);queue.extend(neighbors)
-    return not remaining
+    remaining=set(range(len(boxes)));out=[]
+    while remaining:
+        start=min(remaining);remaining.discard(start);queue=[start];members=[start]
+        while queue:
+            i=queue.pop()
+            neighbors=[j for j in remaining if all(extents[i][0][k]<=extents[j][1][k] and
+                        extents[j][0][k]<=extents[i][1][k] for k in range(3))]
+            remaining.difference_update(neighbors);queue.extend(neighbors);members.extend(neighbors)
+        out.append(tuple(boxes[i] for i in sorted(members)))
+    return out
+
+
+def disconnected_old_rule(intersections) -> bool:
+    """Report-only: under the old rule a disconnected conflict is always DISCONNECTED_CONFLICT_REVIEW_REQUIRED."""
+    return bool(intersections) and not _connected_boxes(intersections)
+
+
+def _float_station(point, route) -> float:
+    """Float 3D projection station of a point on a waypoint route (selection only, never a metric)."""
+    best=None
+    for a,b,sa,sb in zip(route.transforms,route.transforms[1:],route.arc,route.arc[1:]):
+        d=(b.x-a.x,b.y-a.y,b.z-a.z);n=sum(v*v for v in d);q=(point[0]-a.x,point[1]-a.y,point[2]-a.z)
+        f=0. if n==0 else max(0.,min(1.,sum(x*y for x,y in zip(q,d))/n))
+        e=sum((qq-f*dd)**2 for qq,dd in zip(q,d))
+        if best is None or e<best[0]:
+            best=(e,float(sa)+f*(float(sb)-float(sa)))
+    return best[1]
+
+
+def _selected_component(intersections, queries, binding):
+    """v5 C4 (prereg eda7680): select the component holding the closest point of the two route centrelines (midpoint
+    of the closest transform pair, horizontal containment; ambiguity blocks); every other component must be >= 5 m away
+    along BOTH routes; a reviewed CONFLICT_COMPONENT_SELECTION proof must bind the selected component hash."""
+    matches=[p for p in queries.capabilities if p.kind=='CONFLICT_COMPONENT_SELECTION']
+    if len(matches)!=1 or not _proof_valid(matches[0],'CONFLICT_COMPONENT_SELECTION',binding):
+        return BlockedFixture(('DISCONNECTED_CONFLICT_REVIEW_REQUIRED',))
+    chosen=select_conflict_component(intersections,queries.routes['EGO'],queries.routes['NPC'])
+    if isinstance(chosen,BlockedFixture):
+        return chosen
+    selected,others=chosen
+    if matches[0].limits['selected_component_hash']!=_digest(selected):
+        return BlockedFixture(('CONFLICT_COMPONENT_SELECTION_MISMATCH',))
+    return selected,others
+
+
+def select_conflict_component(intersections, ego, npc):
+    """v5 C4 selection rule alone (also used by the preparation tooling): (selected boxes, unselected boxes) or
+    BlockedFixture."""
+    # ponytail: O(n*m) closest transform pair; 0.25 m sampling bounds the point error at 0.125 m.
+    a,b=min(((s,t) for s in ego.transforms for t in npc.transforms),
+            key=lambda st:sum((u-v)**2 for u,v in zip((st[0].x,st[0].y,st[0].z),(st[1].x,st[1].y,st[1].z))))
+    point=((a.x+b.x)/2,(a.y+b.y)/2)
+    comps=_components(intersections)
+    def holds(comp):
+        return any(min(v[0] for v in box)<=point[0]<=max(v[0] for v in box)
+                   and min(v[1] for v in box)<=point[1]<=max(v[1] for v in box) for box in comp)
+    chosen=[c for c in comps if holds(c)]
+    if len(chosen)!=1:
+        return BlockedFixture(('CONFLICT_COMPONENT_UNSELECTED',))
+    selected=chosen[0];others=tuple(c for c in comps if c is not selected)
+    for route in (ego,npc):
+        def span(comp):
+            st=[_float_station(v,route) for box in comp for v in box]
+            return min(st),max(st)
+        lo,hi=span(selected)
+        for comp in others:
+            olo,ohi=span(comp)
+            if max(olo-hi,lo-ohi)<5:
+                return BlockedFixture(('CONFLICT_COMPONENTS_TOO_CLOSE',))
+    return selected,tuple(box for comp in others for box in comp)
 
 
 def _section_matches_route(section, route: DirectedRoute) -> bool:

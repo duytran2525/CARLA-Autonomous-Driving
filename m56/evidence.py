@@ -600,6 +600,26 @@ def _initial_state_matches(actor,pose):
             and speed is not None and speed<=Fraction(1,10))
 
 
+def _runin_route_ok(actor,fixture):
+    """v5 C1 (prereg eda7680): run-in room at ready = route distance from the EGO body's most forward route station to
+    e_entry, > G. OLD RULE (runin_old_rule, report-only): plane distance -max(section margin) > G, which measures a
+    lateral distance when the EGO enters the conflict box through a side face (L01, native 2026-10-24)."""
+    from .geometry import world_vertices,project_route
+    from .model import BlockedFixture
+    stations=[project_route(v,fixture.routes['EGO']) for v in world_vertices(actor.body,actor.pose)]
+    if not stations or any(isinstance(s,BlockedFixture) for s in stations):
+        return False
+    return fixture.domain.e_entry.route_station-max(stations)>fixture.G
+
+
+def runin_old_rule(actor,fixture):
+    """Report-only: the old plane-distance run-in rule."""
+    from .metrics import _section_margin
+    from .geometry import world_vertices
+    margins=_section_margin(world_vertices(actor.body,actor.pose),fixture.domain.e_entry)
+    return margins is not None and -max(margins)>fixture.G
+
+
 def initial_state_old_rule(evidence,fixture):
     """Report-only: roles whose first observation fails the OLD exact rule (both rules are reported)."""
     boundary=_pre_observation(evidence)
@@ -697,10 +717,8 @@ def _initialization_integrity(evidence,fixture):
             marker=metadata['markers_m'][a.role]
             if not isinstance(marker,Fraction) or station is None or abs(station-marker)>Fraction(1,10):
                 raise ValueError('ready marker')
-            if a.role=='EGO' and fixture.G is not None:
-                margins=_section_margin(world_vertices(a.body,a.pose),fixture.domain.e_entry)
-                if margins is None or -max(margins)<=fixture.G:
-                    raise ValueError('run-in room')
+            if a.role=='EGO' and fixture.G is not None and not _runin_route_ok(a,fixture):
+                raise ValueError('run-in room')
     except (KeyError,TypeError,ValueError,AttributeError,ZeroDivisionError):
         return ('INITIALIZATION_INVALID',),()
     return (),()
