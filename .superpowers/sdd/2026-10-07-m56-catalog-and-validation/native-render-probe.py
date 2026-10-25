@@ -101,18 +101,32 @@ def diff(a, b):
     return out
 
 
-# One fresh server per trial, the map loaded once per server (as the preparation and A/B tools do): reloading Town04
-# inside one server crashed CARLA twice on 2026-10-25 (EXCEPTION_ACCESS_VIOLATION, same call stack).
-trials = []
-for render in (True, True, False):
+# One fresh server AND one fresh Python process per trial (python -I native-render-probe.py trial on|off OUT.json):
+# reloading Town04 inside one server crashed CARLA twice, and a second server in the same Python process killed the
+# client process silently (2026-10-25). The parent only compares the three trial files.
+if len(sys.argv) > 1 and sys.argv[1] == 'trial':
     with own_server(log) as (client, proc, start):
-        trials.append(trial(client, render))
-on1, on2, off = trials
+        rows = trial(client, sys.argv[2] == 'on')
+    Path(sys.argv[3]).write_text(json.dumps(rows), encoding='utf-8')
+    print('TRIAL_DONE', sys.argv[2], len(rows))
+    sys.exit(0)
+import subprocess
+paths = []
+for i, mode in enumerate(('on', 'on', 'off')):
+    out = WS.parents[2] / 'outputs' / f'm56_render_probe_trial{i}_{mode}_{now()}.json'
+    r = subprocess.run([str(WS.parents[2] / '.venv-m56-native-v1/Scripts/python.exe'), '-I', '-X', 'utf8', __file__, 'trial', mode, str(out)], capture_output=True, text=True)
+    log(event='TRIAL', mode=mode, rc=r.returncode, tail=(r.stdout + r.stderr)[-300:])
+    assert r.returncode == 0 and out.exists(), f'trial {i} failed'
+    paths.append(out)
+on1, on2, off = (json.loads(p.read_text(encoding='utf-8')) for p in paths)
+for t in (on1, on2, off):
+    for row in t:
+        row['lights'] = [tuple(x) for x in row['lights']]
 base, test = diff(on1, on2), diff(on1, off)
 ok = (all(test[k] <= base[k] + 1e-6 for k in test if k != 'light_ticks_differing')
       and test['light_ticks_differing'] == 0 and base['light_ticks_differing'] == 0)
 report = {'note': 'report-only render probe (Duy 2026-10-25)', 'ticks': TICKS, 'baseline_on_vs_on': base,
-          'on_vs_off': test, 'lights': len(on1[0]['lights']), 'pass': ok}
+          'on_vs_off': test, 'lights': len(on1[0]['lights']), 'trials': [str(p) for p in paths], 'pass': ok}
 with open(OUT, 'x', encoding='utf-8') as f:
     json.dump(report, f, indent=1)
 log(**report)
