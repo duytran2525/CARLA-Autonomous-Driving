@@ -3,6 +3,9 @@
 # preparation -> C0 partial v5h -> the single A/B (P5) of each prepared M scene. Old M preparations (2026-10-24, G = GL)
 # are NOT passed to any revision. Waits for the v5f A/B chain. One own server at a time; logs in outputs/.
 cd "$(dirname "$0")"
+# 2026-10-25: CARLA no_rendering_mode (Duy, after M56_RENDER_PROBE_RESULT_20261025.md) and deferred W05 (perf);
+# both are disclosed in every A/B receipt / preparation record.
+export M56_NO_RENDER=1 M56_DEFER_W05=1
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'; LOG=$A/m56_v5_m_e3_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 PY=../../../.venv-m56-native-v1/Scripts/python.exe; PYM=../../../.venv-m56-v1/Scripts/python.exe
 ID=$A/m56_site_identity_v5_20261024T172844Z.json
