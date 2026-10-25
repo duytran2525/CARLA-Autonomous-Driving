@@ -100,13 +100,31 @@ def _f32(limit):
     return struct.unpack('<f',struct.pack('<f',limit))[0]
 
 
+_DRIVER_HASH_OK = {}
+
+
+def _driver_hash_ok(driver):
+    """_digest(driver.config) == driver.hash. A StockDriver is a frozen model record whose config is deep-frozen at
+    construction (model._freeze: a fresh MappingProxyType nobody else holds), so the answer cannot change for the same
+    driver object: memoized by identity with a strong reference (perf 2026-10-25: re-encoding the config with its
+    response route every tick was ~60% of the native tick loop). ponytail: bounded clear-all cache."""
+    from .catalog import _digest
+    hit=_DRIVER_HASH_OK.get(id(driver))
+    if hit is not None and hit[0] is driver:
+        return hit[1]
+    if len(_DRIVER_HASH_OK)>256:
+        _DRIVER_HASH_OK.clear()
+    ok=_digest(driver.config)==driver.hash
+    _DRIVER_HASH_OK[id(driver)]=(driver,ok)
+    return ok
+
+
 def apply_intent(driver: StockDriver, intent: CommandRecord) -> CommandRecord:
     """Compute a stock forward control; application/tick/readback belong to runtime.
 
     No clipping, brake-one rescue, negative target, reverse, or same-frame retry.
     """
-    from .catalog import _digest
-    if not isinstance(driver.handle,_StockSession) or _digest(driver.config)!=driver.hash:
+    if not isinstance(driver.handle,_StockSession) or not _driver_hash_ok(driver):
         raise ValueError('STOCK_DRIVER_INVALID')
     session=driver.handle;config=driver.config
     if (intent.kind!='CONTROL' or type(intent.frame) is not int or intent.next_frame!=intent.frame+1

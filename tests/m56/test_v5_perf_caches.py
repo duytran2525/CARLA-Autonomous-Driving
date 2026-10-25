@@ -110,3 +110,17 @@ def test_encode_record_fast_paths_match_the_reference():
     assert _route_shape_ok(route) and _route_shape_ok(route)
     bad = DirectedRoute((), route.transforms, (F(0), F(1), F(1), F(2), F(3)), 'b' * 64, (ref0,), F(1))
     assert not _route_shape_ok(bad)
+
+
+def test_driver_hash_memo_is_per_object_and_rejects_a_tampered_hash():
+    from dataclasses import replace
+    import types
+    from m56.catalog import _digest
+    from m56.model import StockDriver
+    from m56.response import _driver_hash_ok
+    config = {'actor_id': 1, 'plan': ('a', 'b'), 'opt_dict': {'dt': .05}}
+    good = StockDriver(object(), config, _digest(types.MappingProxyType(config)))
+    assert isinstance(good.config, types.MappingProxyType)
+    assert _driver_hash_ok(good) and _driver_hash_ok(good)
+    bad = replace(good, hash='0' * 64)
+    assert not _driver_hash_ok(bad) and _driver_hash_ok(good)
