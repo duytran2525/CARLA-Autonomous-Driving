@@ -18,8 +18,10 @@ spec.loader.exec_module(ab)
 from m56.runtime import load_episode  # noqa: E402
 from m56.model import decode_record, load_json  # noqa: E402
 
+INTO = __import__('os').environ.get('M56_REEVAL_INTO', '0') == '1'  # deferred W05: results into the scene dir itself
 for sd in scene_dirs:
     scene = sd.name
+    dest = sd if INTO else ab.root / scene
     fixture = decode_record('CompiledFixture', load_json(sd / 'fixture-frozen.json'))
     result = {'scene': scene, 'fixture_sha256': ab.sha(sd / 'fixture-frozen.json'), 'episodes': {},
               'reeval': {'source_ab_dir': str(sd), 'method': 'runtime.load_episode + native-v2-ab.w05 (offline)'}}
@@ -42,8 +44,8 @@ for sd in scene_dirs:
         stop = [json.loads(l) for l in (root / 'runner/stop.json').read_text(encoding='utf-8').splitlines() if l.strip()]
         runner_reasons = tuple(stop[-1]['reasons']) if stop else ()  # runner-level reasons (e.g. OUTER_TIMEOUT)
         ev = replace(ev, verdict=replace(verdict, reasons=tuple(dict.fromkeys((*verdict.reasons, *runner_reasons)))))
-        result['episodes'][action] = ab.w05(ev, fixture, ab.root / scene / f'w05-{action}')
-    (ab.root / scene).mkdir(parents=True, exist_ok=True)
-    ab.write_ref(ab.root / scene / 'ab-result.json', result, 'LOCAL_AB_RESULT_REEVAL')
+        result['episodes'][action] = ab.w05(ev, fixture, dest / f'w05-{action}')
+    dest.mkdir(parents=True, exist_ok=True)
+    ab.write_ref(dest / 'ab-result.json', result, 'LOCAL_AB_RESULT' if INTO else 'LOCAL_AB_RESULT_REEVAL')
     ab.log(event='AB_REEVAL', **result)
 print('DONE', ab.root)

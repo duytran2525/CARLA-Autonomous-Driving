@@ -239,6 +239,10 @@ def run_scene(c, client, proc, start, world, m, identity):
     ego_gains = None if ego_gains is None else tuple(F(g) for g in ego_gains)
     backend.bind(fixture, policy_maker(fixture, rows, review, source, npc_gains, ego_gains), geometry_review, kit)
     out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)
+    if DEFER_W05 and isinstance(out, tuple):
+        defer_w05(sd)
+        log(event='AB_DEFERRED', scene=c.id, scene_dir=str(sd), fixture_sha256=fref.sha256)
+        return
     result = {'scene': c.id, 'fixture_sha256': fref.sha256, 'episodes': {}}
     for action, ev in zip('AB', out if isinstance(out, tuple) else ()):
         result['episodes'][action] = w05(ev, fixture, sd / f'w05-{action}')
@@ -246,6 +250,22 @@ def run_scene(c, client, proc, start, world, m, identity):
         result['blocked'] = list(getattr(out, 'blocked', ()))
     write_ref(sd / 'ab-result.json', result, 'LOCAL_AB_RESULT')
     log(event='AB', scene=c.id, **{k: v for k, v in result.items() if k != 'scene'})
+
+
+import os, subprocess, time  # noqa: E402
+DEFER_W05 = os.environ.get('M56_DEFER_W05', '0') == '1'
+_DEFERRED = []
+
+
+def defer_w05(sd):
+    """Start native-v5-reeval.py on the sealed scene (results into sd itself); keep at most 2 running."""
+    while sum(p.poll() is None for p in _DEFERRED) >= 2:
+        time.sleep(5)
+    env = {**os.environ, 'M56_REEVAL_INTO': '1'}
+    py = WORK / '.venv-m56-native-v1/Scripts/python.exe'
+    logf = open(sd / 'deferred-w05.log', 'w', encoding='utf-8')
+    _DEFERRED.append(subprocess.Popen([str(py), '-I', '-X', 'utf8', str(WS / 'native-v5-reeval.py'), str(REVISION), TOWN, str(sd)],
+                                      cwd=str(WS), env=env, stdout=logf, stderr=subprocess.STDOUT))
 
 
 def w05(ev, fixture, path):
