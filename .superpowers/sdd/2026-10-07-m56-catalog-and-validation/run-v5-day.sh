@@ -11,11 +11,9 @@ mkdir -p $LOG
 wait_free() { while tasklist | grep -qi CarlaUE4; do sleep 30; done; }
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
 V5D=$O/m56_c0_partial_v5d_20261024T185251Z/c0-partial-v5-frozen-revision.json
-for spec in "Town04 M56-P-M02" "Town05 M56-P-M03,M56-P-M06,M56-P-M07"; do
-  set -- $spec; wait_free
-  $PY -I -X utf8 native-v2-ab.py $V5D $1 $2 > $LOG/rerunM-$1.log 2>&1
-  grep -v "^INFO" $LOG/rerunM-$1.log | grep -E '"event": "(FIXTURE|ADMISSION|SCENE_ERROR)"|^DONE|^Traceback' | cut -c1-300
-done
+# Step 1 (M reruns) REMOVED 2026-10-25 08:30 UTC: the new M candidates use G = fill20 GL and LrefN default 20 m instead
+# of spec 6.2 G (with LrefN = NPC connector road/@length); the M recipe needs a Duy-approved version first. The first
+# M02 rerun was stopped before any episode (0 observations).
 for spec in "Town05 M56-P-C04,M56-P-C05,M56-P-C06,M56-P-L03,M56-P-L04,M56-P-L05" "Town06 M56-P-C07,M56-P-C08" "Town07 M56-P-L06,M56-P-L07,M56-P-L08"; do
   set -- $spec; wait_free
   $PY -I -X utf8 native-v2-prepare.py $1 $2 > $LOG/prep-$1.log 2>&1
