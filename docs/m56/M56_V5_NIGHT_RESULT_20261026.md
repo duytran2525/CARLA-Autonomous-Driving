@@ -55,20 +55,31 @@ Lý do W05_REVIEW_MISSING và W01_W05_VALIDATION_PENDING có ở mọi episode n
 | M07 | A | 6/6 | 2,056 | 16,95 | CONTACT, FIT | — |
 | M07 | B | 6/6 | 14,146 | 13,05 | CONTACT, FIT | — |
 
-**Tình trạng:** vẫn chưa có cặp A/B hợp lệ nào. So với tối qua thì đã tiến xa: M03, M06, M07 và C02 có đủ cả 6 event ở cả A và B, còn
+**Tình trạng:** vẫn chưa có cặp A/B hợp lệ nào. Ở cấp episode, C01-B sau W05 là COMPLETE / VALID, không còn lý do nào (cả lần v5f lẫn lần chạy lại theo erratum 4). So với tối qua thì đã tiến xa: M03, M06, M07 và C02 có đủ cả 6 event ở cả A và B, còn
 L01, L02, L04, L05, L06 có đủ 6 event ở A.
 
 ## 3. Chẩn đoán các rào còn lại (chỉ đọc)
 
-1. **NPC cắt góc khi rẽ (CONTACT_PROOF, CONTINUOUS_FIT)** là rào lớn nhất.
-   - NPC đi theo `LocalPlanner` gốc và ra ngoài hợp các làn Driving ở góc trong của khúc rẽ. Độ sâu đỉnh thân xe ra ngoài:
-     C02 0,32 m, M07 0,56 m, L04 0,77 m, M03 0,99 m.
-   - Đóng khe (r = 0,25 m hoặc 1,0 m) không đổi được gì, nên đây là hành vi thật, không phải artefact. Chỉ có thể sửa ở recipe
-     (NPC chậm hơn ở khúc rẽ, hoặc plan dày hơn), mà đó là quyết định của Duy.
-2. **Khe hở trong vùng drivable.**
-   - Vùng drivable (hợp các ô lane) có 82–613 lỗ. Một số là khe hở giữa các ô, chu vi tới chỉ 0,04 m.
-   - Đóng khe r = 0,25 m sửa được M05-NPC (−0,0 → 2,47 m) và L01-EGO (0,114 → 0,852 m), mà không làm đổi các cảnh khác.
-   - Đây là đề xuất, chưa áp dụng.
+1. **Vùng drivable quá hẹp (CONTACT_PROOF, phần lớn CONTINUOUS_FIT).** Đây là rào lớn nhất, và là lỗi đo.
+   - Vùng drivable của tooling chỉ là hợp các ô của làn `Driving`. Mọi đỉnh thân xe nằm ngoài vùng này đều nằm trên mặt đường
+     thật.
+   - Bằng chứng: probe trên world trống (`native-surface-probe.py`, `outputs/m56_surface_probe_Town0{4,5}_*.json`) bắn tia tại
+     các đỉnh ra ngoài sâu nhất. Mọi tia đều trúng `Roads` hoặc `RoadLines`. Theo map, các điểm đó thuộc làn `Shoulder` (C02,
+     M03, M07), làn `Parking` (L04), hoặc mặt giao lộ không thuộc làn nào (M03, M07).
+   - Độ sâu thân NPC ra ngoài vùng: C02 0,32 m, M07 0,56 m, L04 0,77 m, M03 0,99 m.
+   - Đóng khe (r = 0,25 m hoặc 1,0 m) không giúp, vì đây là cả một dải mặt đường bị loại ra chứ không phải khe hở.
+   - Cũng vì vùng hẹp này mà FIT của EGO hỏng, kể cả khi EGO ở xa mép:
+     - C05-A: mép ≥ 0,35 m nhưng 25 khoảng hỏng FIT;
+     - C02-A: hỏng ngay từ vị trí xuất phát;
+     - L01-A, L04-A cũng hỏng.
+   - Ngoài ra, các ô 0,5 m chạm biên bị bỏ đi trước khi trừ thêm 0,15 m.
+   - *(Bản trước của mục này, viết lúc 02:00, gọi đây là "NPC cắt góc thật". Nhận định đó sai: probe cho thấy các điểm đó đều là
+     mặt đường.)*
+2. **LATERAL_BUDGET là thật và luôn do NPC ở khúc rẽ.**
+   - Đỉnh v²κ: M03 3,54; C02 3,2; L04 5,82 m/s². EGO luôn dưới 1 m/s².
+   - Với vN 3–4 m/s ở khúc rẽ gắt của giao lộ, mức này vượt 2,5. Chỉ có thể sửa ở recipe (tốc độ NPC khi rẽ).
+   - Khe hở thật trong vùng drivable (82–613 lỗ, chu vi tới chỉ 0,04 m) là chuyện nhỏ hơn. Đóng khe r = 0,25 m sửa được
+     M05-NPC (−0,0 → 2,47 m) và L01-EGO (0,114 → 0,852 m).
 3. **GROUND_PROOF:** probe trên world trống (`native-ground-probe.py`, `outputs/m56_ground_probe_*.json`) tái hiện đúng lỗi 1,98 m:
    - ở một số góc xe, tia bắn từ 2 m phía trên lọt qua khe trên mesh va chạm của mặt đường Town06 và trúng `NONE` ở −1,98 m;
    - các góc ngay bên cạnh trúng `Roads` ở 0 m.
@@ -92,15 +103,25 @@ L01, L02, L04, L05, L06 có đủ 6 event ở A.
    - M02, M08: EGO xuất phát ở chỗ va chạm;
    - M01: chưa chuẩn bị.
 
-## 4. Chờ Duy quyết (Claude không tự làm, vì đụng tới P5 hoặc phép đo)
+## 4. Chờ Duy quyết
 
-| # | Đề xuất | Tác động dự kiến |
-|---|---|---|
-| a | Erratum 4a (NPC dừng hẳn sau CLEAR_N, trước khi hết plan), cộng một lần chạy lại thứ hai cho C01, C05 | C01 là ứng viên gần nhất cho cặp hợp lệ đầu tiên: B đã sạch, A chỉ thiếu DESTINATION |
-| b | Đóng khe vùng drivable r = 0,25 m | sửa phần khe hở (M05, L01-A); không sửa phần NPC cắt góc |
-| c | Đo mặt đất nhiều tia (ví dụ lấy hit `Roads` gần nhất trong vòng ±5 cm) | bỏ lỗi 1,98 m; cần chạy lại |
-| d | Recipe NPC ở khúc rẽ (giảm tốc hoặc plan dày hơn) | rào chung của C02, M03/M06/M07, L04/L05 |
-| e | Recipe PID/brake của EGO ở YIELD (L-B) | mọi L-B |
-| f | Xác nhận hoặc bác erratum 6 (quyết theo ủy quyền đêm) | bỏ TARGET/PHASE mismatch ở 4 episode |
+**Điểm chính: P5 đã dùng hết.** Mọi cảnh đã chạy đêm nay đều đã dùng lần chạy lại P5. Vì vậy mọi sửa đổi dưới đây đều cần thêm
+một lần chạy cho các cảnh không còn lượt chạy lại.
+
+**Claude khuyến nghị:** như đã làm với v5, Duy duyệt **một bản v6 gộp** (recipe + consumer). Bản này chỉ chứa những sửa đã được
+kiểm offline đêm nay. Mỗi cảnh được **một A/B mới** dưới v6, kèm W05 và D09. Cách còn lại là mỗi rào một erratum, và lần nào cũng
+cần một ngoại lệ P5.
+
+| # | Thành phần v6 đề xuất | Bằng chứng | Tác động dự kiến |
+|---|---|---|---|
+| a | Erratum 4a: NPC dừng hẳn sau CLEAR_N, trước khi hết plan | TICK_ERROR ở C01-A, C05-A, C05-B | C01: B đã COMPLETE/VALID sau W05, còn A chỉ thiếu DESTINATION |
+| b | Vùng drivable gồm cả `Shoulder`, `Parking` và mặt giao lộ (hoặc lấy từ nhãn `Roads`), kèm đóng khe | probe nhãn bề mặt; phân tích mép | CONTACT và phần lớn FIT ở C02, M03/M06/M07, L01–L05, C05 |
+| c | Đo mặt đất nhiều tia (bỏ hit `NONE` khi có `Roads` trong vòng ±5 cm) | probe mặt đất: tia lọt khe mesh | GROUND_PROOF ở M05, L02, L06, L07, C03 |
+| d | Tốc độ NPC khi rẽ (để v²κ ≤ 2,5) | phân rã LATERAL | LATERAL ở M03, C02-A, L04–L07 |
+| e | PID/brake của EGO ở YIELD | L01-B (v rơi 1,23 → 0,30 m/s) | mọi L-B |
+| f | Erratum 6 (xác nhận hoặc bác) | đã kiểm | bỏ TARGET/PHASE mismatch ở 4 episode |
+| g | Tooling eligibility: đưa bundle W05 vào `compare_ab` và tạo review D09 | `compare_ab` hiện đánh giá lại từ `load_episode`, không thấy W05 | điều kiện để ra cặp PASS đầu tiên |
+
+Ngoài v6: C03 (NPC đi qua hai giao lộ có đèn) cần đặt lại điểm xuất phát của NPC, còn C07/C08 cần sửa ký hiệu làn trong catalog.
 
 Kết quả cũ đều giữ nguyên làm hồ sơ. Chưa có gì được push hay merge.
