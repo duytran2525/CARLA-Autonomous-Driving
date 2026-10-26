@@ -221,6 +221,34 @@ def main(outdir, identity_path, *prep_dirs):
             if raw.get('object_hash') != want:
                 rv = {**raw, 'object_hash': want, 'reasons': [*raw['reasons'], 're-bound to the actors after the runtime recipe']}
                 done[i] = replace(c, environment={**c.environment, 'category_review': rv})
+    # I/O tooling (docs/m56/DESIGN_M56_IO_TOOLING_20261026.md): an I/O candidate with an 'io-v1' preparation gets its
+    # native responses (frozen program/targets/profiles on the native routes, one catalog-arc offset), readiness and
+    # destinations; one without stays byte-identical. Preparation only: no I/O A/B before Duy approves the I/O recipe.
+    from native_io_common import io_routes, catalog_offset, io_responses, io_geometry
+    for i, c in enumerate(done):
+        f, p = preps.get(c.id, (None, None))
+        if c.category not in ('I', 'O') or p is None or p.get('recipe') != 'io-v1':
+            continue
+        pref = {'prepare_json': str(f), 'prepare_sha256': hashlib.sha256(f.read_bytes()).hexdigest(), 'recipe': 'io-v1'}
+        if p['status'] != 'PREPARED':
+            done[i] = replace(c, environment={**c.environment, 'runtime_recipe_v2': {'status': p['status'], 'reason': p.get('reason'), **pref}})
+            report.append({'id': c.id, 'status': p['status'], 'reason': p.get('reason')}); continue
+        pp = {k: (v if k == 'poses' else plain(v)) for k, v in p.items()}
+        routes, _, _ = io_routes(pp, plain, c.town)
+        d = catalog_offset(c, routes)
+        geo = io_geometry(c, pp, routes, d, plain)
+        if geo.get('reason'):
+            done[i] = replace(c, environment={**c.environment, 'runtime_recipe_v2': {'status': 'BLOCKED_FIXTURE', 'reason': geo['reason'], **pref}})
+            report.append({'id': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': geo['reason']}); continue
+        readiness = {'targets_mps': {k: plain(v) for k, v in p['targets'].items()},
+                     'markers_m': {k: plain(v) for k, v in p['markers'].items()}}
+        actors = tuple(replace(a, destination=routes[a.role].destination,
+                               route_recipe={**a.route_recipe, 'io_recipe': 'io-v1', 'catalog_offset_m': str(d),
+                                             'v2_routes_sha256': p['routes_v2_sha256']}) for a in c.actors)
+        done[i] = replace(c, actors=actors, responses=io_responses(c, routes, d),
+                          environment={**c.environment, 'readiness': readiness,
+                                       'runtime_recipe_v2': {'status': 'PREPARED', 'catalog_offset_m': str(d), **pref}})
+        report.append({'id': c.id, 'status': 'PREPARED', 'recipe': 'io-v1', 'catalog_offset_m': str(d)})
     revision = CandidateRevision('c0-partial-v5: retained-23+fill20-v1-minus-F02-F03+fill-v2/v3+recipes+runtime-recipe-v5',
                                  tuple(done), 'x' * 64, None)
     ev = (cr.st.ref(rev2.EV1, 'IDENTITY_EVIDENCE'), cr.st.ref(rev2.EV2, 'IDENTITY_EVIDENCE'), cr.st.ref(identity_path, 'IDENTITY_EVIDENCE'))

@@ -86,14 +86,56 @@ class Kit:
                                 ('native ground_projection witness; Claude review under Duy delegation, not independent',))
             out.append(replace(a, ground=ground))
         pair = self.fixture.pair
-        context = {'pair_hash': pair.hash, 'reference': pair.reference, 'directed_route': self.fixture.routes['EGO'],
-                   'uncertainty': {n: UNC for n in pair.names}}
-        added = {'metric_context': context}
+        topo = self.fixture.domain.topology
+        if topo.get('category') in ('I', 'O'):  # I/O tooling (design 2026-10-26): map reference + path corridors
+            context = {'pair_hash': pair.hash, 'reference': pair.reference, 'map_reference': topo['map_reference'],
+                       'uncertainty': {n: UNC for n in pair.names}}
+            added = {'metric_context': context, **self.io_paths(backend, frame_id, simtime, tuple(out))}
+        else:
+            context = {'pair_hash': pair.hash, 'reference': pair.reference, 'directed_route': self.fixture.routes['EGO'],
+                       'uncertainty': {n: UNC for n in pair.names}}
+            added = {'metric_context': context}
         predicate = self.fixture.environment.get('phase_predicate')
         if predicate is not None:  # signal-phase v1 S3: the same observe-only packet as in preparation
             self.phase = getattr(self, 'phase', None) or PhaseObserver(predicate['light'])
             added.update(self.phase.frame(backend, frame_id, simtime, ())[1])
         return tuple(out), added
+
+    def io_paths(self, backend, frame_id, simtime, actors):
+        """I/O path corridors (I/O tooling design 2026-10-26, choices listed in the I/O recipe prereg):
+        lane-change corridor = the EGO_TARGET lane box from the EGO rear to the EGO front + Dlc + one EGO length along
+        the travel axis; return corridor = the EGO_INITIAL lane box over the same longitudinal span. Clearance = xy
+        distance from the NPC body hull to the corridor (0 when touching), rounded down to 0.1 mm."""
+        from shapely.geometry import MultiPoint, box
+        topo = self.fixture.domain.topology
+        regions, (k, sgn), dlc = topo['action_regions'], topo['io_axis'], float(topo['io_dlc'])
+        recipe = self._recipe(backend, 'io-paths', {
+            'method': 'bounded-lane-change-corridor-v1 / bounded-return-corridor-v1', 'version': '1',
+            'corridor': 'lane box (EGO_TARGET / EGO_INITIAL) x [EGO rear, EGO front + Dlc + EGO length] on the travel axis',
+            'clearance': 'xy distance NPC body hull -> corridor, floored to 1e-4 m'})
+        ego = next(a for a in actors if a.role == 'EGO'); npc = next(a for a in actors if a.role == 'NPC')
+        ev = [sgn * float(v[k]) for v in world_vertices(ego.body, ego.pose)]
+        length = max(ev) - min(ev)
+        lo, hi = sorted((sgn * min(ev), sgn * (max(ev) + dlc + length)))
+        npc_hull = MultiPoint([(float(v[0]), float(v[1])) for v in world_vertices(npc.body, npc.pose)]).convex_hull
+
+        def clearance(region):
+            j = 1 - k
+            a, b = min(float(p[j]) for p in region), max(float(p[j]) for p in region)
+            corridor = box(lo, a, hi, b) if k == 0 else box(a, lo, b, hi)
+            return q(npc_hull.distance(corridor))
+        actors_hash = _digest(actors)
+        why = ('native corridor clearance from observed bodies; Claude review under Duy delegation, not independent',)
+        lc = {'fixture_hash': self.fixture_hash, 'frame': frame_id, 'actors_hash': actors_hash,
+              'from_region_hash': _digest(regions['EGO_INITIAL']), 'to_region_hash': _digest(regions['EGO_TARGET']),
+              'route_hash': _digest(self.fixture.routes['EGO']), 'minimum_clearance_m': clearance(regions['EGO_TARGET'])}
+        rp = {'fixture_hash': self.fixture_hash, 'actors_hash': actors_hash, 'frame': frame_id,
+              'minimum_clearance_m': clearance(regions['EGO_INITIAL'])}
+        raw_lc = backend._raw('g4/lane-change-path.json', lc, frame_id, simtime)
+        raw_rp = backend._raw('g4/return-path.json', rp, frame_id, simtime)
+        return {'lane_change_path': self.proof('LANE_CHANGE_PATH', 'bounded-lane-change-corridor-v1', (raw_lc,), UNC, lc,
+                                               (recipe,), why),
+                'return_path': self.proof('RETURN_PATH', 'bounded-return-corridor-v1', (raw_rp,), UNC, rp, (recipe,), why)}
 
     # -- seal ------------------------------------------------------------------------------------------------
     def initialization_recipe(self, store):
@@ -215,7 +257,8 @@ class Kit:
             response = next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash)
             target = (active_target(response, y.commands[0].cause) if V6 else max(v for v in response.targets.values()))
             actors[x.role] = {'actor_id': x.id, 'response_hash': y.commands[0].response_hash, 'envelope': box,
-                              'reference_lateral_acceleration_bound_mps2': q_up(float(target) ** 2 * self.kappa(x.role, y))}
+                              'reference_lateral_acceleration_bound_mps2': q_up(float(target) ** 2 * (self.kappa(x.role, y)
+                                                                                                    + profile_kappa(response, y)))}
         return {'boot': a.boot, 'world': a.world, 'first_frame': a.frame, 'last_frame': b.frame,
                 'first_actors_hash': _digest(a.actors), 'last_actors_hash': _digest(b.actors), 'actors': actors}
 
@@ -230,6 +273,20 @@ class Kit:
                 dyaw = math.radians((t[i + 1].yaw - t[i - 1].yaw + 180) % 360 - 180)
                 k = max(k, abs(dyaw) / (arc[i + 1] - arc[i - 1]))
         return k
+
+
+def profile_kappa(response, actor, window=10.):
+    """I/O tooling (2026-10-26): max |q''| = (10/sqrt 3)|delta|/L^2 of every planned quintic lateral segment of the
+    response (its own profile and every reference-switch profile, same arc frame) within +-window m of the actor's
+    station; 0 for a response without lateral motion (C/L/M: the bound is unchanged). Added to the route curvature."""
+    s = float(actor.arc) if actor.arc is not None else 0.
+    k = 0.
+    for p in (response.profile, *(w['profile'] for w in response.phases.get('reference_switches', ()))):
+        for g in p['segments']:
+            d, a0, L = abs(float(g['end_offset_m'] - g['start_offset_m'])), float(g['start_arc_m']), float(g['length_m'])
+            if d and a0 - window <= s <= a0 + L + window:
+                k = max(k, 10 / math.sqrt(3) * d / L ** 2)
+    return k
 
 
 def active_target(response, cause):
