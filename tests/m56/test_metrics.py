@@ -1869,3 +1869,30 @@ def test_naked_or_stale_predicate_is_not_observation(require,clear_frames):
     for packet in (True,{'value':True},clear_frames[0].integrity['predicates']['NPC_WHOLE_BODY_CLEAR']):
         frames=tuple(replace(f,integrity={'predicates':{'NPC_WHOLE_BODY_CLEAR':packet}}) for f in clear_frames)
         assert confirm(frames,'NPC_WHOLE_BODY_CLEAR',F(1,4)) is None
+
+
+def _with_speed_marker(fixture, rows):
+    from m56.model import FrozenResponse
+    program = {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
+               'transitions': ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': F(0), 'requires': ()},
+                               {'cause': 'TURN', 'after_event': 'SPEED_MARKER:NPC:TURN', 'delay_s': F(0), 'requires': ()})}
+    r = FrozenResponse('NPC', 'NPC_COMMON', fixture.routes['NPC'], {'SETTLE': F(0), 'NOMINAL': F(3), 'TURN': F(2)}, {},
+                       {'category': 'C', 'program': program, 'speed_markers': rows}, 'n' * 64)
+    return replace(fixture, responses=(r,))
+
+
+def test_v6_speed_marker_is_the_first_front_crossing(require, crossing_trace, rebind_trace):
+    # v6 d (prereg PREREG_M56_V6_20261026): NPC front (pose x + 0.5) reaches station 11 first at frame 102 (x = 12).
+    detect = require('m56.metrics', 'detect_events'); c = crossing_trace
+    fixture = _with_speed_marker(c.fixture, ({'cause': 'TURN', 'marker_arc_m': F(11)},))
+    events = {e.name: e for e in detect(rebind_trace(c.frames, fixture), fixture)}
+    assert events['SPEED_MARKER:NPC:TURN'].frame == 102
+    assert events['NPC_ENTRY'].frame == 101  # the frozen events are unchanged
+
+
+@pytest.mark.parametrize('rows', [({'cause': 'NOPE', 'marker_arc_m': F(11)},), ({'cause': 'TURN', 'marker_arc_m': F(-1)},),
+                                  ({'cause': 'TURN', 'marker_arc_m': F(11), 'x': 1},)])
+def test_v6_malformed_speed_marker_never_fires(require, crossing_trace, rebind_trace, rows):
+    detect = require('m56.metrics', 'detect_events'); c = crossing_trace
+    fixture = _with_speed_marker(c.fixture, rows)
+    assert not any(e.name.startswith('SPEED_MARKER') for e in detect(rebind_trace(c.frames, fixture), fixture))

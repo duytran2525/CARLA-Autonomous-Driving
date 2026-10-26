@@ -164,7 +164,17 @@ def apply_intent(driver: StockDriver, intent: CommandRecord) -> CommandRecord:
             raise ValueError('fields')
     except (AttributeError,TypeError,ValueError):
         raise ValueError('STOCK_CONTROL_INVALID') from None
+    if intent.control is None and intent.target_kmh>0 and control.brake>0:
+        # v6 e (prereg PREREG_M56_V6_20261026, probe native-yield-probe.py): below 1.4 m/s any CARLA brake collapses the
+        # speed to ~0 within one tick; with a moving target the stock brake is replaced by coasting there.
+        vehicle=getattr(session.backend,'_vehicle',None)
+        speed=vehicle.get_velocity().length() if vehicle is not None else None
+        if speed is not None and speed<LOW_SPEED_BRAKE_CUTOFF_MPS:
+            control=replace(control,brake=0.)
     return replace(intent,control=control)
+
+
+LOW_SPEED_BRAKE_CUTOFF_MPS=1.4
 
 
 def _program(response):

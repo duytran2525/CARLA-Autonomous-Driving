@@ -207,3 +207,30 @@ def test_v5_npc_longitudinal_gains_come_from_the_reviewed_binding(stock_case):
     assert s.captured[-1][1]['opt_dict']['longitudinal_control_dict'] == {'K_P': .5, 'K_I': .05, 'K_D': 0., 'dt': .05}
     with pytest.raises(ValueError, match='STOCK_BINDING_INVALID'):
         s.create(s.actor, npc, with_gains(npc, 'ego_longitudinal'))
+
+
+@pytest.mark.parametrize('speed,expected', [(1.0, 0.), (1.39, 0.), (1.4, .3), (2.0, .3), (None, .3)])
+def test_v6_low_speed_brake_becomes_coast_only_with_a_moving_target(stock_case, require, speed, expected):
+    # v6 e (prereg PREREG_M56_V6_20261026): below 1.4 m/s a CARLA brake collapses the speed in one tick (yield probe).
+    s = stock_case; driver = s.create(s.actor, s.c.response, s.policy)
+    s.fake.run_step = lambda: SimpleNamespace(throttle=0., steer=0., brake=.3, hand_brake=False, reverse=False,
+                                              manual_gear_shift=False, gear=1)
+    if speed is not None:
+        s.fake._vehicle = SimpleNamespace(get_velocity=lambda: SimpleNamespace(length=lambda: speed))
+    intent = require('m56.response', 'step_response')(s.c.frame, s.c.state, s.c.response).command
+    assert intent.target_kmh > 0
+    assert require('m56.response', 'apply_intent')(driver, intent).control.brake == expected
+
+
+def test_v6_zero_target_keeps_its_brake(stock_case, require):
+    s = stock_case
+    zero = next((k for k, v in s.c.response.targets.items() if v == 0), None)
+    if zero is None:
+        pytest.skip('response case has no zero-target phase')
+    driver = s.create(s.actor, s.c.response, s.policy)
+    s.fake.run_step = lambda: SimpleNamespace(throttle=0., steer=0., brake=.3, hand_brake=False, reverse=False,
+                                              manual_gear_shift=False, gear=1)
+    s.fake._vehicle = SimpleNamespace(get_velocity=lambda: SimpleNamespace(length=lambda: .5))
+    intent = require('m56.response', 'step_response')(s.c.frame, s.c.state, s.c.response).command
+    intent = replace(intent, cause=zero, target_kmh=type(intent.target_kmh)(0))
+    assert require('m56.response', 'apply_intent')(driver, intent).control.brake == .3

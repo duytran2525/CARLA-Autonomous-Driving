@@ -1203,6 +1203,7 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
     if fixture.pair.names!=('d_yield_m','t_entry_s') or fixture.G is None:
         return ()
     events=[];seen=set();derived=[];previous_positions=None;fixture_hash=_digest(fixture)
+    markers=_speed_markers(fixture)
     # Online detection re-runs this kernel on a growing prefix every tick. Each step depends only on the previous
     # step's state, so a prefix made of the very same frame objects resumes from its saved state (identical result;
     # native A/B 2026-10-24 needed it to meet the 300 s outer deadline). ponytail: bounded clear-all cache.
@@ -1230,6 +1231,9 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
             if name not in seen and refs:
                 event=EventRecord(name,frame.frame,frame.simtime,refs)
                 events.append(event);newly.append(event);seen.add(name)
+        for role,cause,arc in markers:  # v6 d: first frame whose front station on a valid route reaches the marker
+            if role in positions and positions[role]>=arc:
+                emit('SPEED_MARKER:'+role+':'+cause)
         if previous_positions is not None:
             for role,name,section in (('EGO','E_ENTRY',fixture.domain.e_entry),('NPC','NPC_ENTRY',fixture.domain.n_entry)):
                 # Erratum 5 (Duy 2026-10-25): spec 7.3 entry = front crossing on a valid route; no face-corridor
@@ -1277,6 +1281,27 @@ def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> t
         if confirmed is not None:
             events.append(confirmed)
     return tuple(sorted(events,key=lambda e:(e.frame,e.name)))
+
+
+def _speed_markers(fixture):
+    """v6 d (prereg PREREG_M56_V6_20261026): frozen speed-phase markers of C/L/M responses,
+    phases['speed_markers'] = ({'cause': phase, 'marker_arc_m': station on the role's fixture route},).
+    A malformed entry yields no marker (the phase then never starts); it is never repaired."""
+    out=[]
+    for response in fixture.responses:
+        rows=response.phases.get('speed_markers',())
+        if not isinstance(rows,tuple):
+            continue
+        try:
+            phases=(response.phases['program']['initial'],*(t['cause'] for t in response.phases['program']['transitions']))
+        except (KeyError,TypeError):
+            continue
+        for row in rows:
+            if (isinstance(row,Mapping) and set(row)=={'cause','marker_arc_m'} and row['cause'] in phases
+                    and isinstance(row['marker_arc_m'],Number) and not isinstance(row['marker_arc_m'],bool)
+                    and row['marker_arc_m']>=0):
+                out.append((response.actor_role,row['cause'],row['marker_arc_m']))
+    return tuple(out)
 
 
 def _reference_marker_events(frames,fixture):
