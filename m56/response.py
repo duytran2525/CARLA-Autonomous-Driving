@@ -221,7 +221,28 @@ def _advance_program(frame, state, response, observations):
     return ScriptState(phase,start,tuple(known.values()))
 
 
+_REFERENCE_CACHE={}
+
+
 def _reference_response(response, cause):
+    """_reference_response_uncached memoized by (response identity, cause): a frozen response gives the same reference
+    or the same ValueError. Perf 2026-10-27 (M56 O03): validating the two CARLA-route switches (_switch_real_v5, O(n*m)
+    projection) took ~1.4 s per call and step_response calls it every tick. ponytail: bounded clear-all cache."""
+    key=(id(response),cause);hit=_REFERENCE_CACHE.get(key)
+    if hit is None or hit[0] is not response:
+        try:
+            hit=(response,_reference_response_uncached(response,cause),None)
+        except ValueError as exc:
+            hit=(response,None,str(exc))
+        if len(_REFERENCE_CACHE)>256:
+            _REFERENCE_CACHE.clear()
+        _REFERENCE_CACHE[key]=hit
+    if hit[2] is not None:
+        raise ValueError(hit[2])
+    return hit[1]
+
+
+def _reference_response_uncached(response, cause):
     """Resolve frozen phase references; only analytically continuous parallel plans.
 
     Curved/banked switches require a separately qualified recipe and are blocked,
