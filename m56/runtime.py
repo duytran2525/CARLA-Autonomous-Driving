@@ -426,6 +426,31 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
         self.plan_refs = {role: self._raw(f'native/plan-{role}.json', route) for role, route in fixture.routes.items()}
         return self
 
+    def _plan_refs_for(self, frames):
+        """Per role, the stock plan's reference route: the active reference (after reference switches) of the command that
+        produced this observation, else the fixture route. I/O 2026-10-27 (M56 O03 native A/B): a lane-change reference
+        switch moves the stock plan to the switched route (response.apply_intent phase_plans), and the consumer checks the
+        plan witness against that route. Responses without switches (C/L/M) keep the fixture route refs unchanged."""
+        from m56.response import _reference_response
+        out = dict(self.plan_refs)
+        cache = self.__dict__.setdefault('switch_plan_refs', {})
+        for a in frames:
+            c = a.commands[0] if a.commands else None
+            r = next((x for x in self.fixture.responses if c is not None and x.hash == c.response_hash), None)
+            if r is None or not r.phases.get('reference_switches'):
+                continue
+            key = (a.role, r.hash, c.cause)
+            if key not in cache:
+                try:
+                    route = _reference_response(r, c.cause).route
+                except ValueError:
+                    route = None
+                cache[key] = (None if route is None or route == self.fixture.routes.get(a.role)
+                              else self._raw(f'native/plan-{a.role}-{c.cause}.json', route))
+            if cache[key] is not None:
+                out[a.role] = cache[key]
+        return out
+
     def _raw(self, stream, record, frame=None, time=None):
         self.count = getattr(self, 'count', 0) + 1  # one immutable file per record: refs never go stale
         a = append_record(self.store, f'{stream.rsplit(".", 1)[0]}/{self.count:07d}.json', record)
@@ -620,6 +645,7 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
             integrity['npc_controls'] = {**packet, 'witness_refs': (self._raw('native/npc_controls.json', packet,
                                                                                 frame_id, simtime),)}
         frames = self._actor_frames(actors)
+        integrity['plan_refs'] = self._plan_refs_for(frames)
         kit = getattr(self, 'seal_kit', None)
         if kit is not None:  # per-frame ground proofs / metric context, attached before the observation is written
             frames, added = kit.frame(self, frame_id, simtime, frames)
