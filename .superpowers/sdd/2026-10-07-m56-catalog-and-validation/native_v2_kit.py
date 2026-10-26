@@ -10,7 +10,8 @@ Bounds are conservative: a quantity that cannot be bounded is reported as a fail
 from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
-import hashlib, json, math
+import hashlib, json, math, os
+V6 = os.environ.get('M56_RECIPE', 'v5') == 'v6'  # same switch as native_v2_common (prereg v6)
 
 from m56.catalog import _digest
 from m56.evidence import append_record
@@ -74,8 +75,7 @@ class Kit:
             corners = sorted(world_vertices(a.body, a.pose), key=lambda v: v[2])[:4]
             errors = []
             for v in corners:
-                g = backend.world.ground_projection(carla.Location(v[0], v[1], v[2] + 2.), 10.)
-                errors.append(abs(v[2] - g.location.z) if g is not None else math.inf)
+                errors.append(ground_error(backend.world, v) if V6 else _v5_ground_error(backend.world, v))
             error = q_up(max(errors)) if math.isfinite(max(errors)) else Fraction(1)
             limits = {'fixture_hash': self.fixture_hash, 'boot': backend.ownership.boot, 'world': str(backend.world.id),
                       'frame': frame_id, 'actor_id': a.id, 'body_pose_hash': _digest({'body': a.body, 'pose': a.pose}),
@@ -212,7 +212,8 @@ class Kit:
             low = tuple(float(q(min(p[k] for p in pts) - pad)) for k in range(3))
             high = tuple(float(q_up(max(p[k] for p in pts) + pad)) for k in range(3))
             box = tuple(tuple(high[k] if s[k] else low[k] for k in range(3)) for s in product((0, 1), repeat=3))
-            target = max(v for v in next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash).targets.values())
+            response = next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash)
+            target = (active_target(response, y.commands[0].cause) if V6 else max(v for v in response.targets.values()))
             actors[x.role] = {'actor_id': x.id, 'response_hash': y.commands[0].response_hash, 'envelope': box,
                               'reference_lateral_acceleration_bound_mps2': q_up(float(target) ** 2 * self.kappa(x.role, y))}
         return {'boot': a.boot, 'world': a.world, 'first_frame': a.frame, 'last_frame': b.frame,
@@ -231,9 +232,36 @@ class Kit:
         return k
 
 
+def active_target(response, cause):
+    """v6 d: the reference speed of the phase that issued this interval's command (NPC_TRAFFIC_HOLD = 0)."""
+    return 0 if cause == 'NPC_TRAFFIC_HOLD' else response.targets[cause]
+
+
 def decode_ref(packet):
     from m56.model import decode_record
     return decode_record('SourceRef', packet)
+
+
+def _v5_ground_error(world, v):
+    import carla
+    g = world.ground_projection(carla.Location(v[0], v[1], v[2] + 2.), 10.)
+    return abs(v[2] - g.location.z) if g is not None else math.inf
+
+
+GROUND_OFFSETS = ((0., 0.), (.05, 0.), (-.05, 0.), (0., .05), (0., -.05))
+
+
+def ground_error(world, v):
+    """v6 c (prereg PREREG_M56_V6_20261026): the corner and 4 points 5 cm away; hits labelled NONE are dropped (a ray
+    through a road-mesh seam, native ground probe 2026-10-26); min error over the labelled hits; no labelled hit = the
+    v5 single-ray value."""
+    import carla
+    errs = []
+    for dx, dy in GROUND_OFFSETS:
+        g = world.ground_projection(carla.Location(v[0] + dx, v[1] + dy, v[2] + 2.), 10.)
+        if g is not None and str(g.label) != 'NONE':
+            errs.append(abs(v[2] - g.location.z))
+    return min(errs) if errs else _v5_ground_error(world, v)
 
 
 class PhaseObserver:

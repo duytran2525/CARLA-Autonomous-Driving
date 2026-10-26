@@ -14,7 +14,7 @@ from pathlib import Path
 import json, math, sys, traceback
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from native_v2_common import (NO_RENDER, NOMINAL, WORK, WS, PREREG, body_record, certificates, directed, drivable_union, load,
+from native_v2_common import (NO_RENDER, V6, v6_npc_program, NOMINAL, WORK, WS, PREREG, body_record, certificates, directed, drivable_union, load,
                               now, own_server, ownership, policy_maker, reviewer, sha, write_ref, npc_response, up)
 from native_v2_kit import Kit, q
 from m56 import runtime
@@ -43,6 +43,7 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
     'prereg': {'path': str(PREREG), 'sha256': sha(PREREG)}, 'revision_v2': {'path': str(REVISION), 'sha256': sha(REVISION)},
     'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B',
     'carla_no_rendering_mode': NO_RENDER,
+    **({'m56_recipe': 'v6', 'm56_code': __import__('os').environ.get('M56_CODE', str(WORK))} if V6 else {}),
     'approvals': ['[chat] 2026-10-24 Duy: v3 prereg ab1fb09 + signal-phase erratum 4 (7374ed7), run C01/C02 once',
                   '[chat] 2026-10-24 Duy: "cho chạy A/B C01, C02 thêm đúng một lần với hai bản sửa harness (cùng '
                   'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)',
@@ -149,7 +150,7 @@ def run_scene(c, client, proc, start, world, m, identity):
     # 92-146 m from the conflict centre, outside the old fixed 90 m radius, so BODY_FIT failed (edge = -1) before any
     # episode for C03, L04, L05, L06 (and M05). Radius = max(90 m, farthest start + 20 m).
     radius = max(90., max(math.dist((poses[r].x, poses[r].y), center) for r in poses) + 20.)
-    drivable = drivable_union(m, center, radius)
+    drivable = drivable_union(m, center, radius, world, routes) if V6 else drivable_union(m, center, radius)
     dpath = sd / 'drivable-union.wkt'
     dpath.write_text(drivable.wkt, encoding='utf-8')
     dref = SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')
@@ -161,7 +162,14 @@ def run_scene(c, client, proc, start, world, m, identity):
     pair_spec = (('d_yield_m', 't_entry_s'), ('m', 's'), ('forward_distance', 'elapsed'),
                  (('TRIGGER', 'CLEAR_N_CONFIRMED'), ('TRIGGER', 'E_ENTRY')), 'route:' + _digest(routes['EGO']))
     pair = FrozenMetricPair(*pair_spec, _digest(pair_spec), 'APPROVED_PROPOSAL_NOT_READY')
-    responses = (*(r for r in c.responses if r.actor_role == 'EGO'), npc_response(c.category, vN, routes['NPC']))
+    v6p = None
+    if V6:  # prereg v6 a+d: recomputed on the final routes and required to equal the preparation's frozen program
+        cut = (raw_prep.get('npc_route_end_e4') or {}).get('cut_index') is not None
+        v6p = v6_npc_program(routes['NPC'], vN, region, 2 * prep['bbox']['extent'][0], cut)
+        assert raw_prep.get('m56_recipe') == 'v6' and not v6p.get('reason'), f'V6_PREPARATION_MISSING:{v6p.get("reason")}'
+        assert json.dumps(v6p, default=str, sort_keys=True) == json.dumps(plain(raw_prep['v6_npc_program']), default=str,
+                                                                           sort_keys=True), 'V6_PROGRAM_MISMATCH'
+    responses = (*(r for r in c.responses if r.actor_role == 'EGO'), npc_response(c.category, vN, routes['NPC'], v6p))
     g = c.parameters['G']
     policies = PolicyBundle('m56-v2-fixture', 'f' * 64, {c.id + '.G': g}, {}, {}, (prep_ref,))
     mp = {'town': c.town, 'opendrive_sha256': identity.map}

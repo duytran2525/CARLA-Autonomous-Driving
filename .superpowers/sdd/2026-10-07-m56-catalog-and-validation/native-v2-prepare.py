@@ -208,7 +208,14 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     for role in routes:
         poses[role], grounds[role] = pose_at(routes[role])
     ego_responses = tuple(r for r in c.responses if r.actor_role == 'EGO')
-    responses = (next(r for r in ego_responses if r.action_id == 'A'), npc_response(c.category, vN, routes['NPC']))
+    v6p = None
+    if V6:  # prereg v6 d: the probe-1 NPC already slows before its turn (no PARK: the route is not cut yet)
+        v6p = v6_npc_program(routes['NPC'], vN, region, 2 * bbox['extent'][0], cut=False)
+        if v6p.get('reason'):
+            finish(c, {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': v6p['reason'], 'v6_npc_program_probe1': v6p,
+                       'm56_recipe': 'v6'})
+            return
+    responses = (next(r for r in ego_responses if r.action_id == 'A'), npc_response(c.category, vN, routes['NPC'], v6p))
     signal = {role: find_light(world, m, rows[role], exit_idx[role], routes[role], {'NPC': n_entry, 'EGO': e_entry}[role])
               for role in ('NPC', 'EGO')}
     sig = signal['NPC']
@@ -232,7 +239,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
            'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s, 'conflict_component': component,
-           'carla_no_rendering_mode': NO_RENDER}
+           'carla_no_rendering_mode': NO_RENDER, **({'m56_recipe': 'v6'} if V6 else {})}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)
@@ -324,7 +331,14 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         r_, a_ = rows[role]
         routes[role] = directed(r_, a_, identity.map, c.town, notation[role], cont2, a_[exit_idx[role]] + 5)
     poses['NPC'], grounds['NPC'] = pose_at(routes['NPC'])
-    responses = (responses[0], npc_response(c.category, vN, routes['NPC']))
+    v6p = None
+    if V6:  # prereg v6 a+d on the final (phased, erratum-4 cut) NPC route
+        v6p = v6_npc_program(routes['NPC'], vN, region, 2 * bbox['extent'][0], cut=end.get('cut_index') is not None)
+        out['v6_npc_program'] = v6p
+        if v6p.get('reason'):
+            out.update(status='BLOCKED_FIXTURE', reason=v6p['reason'])
+            return finish(c, out)
+    responses = (responses[0], npc_response(c.category, vN, routes['NPC'], v6p))
     pred2 = None
     if sig and sig.get('stop_station') is None:
         out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_STOP_UNMAPPED')

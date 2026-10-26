@@ -105,6 +105,9 @@ def own_server(log):
 # Duy [chat] 2026-10-25: CARLA no_rendering_mode for the runs from now on (no camera: no metric depends on rendering),
 # disclosed in every run receipt, after a probe showed physics and traffic lights unchanged (native-render-probe.py).
 NO_RENDER = os.environ.get('M56_NO_RENDER', '0') == '1'
+# v6 (docs/m56/PREREG_M56_V6_20261026.md): M56_RECIPE=v6 turns on items a-d of the bundled v6 recipe; the default
+# (unset) keeps every v5 byte. Recorded in every v6 receipt / preparation record.
+V6 = os.environ.get('M56_RECIPE', 'v5') == 'v6'
 
 
 def load(client, town):
@@ -322,14 +325,64 @@ def policy_maker(fixture, rows_by_role, review, source, npc_gains=None, ego_gain
     return policy_for
 
 
-def npc_response(category, vN, route):
-    program = {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
-               'transitions': ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()},)}
+def npc_response(category, vN, route, v6=None):
+    """v6=None: the v5 NPC program byte for byte. v6 = v6_npc_program(...) without 'reason': TURN (after the speed
+    marker) and/or PARK (after CLEAR_N + delay) appended in that order (prereg v6 a, d)."""
+    rows = [{'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()}]
+    targets = {'SETTLE': F(0), 'NOMINAL': vN}
+    markers = None
+    if v6 and v6.get('turn'):
+        rows.append({'cause': 'TURN', 'after_event': 'SPEED_MARKER:NPC:TURN', 'delay_s': F(0), 'requires': ()})
+        targets['TURN'] = v6['turn']['v_mps']
+        markers = ({'cause': 'TURN', 'marker_arc_m': v6['turn']['marker_arc_m']},)
+    if v6 and v6.get('park'):
+        rows.append({'cause': 'PARK', 'after_event': 'CLEAR_N_CONFIRMED', 'delay_s': v6['park']['delay_s'], 'requires': ()})
+        targets['PARK'] = F(0)
+    program = {'method': 'ordered-event-program-v1', 'initial': 'SETTLE', 'transitions': tuple(rows)}
     zero = {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': F(0), 'length_m': F(1), 'start_offset_m': F(0),
                                                       'end_offset_m': F(0)},)}
-    r = FrozenResponse('NPC', 'NPC_COMMON', route, {'SETTLE': F(0), 'NOMINAL': vN}, zero,
-                       {'category': category, 'program': program, 'annex': 'prereg v2 2.2: temporary, never catalog'}, '')
+    phases = {'category': category, 'program': program, 'annex': 'prereg v2 2.2: temporary, never catalog'}
+    if markers:
+        phases['speed_markers'] = markers
+    r = FrozenResponse('NPC', 'NPC_COMMON', route, targets, zero, phases, '')
     return replace(r, hash=_digest({k: getattr(r, k) for k in ('actor_role', 'action_id', 'route', 'targets', 'profile', 'phases')}))
+
+
+def route_kappa(route):
+    """Curvature per interior route point exactly as the G4 kit computes it (yaw change over the two neighbours)."""
+    t, arc = route.transforms, [float(x) for x in route.arc]
+    return [(arc[i], abs(math.radians((t[i + 1].yaw - t[i - 1].yaw + 180) % 360 - 180)) / (arc[i + 1] - arc[i - 1]))
+            for i in range(1, len(t) - 1)]
+
+
+def v6_npc_program(route, vN, region, body_len, cut):
+    """Prereg v6 d (TURN) and a (PARK) on a frozen NPC route, before any outcome. Returns {'turn', 'park'} or
+    {'reason'} (BLOCKED_FIXTURE). Budget 2.25 = 0.9 x the frozen 2.5 m/s^2; window 10 m + 1 m as erratum 4."""
+    from m56.geometry import _derive_box_sections
+    out = {'turn': None, 'park': None, 'rule': 'prereg v6 a+d'}
+    k = route_kappa(route); v2 = float(vN) ** 2
+    hot = [(s, x) for s, x in k if v2 * x > 2.25]
+    if hot:
+        s_turn = hot[0][0]; kmax = max(x for s, x in k if s >= s_turn)
+        v_turn = F(math.floor(math.sqrt(2.25 / kmax) * 8), 8)
+        marker = F(math.floor((s_turn - 11.) * 1000), 1000)
+        if v_turn < F(3, 2) or marker <= route.arc[0]:
+            return {'reason': 'NPC_TURN_SPEED', 's_turn_m': s_turn, 'kappa_max': kmax, 'v_turn': v_turn, 'marker': marker}
+        if v_turn < vN:
+            out['turn'] = {'v_mps': v_turn, 'marker_arc_m': marker, 's_turn_m': F(str(round(s_turn, 6))),
+                           'kappa_max': F(str(round(kmax, 9)))}
+    if cut:
+        secs = _derive_box_sections(route, region)
+        assert not hasattr(secs, 'reasons'), f'V6_PARK_SECTIONS:{getattr(secs, "reasons", None)}'
+        v_last = out['turn']['v_mps'] if out['turn'] else vN
+        front_clear = float(secs[1].route_station) + .5 + float(body_len)
+        room = float(route.arc[-1]) - front_clear
+        margin = float(v_last) ** 2 / 3. + 5.
+        if room < margin:
+            return {'reason': 'NPC_PARK_ROOM', 'room_m': room, 'margin_m': margin}
+        out['park'] = {'delay_s': F(math.floor((room - margin) / float(v_last) * 20), 20), 'room_m': F(str(round(room, 6))),
+                       'margin_m': F(str(round(margin, 6)))}
+    return out
 
 
 # -- bodies, certificates, drivable area ---------------------------------------------------------------------------
@@ -357,11 +410,17 @@ def certificates(route, body, review, source):
     return tuple(out)
 
 
-def drivable_union(m, center, radius=90.):
-    """Union of CARLA driving-lane quads (waypoints every 0.5 m, lane width) within radius of center."""
+def drivable_union(m, center, radius=90., world=None, routes=None):
+    """v5: union of CARLA driving-lane quads (waypoints every 0.5 m, lane width) within radius of center.
+    v6 b (prereg PREREG_M56_V6_20261026, needs world + routes): that union plus the paved surface actually present:
+    a 0.5 m grid inside 12 m of either route (and the radius), each point paved iff its first cast_ray hit from the
+    local route z + 3 m down to z - 3 m is labelled Roads or RoadLines; the paved cells are unioned and eroded by
+    0.25 m (half a cell: conservative boundary). No closing/dilation of the lane union (probe 2026-10-26: a 1 m
+    closing reached sidewalks)."""
     import carla
-    from shapely.geometry import Polygon
+    from shapely.geometry import Polygon, box, LineString, Point
     from shapely.ops import unary_union
+    from shapely.prepared import prep
     quads = []
     for w in m.generate_waypoints(.5):
         if w.lane_type != carla.LaneType.Driving:
@@ -377,7 +436,39 @@ def drivable_union(m, center, radius=90.):
             quad = Polygon(pts)
             if quad.is_valid and quad.area > 0:
                 quads.append(quad)
-    return unary_union(quads).buffer(0)
+    union = unary_union(quads).buffer(0)
+    if not V6:
+        return union
+    assert world is not None and routes, 'V6_DRIVABLE_NEEDS_WORLD_AND_ROUTES'
+    ref = [(float(t.x), float(t.y), float(t.z)) for r in routes.values() for t in r.transforms]
+    corridor = unary_union([LineString([(x, y) for x, y, _ in [(float(t.x), float(t.y), 0) for t in r.transforms]]).buffer(12.)
+                            for r in routes.values()]).intersection(Point(center).buffer(radius))
+    zcell = {}
+    for x, y, z in ref:  # local route z on a 2 m hash
+        zcell.setdefault((round(x / 2), round(y / 2)), z)
+    def local_z(x, y):
+        for d in range(0, 8):
+            for i in range(-d, d + 1):
+                for j in range(-d, d + 1):
+                    z = zcell.get((round(x / 2) + i, round(y / 2) + j))
+                    if z is not None:
+                        return z
+        return None
+    pc = prep(corridor); cells = []
+    x0, y0, x1, y1 = corridor.bounds
+    for i in range(int((x1 - x0) / .5) + 1):
+        for j in range(int((y1 - y0) / .5) + 1):
+            x, y = x0 + .5 * i, y0 + .5 * j
+            if not pc.contains(Point(x, y)):
+                continue
+            z = local_z(x, y)
+            if z is None:
+                continue
+            hits = world.cast_ray(carla.Location(x, y, z + 3.), carla.Location(x, y, z - 3.))
+            if hits and str(hits[0].label) in ('Roads', 'RoadLines'):
+                cells.append(box(x - .25, y - .25, x + .25, y + .25))
+    paved = unary_union(cells).buffer(-.25) if cells else Polygon()
+    return unary_union([union, paved]).buffer(0)
 
 
 def driving_boxes(drivable, route, z_lo, z_hi, corridor=6., cell=.5):

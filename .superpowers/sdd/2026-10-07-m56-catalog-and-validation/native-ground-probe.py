@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from native_v2_common import own_server, load, now, WS
 from m56.model import decode_record
 from m56.geometry import world_vertices
+from native_v2_kit import ground_error
 
 run, town, frames = Path(sys.argv[1]), sys.argv[2], [int(x) for x in sys.argv[3].split(',')]
 OUT = WS.parents[2] / 'outputs' / f'm56_ground_probe_{now()}.json'
@@ -39,7 +40,9 @@ with own_server(log) as (client, proc, start):
                 rows.append({'frame': fr, 'role': a.role, 'corner': [float(c) for c in v],
                              'ground': None if g is None else [g.location.z, str(g.label)],
                              'error': None if g is None else abs(float(v[2]) - g.location.z),
-                             'cast_ray': [[h.location.z, str(h.label)] for h in hits]})
+                             'cast_ray': [[h.location.z, str(h.label)] for h in hits],
+                             # prereg v6 c: the kit's v6 multi-ray rule at the same corner
+                             'error_v6': ground_error(world, tuple(float(c) for c in v))})
                 log(**rows[-1])
 with open(OUT, 'x', encoding='utf-8') as f:
     json.dump({'note': 'report-only ground probe, empty world', 'run': str(run), 'town': town, 'rows': rows}, f, indent=1)
