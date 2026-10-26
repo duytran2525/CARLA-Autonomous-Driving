@@ -4,8 +4,9 @@
   2. reference lateral acceleration v_nominal^2 * profile_kappa <= 2.5 m/s^2 (consumer REFERENCE_LATERAL_BUDGET) with the
      kit's own profile_kappa at the lane-change midpoints; 0 for EGO B and the NPC;
   3. sections in order on the EGO route: O_DECISION < O_RETURN_START < X < DESTINATION < plan end - 5 m;
-  4. predicted return clearance from the preparation (probe-2 plateaus, realised gap at t0): the NPC front is behind the EGO
-     rear when the EGO front reaches O_RETURN_START (kinematic estimate only, NOT evidence).
+  4. return slack: earliest RETURN_CLEAR_CONFIRMED (rear gap >= 0.5 m held 0.25 s) before the vehicle centre reaches
+     the fixed return-segment start, from the probe-2 plateaus and the realised gap at t0 (kinematic estimate, NOT evidence);
+  5. X slack (reported): time from the end of the return segment to X_END.
   python -I native-io-selfcheck.py SCENE_DIR (holding fixture-frozen.json)   [M56_CODE = the consumer under test]
 """
 import json, sys
@@ -44,10 +45,18 @@ print('3 sections OK:', {k: float(x) for k, x in st.items()}, 'plan end', float(
 prep = json.loads(Path(fx.environment['runtime_recipe_v2']['prepare_json']).read_text(encoding='utf-8'))
 fl = lambda x: float.fromhex(x['binary64']) if 'binary64' in x else x['numerator'] / x['denominator']  # noqa: E731
 vE, vN, gap = fl(prep['probe2']['EGO']), fl(prep['probe2']['NPC']), fl(prep['gap_at_t0_probe2'])
-body = 2 * fl(prep['bbox']['extent'][0])
-dist = float(st['O_RETURN_START'] - st['O_DECISION'])
-npc_front = gap + body + vN * dist / vE            # from the decision section, when the EGO front reaches O_RETURN_START
-margin = (dist - body) - npc_front                 # EGO rear minus NPC front
-print(f'4 predicted return clearance {margin:.3f} m (vE {vE:.3f}, vN {vN:.3f}, gap at t0 {gap:.3f}, body {body:.3f}) - estimate only')
-assert margin > .2, 'PREDICTED_RETURN_BLOCKED'
+body = 2 * fl(prep['bbox']['extent'][0]); half = body / 2
+dec = float(st['O_DECISION'])
+# The return segment starts at a fixed arc (the vehicle centre at `ret`): from then on step_response needs
+# RETURN_CLEAR_CONFIRMED (EGO rear - NPC front >= 0.5 m held 0.25 s) or raises RETURN_GUARD_MISSING. Constant-speed
+# kinematics from t0 (EGO front at O_DECISION, NPC rear gap ahead): estimate only, not evidence.
+t_centre = (float(ret) + half - dec) / vE
+t_clear = (gap + 2 * body + .5) / (vE - vN) + .25
+slack = t_centre - t_clear
+print(f'4 return slack {slack:.3f} s = {slack * vE:.2f} m (centre at return start {t_centre:.3f} s, earliest '
+      f'RETURN_CLEAR_CONFIRMED {t_clear:.3f} s; vE {vE:.3f}, vN {vN:.3f}, gap at t0 {gap:.3f}) - estimate only')
+assert slack > .05, 'PREDICTED_RETURN_GUARD_MISSING'
+x_slack = (float(st['X']) + half - float(ret + L)) / vE
+print(f'5 X slack {x_slack:.3f} s: return profile ends (centre {float(ret + L):.2f}) before X_END (centre '
+      f'{float(st["X"]) + half:.2f}) - the stock lateral controller must settle in the initial box by then')
 print('SELFCHECK PASS')

@@ -23,7 +23,7 @@ from m56.evidence import open_run
 from m56.geometry import compile_fixture, project_route, world_vertices
 from m56.model import (ApprovalBundle, CapabilityProof, CompiledFixture, PolicyBundle, QueryBundle, RuntimeContext, SourceRef,
                        decode_record, encode_record, load_json)
-from m56.response import _lateral_contract, _reference_response, _program
+from m56.response import _forward_contract, _lateral_contract, _reference_response, _program
 
 REVISION, TOWN, SCENES = Path(sys.argv[1]), sys.argv[2], sys.argv[3].split(',')
 AB = '--ab' in sys.argv[4:]
@@ -168,7 +168,7 @@ def run_scene(c, client, proc, start, world, m, identity):
     checks = {}
     for r in fixture.responses:  # the consumer's own frozen-response contracts on the compiled fixture
         try:
-            _lateral_contract(r, fixture)
+            _lateral_contract(r, fixture); _forward_contract(r, fixture)  # lateral + normative (evidence integrity)
             for cause in (_program(r)['initial'], *(t['cause'] for t in _program(r)['transitions'])):
                 _reference_response(r, cause)
             checks[f'{r.actor_role}:{r.action_id}'] = 'OK'

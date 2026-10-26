@@ -125,7 +125,7 @@ def io_geometry(c, prep, routes, d, plain):
     sections = {'O_DECISION': section(dec), 'O_RETURN_START': section(ret), 'X': section(xs),
                 'DESTINATION': section(ego.destination)}
     normals = tuple((-(b.y - a.y), b.x - a.x, 0.) for a, b in zip(ego.transforms, ego.transforms[1:]))
-    reference = {'method': 'segment-map-normal-v1', 'route': ego, 'normals': normals, 'refs': ego.refs}
+    reference = {'method': 'segment-map-normal-v1', 'route': ego, 'normals': normals, 'refs': ego.continuity}  # admitted SourceRefs
     spec = (('v_mean_E', 'e_lat_peak'), ('m/s', 'm'), ('mean_speed', 'map_lateral_peak'), (('TRIGGER', 'X_END'),) * 2,
             'map:' + _digest(reference))
     pair = FrozenMetricPair(*spec, _digest(spec), 'APPROVED_PROPOSAL_NOT_READY')
