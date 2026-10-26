@@ -88,7 +88,7 @@ class Kit:
         pair = self.fixture.pair
         topo = self.fixture.domain.topology
         if topo.get('category') in ('I', 'O'):  # I/O tooling (design 2026-10-26): map reference + path corridors
-            context = {'pair_hash': pair.hash, 'reference': pair.reference, 'map_reference': topo['map_reference'],
+            context = {'pair_hash': pair.hash, 'reference': pair.reference, 'map_reference': self.map_reference(),
                        'uncertainty': {n: UNC for n in pair.names}}
             added = {'metric_context': context, **self.io_paths(backend, frame_id, simtime, tuple(out))}
         else:
@@ -100,6 +100,19 @@ class Kit:
             self.phase = getattr(self, 'phase', None) or PhaseObserver(predicate['light'])
             added.update(self.phase.frame(backend, frame_id, simtime, ())[1])
         return tuple(out), added
+
+    def map_reference(self):
+        """I/O v1.1 (2026-10-27): the map reference as TYPED records (the fixture EGO DirectedRoute and its continuity
+        SourceRefs), so the runner seals the route source with the episode (it seals SourceRef objects found in frame
+        integrity). v1 passed the decoded topology mapping, whose nested refs are plain mappings: the route source was never
+        sealed and every frame failed METRIC_CONTEXT_INVALID (O03 2026-10-27). Same value: digest == pair reference."""
+        if getattr(self, '_map_reference', None) is None:
+            mr, ego = self.fixture.domain.topology['map_reference'], self.fixture.routes['EGO']
+            packet = {'method': mr['method'], 'route': ego, 'normals': tuple(tuple(n) for n in mr['normals']),
+                      'refs': ego.continuity}
+            assert 'map:' + _digest(packet) == self.fixture.pair.reference, 'MAP_REFERENCE_DIGEST_MISMATCH'
+            self._map_reference = packet
+        return self._map_reference
 
     def io_paths(self, backend, frame_id, simtime, actors):
         """I/O path corridors (I/O tooling design 2026-10-26, choices listed in the I/O recipe prereg):

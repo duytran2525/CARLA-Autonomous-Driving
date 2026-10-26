@@ -34,7 +34,8 @@ from m56.model import Transform6, decode_record, encode_record, load_json  # noq
 from m56.response import _f32  # noqa: E402
 
 RUNIN_M = 100.          # EGO start = front_t0 - 100 m of its lane (Claude's choice; probe-checked readiness)
-EGO_TAIL_M = 20.        # EGO route ends X + 20 m (destination X + 5 m, plan 5 m further, 10 m margin)
+EGO_TAIL_M = 20.        # io-v1.1: EGO route ends X + gap + 2 bodies + 20 m (v1: X + 20 m). In B the NPC drives ~gap ahead;
+                        # its front must stay on the EGO route through X_END or min_front_gap is unknown (O03 2026-10-27)
 NPC_BACK_M, NPC_TAIL_M = 60., 30.
 log = P.log
 
@@ -122,10 +123,10 @@ def rear_station(actor, route):
 def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     g = geometry(c); sg = g['sign']; L = 2 * bbox['extent'][0]
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
-    out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1', 'geometry': g, 'bbox': bbox,
+    out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1', 'recipe_version': 'io-v1.1', 'geometry': g, 'bbox': bbox,
            'runin_m': RUNIN_M, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
            **({'m56_recipe': 'v6'} if V6 else {})}
-    s_e0, s_end = g['front_t0_s'] - sg * RUNIN_M, g['X_s'] + sg * EGO_TAIL_M
+    s_e0, s_end = g['front_t0_s'] - sg * RUNIN_M, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
     s_n0 = g['front_t0_s'] + sg * (g['gap'] + L)            # first guess: NPC rear `gap` ahead at time 0
     rows = {'EGO': lane_rows(m, g['road'], g['ego_lane'], s_e0, s_end),
             'EGO_TARGET': lane_rows(m, g['road'], g['target_lane'], s_e0, s_end),
