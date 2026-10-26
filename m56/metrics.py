@@ -65,7 +65,7 @@ def evaluate_episode(records: EpisodeEvidence, fixture: CompiledFixture) -> Epis
         if route is not None and order in ('front','rear'):
             estimator='min_rear_gap' if order=='rear' else 'min_front_gap'
             for frame in records.raw:
-                gap=_route_observation(frame,{'directed_route':route},'route:'+_digest(route),estimator)
+                gap=_route_observation(frame,{'directed_route':route},_route_ref(route),estimator)
                 if gap is not None and gap<0:
                     negative_gap=True;reasons.append('NEGATIVE_DIRECTED_GAP');break
     metrics={name:MetricValue(name,None,unit,window,fixture.pair.reference,estimator,(),None,'UNKNOWN')
@@ -213,7 +213,7 @@ def _io_action(frames,fixture,events):
                 npc=next(a for a in previous.actors if a.role=='NPC')
                 proof=_continuous_proof(previous,frame,_digest(fixture))
                 inside=_in_action_region(npc,regions['EGO_INITIAL'],proof.uncertainty)
-                gap=_route_observation(previous,{'directed_route':route},'route:'+_digest(route),'min_front_gap')
+                gap=_route_observation(previous,{'directed_route':route},_route_ref(route),'min_front_gap')
                 if clear is None or clear.frame>=frame.frame or inside is False or (gap is not None and gap+proof.uncertainty<Fraction(1,5)):
                     failed.append('RESUMED_BEFORE_NPC_MERGED_AHEAD');break
                 if inside is None or gap is None or gap-proof.uncertainty<Fraction(1,5):
@@ -242,7 +242,7 @@ def _io_action(frames,fixture,events):
     if category=='O' and action=='B':
         route=fixture.routes['EGO']
         for frame in selected:
-            gap=_route_observation(frame,{'directed_route':route},'route:'+_digest(route),'min_front_gap')
+            gap=_route_observation(frame,{'directed_route':route},_route_ref(route),'min_front_gap')
             previous=next(f for f in frames if f.frame==frame.frame-1)
             error=_continuous_proof(previous,frame,_digest(fixture)).uncertainty
             if gap is None:
@@ -380,7 +380,7 @@ def _o_return_action(frames,fixture,events,selected,states):
         for frame in hold:
             previous=by_frame.get(frame.frame-1)
             proof=_continuous_proof(previous,frame,binding) if previous is not None else None
-            gap=_route_observation(frame,{'directed_route':route},'route:'+_digest(route),'min_rear_gap')
+            gap=_route_observation(frame,{'directed_route':route},_route_ref(route),'min_rear_gap')
             if proof is None or gap is None:
                 unknown.append('RETURN_CLEARANCE_WITNESS_UNKNOWN');continue
             if gap+proof.uncertainty<Fraction(1,2):
@@ -1179,6 +1179,67 @@ def _section_corridor_uncached(vertices, section):
 
 
 _CL_CACHE={}
+_ROUTE_MEMO={}
+
+
+def _route_ref(route):
+    """'route:'+_digest(route), memoized by identity of the immutable record (strong ref). Perf 2026-10-27 (M56 O03):
+    re-digesting a ~1000-point native route on every frame and tick dominated online I/O detection. ponytail: bounded."""
+    key=('ref',id(route));hit=_ROUTE_MEMO.get(key)
+    if hit is not None and hit[0] is route:
+        return hit[1]
+    if len(_ROUTE_MEMO)>1024:
+        _ROUTE_MEMO.clear()
+    out='route:'+_digest(route);_ROUTE_MEMO[key]=(route,out)
+    return out
+
+
+def _decoded_route(packet):
+    """decode_record('DirectedRoute',encode_record(packet)), memoized by identity of the packet (strong ref)."""
+    key=('decode',id(packet));hit=_ROUTE_MEMO.get(key)
+    if hit is not None and hit[0] is packet:
+        return hit[1]
+    if len(_ROUTE_MEMO)>1024:
+        _ROUTE_MEMO.clear()
+    out=decode_record('DirectedRoute',encode_record(packet));_ROUTE_MEMO[key]=(packet,out)
+    return out
+
+
+_MAP_MEMO=[]
+
+
+def _map_packet(packet):
+    """('map:'+_digest(packet), decoded route) of a structurally checked map reference packet, memoized by VALUE
+    (exact ==; the frozen packet is re-created per frame and its nested mappings are unhashable). A digest and a decode are
+    pure functions of the value, so the result is identical. ponytail: last 8 packets, linear scan."""
+    for known,out in _MAP_MEMO:
+        if known is packet or known==packet:
+            return out
+    out=('map:'+_digest(packet),decode_record('DirectedRoute',encode_record(packet['route'])))
+    _MAP_MEMO.append((packet,out));del _MAP_MEMO[:-8]
+    return out
+
+_DERIVED_CACHE={}
+
+
+def _derived(frame, events, name, packet):
+    """replace(frame, events, integrity + one predicate packet), memoized by frame identity + (events, packet) values.
+    Pure: the same immutable frame and equal inputs give an equal record. Perf 2026-10-27 (M56 O03 native A/B: both episodes
+    hit the 300 s outer deadline because the online per-tick re-detection re-froze every I/O frame, ~360 KB each, on every
+    tick: O(n^2)). Results are identical (tests/m56/test_io_detect_cache.py). ponytail: bounded clear-all cache."""
+    try:
+        key=(id(frame),events,name,tuple(sorted(packet.items())))
+        hash(key)
+    except TypeError:
+        return replace(frame,events=events,integrity={**frame.integrity,'predicates':{name:packet}})
+    hit=_DERIVED_CACHE.get(key)
+    if hit is not None and hit[0] is frame:
+        return hit[1]
+    if len(_DERIVED_CACHE)>65536:
+        _DERIVED_CACHE.clear()
+    out=replace(frame,events=events,integrity={**frame.integrity,'predicates':{name:packet}})
+    _DERIVED_CACHE[key]=(frame,out)
+    return out
 
 
 def detect_events(frames: tuple[FrameRecord,...], fixture: CompiledFixture) -> tuple[EventRecord,...]:
@@ -1333,7 +1394,14 @@ def _with_destination(events,frames,fixture):
     if section is None or route is None or section.route_station!=route.destination:
         return events
     derived=[];binding=_digest(fixture)
-    for i,frame in enumerate(frames):
+    # Perf 2026-10-27 (M56 O03): online re-detection resumes from the saved prefix state when every saved frame is the
+    # very same object (identical result).
+    ckey=('DEST',id(fixture),id(frames[0]));state=_CL_CACHE.get(ckey);start=0
+    if (state is not None and state['fixture'] is fixture and state['first'] is frames[0]
+            and state['n']<=len(frames) and all(a is b for a,b in zip(state['frames'],frames))):
+        derived=list(state['derived']);start=state['n']
+    for i in range(start,len(frames)):
+        frame=frames[i]
         actors=tuple(a for a in frame.actors if a.role=='EGO')
         proof=_continuous_proof(frames[i-1],frame,binding) if i else None
         refs=_frame_refs(frame);arrived=False
@@ -1342,7 +1410,10 @@ def _with_destination(events,frames,fixture):
             margins=_section_margin(body,section);error=proof.uncertainty if proof is not None else Fraction(0)
             arrived=(margins is not None and min(margins)-error>0 and _section_corridor(body,section))
         packet={'value':arrived,'frame':frame.frame,'time':frame.simtime,'fixture_hash':binding,'witness_refs':refs}
-        derived.append(replace(frame,events=(),integrity={**frame.integrity,'predicates':{'EGO_DESTINATION':packet}}))
+        derived.append(_derived(frame,(),'EGO_DESTINATION',packet))
+    if len(_CL_CACHE)>256:
+        _CL_CACHE.clear()
+    _CL_CACHE[ckey]={'fixture':fixture,'first':frames[0],'frames':tuple(frames),'n':len(frames),'derived':tuple(derived)}
     event=confirm_hold(tuple(derived),'EGO_DESTINATION',Fraction(1,4))
     return tuple(sorted((*events,event),key=lambda e:(e.frame,e.name))) if event is not None else events
 
@@ -1772,7 +1843,7 @@ def _detect_f05(frames,fixture):
         except (ValueError,TypeError,KeyError,AttributeError):return (_unknown(frames[-1]),)
         if start is None:return ()
     result=[];queue_start=None;ego_start=None;trigger=None;move_start=None;moved=False;advanced=False
-    route=fixture.routes['EGO'];reference='route:'+_digest(route)
+    route=fixture.routes['EGO'];reference=_route_ref(route)
     for i,frame in enumerate(frames):
         if trigger is None:
             actual=_route_observation(frame,{'directed_route':route},reference,'min_front_gap')
@@ -1924,7 +1995,7 @@ def _detect_f02(frames,fixture):
     if (section is None or isinstance(front,bool) or not isinstance(front,(int,Fraction))
             or section.route_station-front!=60):
         return (EventRecord('WITNESS_UNKNOWN',frames[-1].frame,frames[-1].simtime,_frame_refs(frames[-1])),)
-    reference='route:'+_digest(route);context={'directed_route':route};result=[];triggered=False
+    reference=_route_ref(route);context={'directed_route':route};result=[];triggered=False
     for previous,current in zip(frames,frames[1:]):
         old=_route_observation(previous,context,reference,'min_rear_gap')
         gap=_route_observation(current,context,reference,'min_rear_gap')
@@ -2022,7 +2093,13 @@ def _detect_io(frames, fixture):
         return (EventRecord('WITNESS_UNKNOWN',frames[-1].frame,frames[-1].simtime,_frame_refs(frames[-1])),)
     boundary=fixture.sections[key];end=fixture.sections['X'];binding=_digest(fixture)
     result=[];seen=set();derived=[]
-    for previous,current in zip(frames,frames[1:]):
+    # Perf 2026-10-27 (M56 O03): online re-detection resumes from the saved prefix state when every saved frame is the
+    # very same object (identical result).
+    ckey=('IO',id(fixture),id(frames[0]));state=_CL_CACHE.get(ckey);start=0
+    if (state is not None and state['fixture'] is fixture and state['first'] is frames[0]
+            and state['n']<=len(frames) and all(a is b for a,b in zip(state['frames'],frames))):
+        result=list(state['result']);seen=set(state['seen']);derived=list(state['derived']);start=state['n']-1
+    for previous,current in zip(frames[start:],frames[start+1:]):
         prior_refs=_frame_refs(previous);refs=_frame_refs(current)
         proof=_continuous_proof(previous,current,binding)
         if not prior_refs or not refs or proof is None:
@@ -2082,14 +2159,16 @@ def _detect_io(frames, fixture):
                            and _section_corridor(body,boundary))
             elif category=='O':
                 context={'directed_route':fixture.routes['EGO']}
-                gap=_route_observation(current,context,'route:'+_digest(fixture.routes['EGO']),'min_rear_gap')
+                gap=_route_observation(current,context,_route_ref(fixture.routes['EGO']),'min_rear_gap')
                 clear=(gap is not None and gap-proof.uncertainty>=Fraction(1,2)
                        and _return_path(current,binding))
         predicate='NPC_SOURCE_CLEAR' if category=='I' else 'EGO_RETURN_CLEAR'
-        derived.append(replace(current,events=tuple(e for e in result if e.frame==current.frame),
-                       integrity={**current.integrity,'predicates':{predicate:{'value':clear,
-                       'frame':current.frame,'time':current.simtime,'fixture_hash':binding,
-                       'witness_refs':refs}}}))
+        derived.append(_derived(current,tuple(e for e in result if e.frame==current.frame),predicate,
+                       {'value':clear,'frame':current.frame,'time':current.simtime,'fixture_hash':binding,'witness_refs':refs}))
+    if len(_CL_CACHE)>256:
+        _CL_CACHE.clear()
+    _CL_CACHE[ckey]={'fixture':fixture,'first':frames[0],'frames':tuple(frames),'n':len(frames),'result':tuple(result),
+                     'seen':frozenset(seen),'derived':tuple(derived)}
     predicate='NPC_SOURCE_CLEAR' if category=='I' else 'EGO_RETURN_CLEAR'
     confirmed=confirm_hold(tuple(derived),predicate,Fraction(1,4))
     if confirmed is not None:
@@ -2237,9 +2316,9 @@ def _speed(velocity):
 def _map_offset(pose, packet, reference):
     if (not isinstance(packet,Mapping) or set(packet)!={'method','route','normals','refs'}
             or packet['method']!='segment-map-normal-v1' or not packet['refs']
-            or reference!='map:'+_digest(packet)):
+            or reference!=_map_packet(packet)[0]):
         return None
-    route=decode_record('DirectedRoute',encode_record(packet['route']))
+    route=_map_packet(packet)[1]
     if not isinstance(route,DirectedRoute):
         return None
     point=(pose.x,pose.y,pose.z);station=_metric_station(point,route)
@@ -2290,8 +2369,8 @@ def _route_observation(frame,context,reference,estimator):
     packet=context.get('directed_route')
     if packet is None:
         return None
-    route=decode_record('DirectedRoute',encode_record(packet))
-    if not isinstance(route,DirectedRoute) or reference!='route:'+_digest(route):
+    route=_decoded_route(packet)
+    if not isinstance(route,DirectedRoute) or reference!=_route_ref(route):
         return None
     actors={a.role:a for a in frame.actors}
     if len(actors)!=len(frame.actors):
