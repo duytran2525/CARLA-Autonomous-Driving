@@ -248,20 +248,27 @@ def _v5_ground_error(world, v):
     return abs(v[2] - g.location.z) if g is not None else math.inf
 
 
-GROUND_OFFSETS = ((0., 0.), (.05, 0.), (-.05, 0.), (0., .05), (0., -.05))
+GROUND_RINGS = (.05, .1, .2, .3)  # m; prereg v6 c (seam probe 2026-10-26: NONE patches up to ~0.2 m around a corner)
 
 
 def ground_error(world, v):
-    """v6 c (prereg PREREG_M56_V6_20261026): the corner and 4 points 5 cm away; hits labelled NONE are dropped (a ray
-    through a road-mesh seam, native ground probe 2026-10-26); min error over the labelled hits; no labelled hit = the
-    v5 single-ray value."""
+    """v6 c (prereg PREREG_M56_V6_20261026): the v5 corner ray; only when its hit is unlabelled (NONE, a ray through
+    a hole of the road collision mesh, native ground/seam probes 2026-10-26) the search widens ring by ring (4 points
+    at 0.05, 0.1, 0.2, 0.3 m) and stops at the first ring with a labelled hit: min error over that ring's labelled
+    hits. No labelled hit at all = the v5 value. A labelled centre hit is exactly v5."""
     import carla
-    errs = []
-    for dx, dy in GROUND_OFFSETS:
-        g = world.ground_projection(carla.Location(v[0] + dx, v[1] + dy, v[2] + 2.), 10.)
-        if g is not None and str(g.label) != 'NONE':
-            errs.append(abs(v[2] - g.location.z))
-    return min(errs) if errs else _v5_ground_error(world, v)
+    g = world.ground_projection(carla.Location(v[0], v[1], v[2] + 2.), 10.)
+    if g is not None and str(g.label) != 'NONE':
+        return abs(v[2] - g.location.z)
+    for d in GROUND_RINGS:
+        errs = []
+        for dx, dy in ((d, 0.), (-d, 0.), (0., d), (0., -d)):
+            h = world.ground_projection(carla.Location(v[0] + dx, v[1] + dy, v[2] + 2.), 10.)
+            if h is not None and str(h.label) != 'NONE':
+                errs.append(abs(v[2] - h.location.z))
+        if errs:
+            return min(errs)
+    return abs(v[2] - g.location.z) if g is not None else math.inf
 
 
 class PhaseObserver:

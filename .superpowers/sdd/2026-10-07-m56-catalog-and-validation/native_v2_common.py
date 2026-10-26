@@ -360,6 +360,8 @@ def v6_npc_program(route, vN, region, body_len, cut):
     {'reason'} (BLOCKED_FIXTURE). Budget 2.25 = 0.9 x the frozen 2.5 m/s^2; window 10 m + 1 m as erratum 4."""
     from m56.geometry import _derive_box_sections
     out = {'turn': None, 'park': None, 'rule': 'prereg v6 a+d'}
+    secs = _derive_box_sections(route, region)
+    assert not hasattr(secs, 'reasons'), f'V6_SECTIONS:{getattr(secs, "reasons", None)}'
     k = route_kappa(route); v2 = float(vN) ** 2
     hot = [(s, x) for s, x in k if v2 * x > 2.25]
     if hot:
@@ -368,12 +370,15 @@ def v6_npc_program(route, vN, region, body_len, cut):
         marker = F(math.floor((s_turn - 11.) * 1000), 1000)
         if v_turn < F(3, 2) or marker <= route.arc[0]:
             return {'reason': 'NPC_TURN_SPEED', 's_turn_m': s_turn, 'kappa_max': kmax, 'v_turn': v_turn, 'marker': marker}
+        # A slowdown before the box exit would change the NPC's frozen speed vN inside the conflict and the
+        # preparation's phasing (its probes carry no C/L/M events, so no marker): a decision for Duy, not a recipe.
+        if v_turn < vN and marker < secs[1].route_station:
+            return {'reason': 'NPC_TURN_BEFORE_EXIT', 's_turn_m': s_turn, 'marker': marker,
+                    'n_exit_m': secs[1].route_station, 'v_turn': v_turn}
         if v_turn < vN:
             out['turn'] = {'v_mps': v_turn, 'marker_arc_m': marker, 's_turn_m': F(str(round(s_turn, 6))),
                            'kappa_max': F(str(round(kmax, 9)))}
     if cut:
-        secs = _derive_box_sections(route, region)
-        assert not hasattr(secs, 'reasons'), f'V6_PARK_SECTIONS:{getattr(secs, "reasons", None)}'
         v_last = out['turn']['v_mps'] if out['turn'] else vN
         front_clear = float(secs[1].route_station) + .5 + float(body_len)
         room = float(route.arc[-1]) - front_clear
@@ -415,8 +420,8 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
     v6 b (prereg PREREG_M56_V6_20261026, needs world + routes): that union plus the paved surface actually present:
     a 0.5 m grid inside 12 m of either route (and the radius), each point paved iff its first cast_ray hit from the
     local route z + 3 m down to z - 3 m is labelled Roads or RoadLines; the paved cells are unioned and eroded by
-    0.25 m (half a cell: conservative boundary). No closing/dilation of the lane union (probe 2026-10-26: a 1 m
-    closing reached sidewalks)."""
+    0.25 m (half a cell: conservative boundary). The lane union itself gets only a 0.25 m closing (seams < 0.5 m); a
+    1 m closing reached sidewalks (probe 2026-10-26)."""
     import carla
     from shapely.geometry import Polygon, box, LineString, Point
     from shapely.ops import unary_union
@@ -439,6 +444,7 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
     union = unary_union(quads).buffer(0)
     if not V6:
         return union
+    union = union.buffer(.25).buffer(-.25)  # v6 b: closes seams < 0.5 m between lane quads (L01: a 0.114 m sliver edge)
     assert world is not None and routes, 'V6_DRIVABLE_NEEDS_WORLD_AND_ROUTES'
     ref = [(float(t.x), float(t.y), float(t.z)) for r in routes.values() for t in r.transforms]
     corridor = unary_union([LineString([(x, y) for x, y, _ in [(float(t.x), float(t.y), 0) for t in r.transforms]]).buffer(12.)

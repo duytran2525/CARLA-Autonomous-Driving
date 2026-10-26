@@ -31,7 +31,7 @@ def shape(straight):
 
 
 r = shape(50.)
-region = tuple(product((10., 15.), (-3., 3.), (-1., 3.)))
+region = tuple(product((10., 15.), (-3., 3.), (-1., 3.)))  # conflict box before the arc
 
 # v5 program bytes are unchanged without v6
 v5 = c.npc_response('C', F(4), r)
@@ -61,6 +61,8 @@ assert v6.hash != v5.hash
 assert c.v6_npc_program(r, F(4), region, 3.7, cut=False)['park'] is None
 assert c.v6_npc_program(r, F(3), region, 3.7, cut=False)['turn'] is None  # 9/6 = 1.5 <= 2.25
 assert c.v6_npc_program(r, F(4), region, 75., cut=True)['reason'] == 'NPC_PARK_ROOM'
+late_box = tuple(product((55.5, 56.5), (8., 12.), (-1., 3.)))  # a conflict box after the arc: the slowdown precedes its exit
+assert c.v6_npc_program(r, F(4), late_box, 3.7, cut=False)['reason'] == 'NPC_TURN_BEFORE_EXIT'
 early = shape(6.)  # the arc starts 6 m after the start: the marker would precede it
 assert c.v6_npc_program(early, F(4), region, 3.7, cut=False)['reason'] == 'NPC_TURN_SPEED'
 
@@ -75,7 +77,9 @@ class World:
     def ground_projection(self, loc, dist):
         z, lab = next(self.hits)
         return None if z is None else SimpleNamespace(location=SimpleNamespace(z=z), label=lab)
-seam = [(-1.98, 'NONE'), (0., 'Roads'), (0., 'Roads'), (-1.98, 'NONE'), (.01, 'Roads')]
+assert kit.ground_error(World([(0., 'Roads')]), (0., 0., .002)) == .002  # labelled centre: one ray, the v5 value
+none4 = [(-1.98, 'NONE')] * 4
+seam = [(-1.98, 'NONE')] + none4 + [(-1.98, 'NONE'), (.01, 'Road'), (-1.98, 'NONE'), (0., 'Road')]  # found at 0.1 m
 assert kit.ground_error(World(seam), (0., 0., .002)) == .002
-assert kit.ground_error(World([(-1.98, 'NONE')] * 5 + [(-1.98, 'NONE')]), (0., 0., .002)) == abs(.002 + 1.98)
+assert kit.ground_error(World([(-1.98, 'NONE')] + none4 * 4), (0., 0., .002)) == abs(.002 + 1.98)  # none: v5 value
 print('OK v6 tooling self-check')

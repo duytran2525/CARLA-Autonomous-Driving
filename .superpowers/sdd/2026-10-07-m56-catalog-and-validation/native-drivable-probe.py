@@ -46,6 +46,7 @@ with own_server(log) as (client, proc, start):
         center = (sum(float(v[0]) for v in reg) / len(reg), sum(float(v[1]) for v in reg) / len(reg))
         radius = max(90., max(math.dist((float(p.x), float(p.y)), center) for p in fx.poses.values()) + 20.)
         new = drivable_union(m, center, radius, world, fx.routes)
+        (OUT.parent / f'{OUT.stem}_{sd.name}_{action}.wkt').write_text(new.wkt, encoding='utf-8')
         added = new.difference(old)
         zref = sum(float(t.z) for r in fx.routes.values() for t in r.transforms) / sum(len(r.transforms) for r in fx.routes.values())
         pa = prep(added); labels = Counter(); bad_pts = []
