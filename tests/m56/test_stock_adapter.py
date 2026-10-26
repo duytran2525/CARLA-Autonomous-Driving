@@ -253,3 +253,11 @@ def test_v6_native_stock_exposes_the_vehicle_for_the_brake_rule(monkeypatch):
     world = SimpleNamespace(get_map=lambda: 'map')
     for backend in ('BasicAgent', 'LocalPlanner'):
         assert runtime._NativeStock(actor, {'opt_dict': {}, 'backend': backend}, world)._vehicle is actor
+
+
+@pytest.mark.parametrize('value,expected', [(None, 60), (F(312, 5), F(312, 5)), (F(30), 60), (True, 60), (F(60), 60)])
+def test_v4_p2_phase_wait_limit_is_read_from_the_fixture(value, expected):
+    # v4 P2 (approved 2026-10-24) was never read by the runner until v6 (C05-A BLOCKED_SIGNAL_ADMISSION, cycle 60.4 s).
+    from m56.runtime import phase_wait_limit
+    env = {} if value is None else {'phase_wait_limit_s': value}
+    assert phase_wait_limit(SimpleNamespace(environment=env)) == expected

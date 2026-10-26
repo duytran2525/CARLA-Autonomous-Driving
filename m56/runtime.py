@@ -698,6 +698,16 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
 # end - boundary <= 76.5. The runner never writes reviews; unreviewed packets stay invalid/uncertain.
 
 SETTLE_S, READY_LIMIT_S, PHASE_LIMIT_S, VALIDATION_S, TOTAL_S = 1, 15, 60, 60, Fraction(153, 2)
+
+
+def phase_wait_limit(fixture):
+    """Prereg v4 P2 (docs/m56/PREREG_M56_RUNTIME_RECIPE_V4_20261024.md): the fixture's environment.phase_wait_limit_s
+    = max(60 s, observed cycle + 2 s); absent = PHASE_LIMIT_S. Never below PHASE_LIMIT_S. Approved 2026-10-24 but not
+    read by the runner until v6 (C05-A 2026-10-26: cycle 60.4 s, BLOCKED_SIGNAL_ADMISSION at 60 s)."""
+    value = fixture.environment.get('phase_wait_limit_s')
+    if isinstance(value, bool) or not isinstance(value, (int, Fraction)) or value <= PHASE_LIMIT_S:
+        return PHASE_LIMIT_S
+    return value
 HOLD_S = Fraction(1, 2)
 
 
@@ -823,6 +833,7 @@ def run_episode(context, fixture, action_id):
             return None
 
     predicate, phase_packet = fixture.environment.get('phase_predicate'), None
+    limit = phase_wait_limit(fixture)
     if predicate is not None:  # observe only: no reload, no phase hunting, no actor mutation
         start = None
         while phase_packet is None:
@@ -833,7 +844,7 @@ def run_episode(context, fixture, action_id):
             seen = f.integrity.get('phase')
             if seen is not None and all(seen.get(k) == v for k, v in predicate.items()):
                 phase_packet = {'frame': f.frame, 'time': str(f.simtime), 'observed': seen}
-            elif f.simtime - start >= PHASE_LIMIT_S:
+            elif f.simtime - start >= limit:
                 reasons.append('BLOCKED_SIGNAL_ADMISSION')
                 return _seal_stop(context, reasons, None)
     if set(fixture.environment.get('readiness') or ()) != {'targets_mps', 'markers_m'}:
