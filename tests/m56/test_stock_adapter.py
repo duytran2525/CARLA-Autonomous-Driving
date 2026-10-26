@@ -234,3 +234,22 @@ def test_v6_zero_target_keeps_its_brake(stock_case, require):
     intent = require('m56.response', 'step_response')(s.c.frame, s.c.state, s.c.response).command
     intent = replace(intent, cause=zero, target_kmh=type(intent.target_kmh)(0))
     assert require('m56.response', 'apply_intent')(driver, intent).control.brake == .3
+
+
+def test_v6_native_stock_exposes_the_vehicle_for_the_brake_rule(monkeypatch):
+    # v6 e was silent in native runs (L02-B 2026-10-26): apply_intent reads session.backend._vehicle, and the native
+    # wrapper must provide it. Fake stock agents stand in for the pinned CARLA PythonAPI modules.
+    import sys, types
+    from m56 import runtime
+    class Agent:
+        def __init__(self, actor, **k):
+            self.actor = actor
+        def get_local_planner(self):
+            return self
+    for name, attrs in (('agents', {}), ('agents.navigation', {}), ('agents.navigation.basic_agent', {'BasicAgent': Agent}),
+                        ('agents.navigation.local_planner', {'LocalPlanner': Agent, 'RoadOption': None})):
+        monkeypatch.setitem(sys.modules, name, types.SimpleNamespace(**attrs))
+    actor = object()
+    world = SimpleNamespace(get_map=lambda: 'map')
+    for backend in ('BasicAgent', 'LocalPlanner'):
+        assert runtime._NativeStock(actor, {'opt_dict': {}, 'backend': backend}, world)._vehicle is actor

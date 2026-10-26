@@ -353,6 +353,7 @@ class _NativeStock:
         from agents.navigation.basic_agent import BasicAgent
         from agents.navigation.local_planner import LocalPlanner
         self.map = world.get_map()
+        self._vehicle = actor  # v6 e: apply_intent reads the live speed here (2038d93 looked for it and found none)
         opt = dict(config['opt_dict'])
         if config['backend'] == 'BasicAgent':
             self.agent = BasicAgent(actor, target_speed=0., opt_dict=opt, map_inst=self.map)
