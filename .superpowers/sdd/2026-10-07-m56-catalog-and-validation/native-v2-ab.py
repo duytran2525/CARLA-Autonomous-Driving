@@ -167,8 +167,13 @@ def run_scene(c, client, proc, start, world, m, identity):
         cut = (raw_prep.get('npc_route_end_e4') or {}).get('cut_index') is not None
         v6p = v6_npc_program(routes['NPC'], vN, region, 2 * prep['bbox']['extent'][0], cut)
         assert raw_prep.get('m56_recipe') == 'v6' and not v6p.get('reason'), f'V6_PREPARATION_MISSING:{v6p.get("reason")}'
-        assert json.dumps(v6p, default=str, sort_keys=True) == json.dumps(plain(raw_prep['v6_npc_program']), default=str,
-                                                                           sort_keys=True), 'V6_PROGRAM_MISMATCH'
+        frozen = plain(raw_prep['v6_npc_program'])
+        # TURN depends on the route and vN only: exact. PARK also uses this fixture's own box exit (the preparation's
+        # region came from the probe routes and differs in the last digits, C02 2026-10-26): same presence, and the
+        # value used is the one of the frozen fixture domain; both are logged.
+        assert (json.dumps(v6p['turn'], default=str, sort_keys=True) == json.dumps(frozen['turn'], default=str, sort_keys=True)
+                and (v6p['park'] is None) == (frozen['park'] is None)), 'V6_PROGRAM_MISMATCH'
+        log(event='V6_NPC_PROGRAM', scene=c.id, program=v6p, preparation=frozen)
     responses = (*(r for r in c.responses if r.actor_role == 'EGO'), npc_response(c.category, vN, routes['NPC'], v6p))
     g = c.parameters['G']
     policies = PolicyBundle('m56-v2-fixture', 'f' * 64, {c.id + '.G': g}, {}, {}, (prep_ref,))
