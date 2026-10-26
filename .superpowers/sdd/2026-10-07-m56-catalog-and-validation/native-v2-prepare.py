@@ -208,13 +208,10 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     for role in routes:
         poses[role], grounds[role] = pose_at(routes[role])
     ego_responses = tuple(r for r in c.responses if r.actor_role == 'EGO')
+    # v6: probe 1 keeps the v5 NPC program. Its route is the long pre-phasing one (before the start and erratum-4 cuts),
+    # so curves outside the final route would wrongly block (C05, L01 on 2026-10-26); the prereg defines TURN/PARK on the
+    # final frozen route only, and both act after the box exit, i.e. never on the phasing a probe measures.
     v6p = None
-    if V6:  # prereg v6 d: the probe-1 NPC already slows before its turn (no PARK: the route is not cut yet)
-        v6p = v6_npc_program(routes['NPC'], vN, region, 2 * bbox['extent'][0], cut=False)
-        if v6p.get('reason'):
-            finish(c, {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': v6p['reason'], 'v6_npc_program_probe1': v6p,
-                       'm56_recipe': 'v6'})
-            return
     responses = (next(r for r in ego_responses if r.action_id == 'A'), npc_response(c.category, vN, routes['NPC'], v6p))
     signal = {role: find_light(world, m, rows[role], exit_idx[role], routes[role], {'NPC': n_entry, 'EGO': e_entry}[role])
               for role in ('NPC', 'EGO')}
