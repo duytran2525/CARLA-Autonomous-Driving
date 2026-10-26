@@ -1,8 +1,10 @@
-# M56 I/O recipe v1, pilot O03: bản đăng ký trước (DỰ THẢO, CHỜ DUY DUYỆT)
+# M56 I/O recipe v1, pilot O03: bản đăng ký trước (ĐÃ DUYỆT)
 
 **Thẩm quyền đã có:** [chat] 26/10/2026, Duy: "Tiếp tục dựng tooling I/O với pilot O, chỉ chuẩn bị".
 
-**Chưa có:** quyền chạy A/B I/O. Không có A/B I/O nào trước khi Duy duyệt văn bản này. `native-io-ab.py --ab` từ chối chạy
+**Duyệt:** [chat] 27/10/2026, Duy: "duyệt recipe I/O v1 tại 688ad64 cho O03; chạy đúng một A/B (P5), báo nguyên trạng theo nhãn not independent". Văn bản duyệt = bytes tại `688ad64`.
+
+**Trước khi duyệt:** chưa có quyền chạy A/B I/O. Không có A/B I/O nào trước khi Duy duyệt văn bản này. `native-io-ab.py --ab` từ chối chạy
 nếu thiếu `M56_IO_PREREG_APPROVED=<commit Duy duyệt>`.
 
 **Nhãn:** independent review waived by Duy 2026-10-24; CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
