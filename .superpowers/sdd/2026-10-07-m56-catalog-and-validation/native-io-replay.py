@@ -48,9 +48,10 @@ def replay(action):
     # t0 (frame 60): EGO front at O_DECISION, NPC rear `gap` ahead (NPC route arc of road-s: same straight road, so
     # the NPC rear station = its spawn-frame station + the along-road distance)
     e0 = dec - half - 3 * vE - .2  # off-grid phase: a sample inside the +-0.001 m band of a section loses that crossing (consumer rule)
-    n_spawn = float(_metric_station((fx.poses['NPC'].x, fx.poses['NPC'].y, fx.poses['NPC'].z), npc))
-    ex = at(ego, dec)[0]; nx = at(npc, n_spawn)[0]
-    n0 = n_spawn + (ex + gap + half - nx) - 3 * vN   # NPC centre station at frame 0 (x-axis road)
+    # NPC centre station at frame 0: the EGO decision point projected on the NPC route, + gap + half body, - 3 s of travel
+    # (any road axis; the NPC drives the same lane line as the EGO's initial lane)
+    ex, ey, ez, _ = at(ego, dec)
+    n0 = float(_metric_station((ex, ey, ez), npc)) + gap + half - 3 * vN
     kit = Kit.__new__(Kit); kit.fixture, kit.fixture_hash, kit.recipes, kit.authority = fx, _digest(fx), {}, s.authority
     frames, e_arc, follow = [], e0, False
     hold = ControlPacket(0., 0., .3, False, False, False, 1); fwd = ControlPacket(.2, 0., 0., False, False, False, 1)

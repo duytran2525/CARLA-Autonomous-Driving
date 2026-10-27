@@ -48,10 +48,13 @@ def io_routes(prep, plain, town):
     return routes, rows, cont
 
 
-def catalog_offset(c, routes):
-    """Native EGO station of the frozen catalog EGO route's first point (one shift for every frozen arc)."""
+def catalog_offset(c, routes, prep=None):
+    """Native EGO station of the frozen catalog EGO route's first point (one shift for every frozen arc), plus the
+    proposed site-window shift along the travel direction when the preparation records one (0 otherwise)."""
     first = next(r for r in c.responses if r.actor_role == 'EGO').route.transforms[0]
-    return q6(project_route((first.x, first.y, first.z), routes['EGO']))
+    d = q6(project_route((first.x, first.y, first.z), routes['EGO']))
+    shift = ((prep or {}).get('geometry') or {}).get('site_shift_travel_m')
+    return d + q6(shift) if shift else d
 
 
 def _shift(profile, d):

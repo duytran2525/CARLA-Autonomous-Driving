@@ -33,7 +33,8 @@ from m56.metrics import _metric_station, _speed  # noqa: E402
 from m56.model import Transform6, decode_record, encode_record, load_json  # noqa: E402
 from m56.response import _f32  # noqa: E402
 
-RUNIN_M = 100.          # EGO start = front_t0 - 100 m of its lane (Claude's choice; probe-checked readiness)
+RUNIN_M = 100.          # EGO start = front_t0 - RUNIN_M * vE / 9.375 m of its lane, rounded up to 1 m (O03: 100 m;
+                        # O01/O02 extension 2026-10-27: the 16 s probe must reach the decision at vE 6 / 7.5 m/s)
 EGO_TAIL_M = 20.        # io-v1.1: EGO route ends X + gap + 2 bodies + 20 m (v1: X + 20 m). In B the NPC drives ~gap ahead;
                         # its front must stay on the EGO route through X_END or min_front_gap is unknown (O03 2026-10-27)
 NPC_BACK_M, NPC_TAIL_M = 60., 30.
@@ -58,10 +59,18 @@ def geometry(c):
     e_lanes = [int(x) for x in e[1:].split('→')]
     n_lane = int(n[1:])
     p = {k: v.values[0] for k, v in c.parameters.items()}
-    return {'road': road, 'ego_lane': e_lanes[0], 'target_lane': e_lanes[1], 'npc_lane': n_lane,
+    # Site-window shift PROPOSAL (I/O recipe extension prereg, pending Duy): front_t0 and X move together by `shift` m of
+    # road-s, every spec distance kept; recorded in prepare.json. Default 0 = the spec window (O03 bytes unchanged).
+    import os
+    shift = dict(kv.split('=') for kv in filter(None, os.environ.get('M56_IO_SITE_SHIFT', '').split(','))).get(c.id)
+    shift = float(shift) if shift else 0.
+    out = {'road': road, 'ego_lane': e_lanes[0], 'target_lane': e_lanes[1], 'npc_lane': n_lane,
             'sign': 1 if e_lanes[0] < 0 else -1,             # negative lanes increase road-s
-            'front_t0_s': float(p['front_t0']), 'X_s': float(p['X']), 'Dlc': p['Dlc'], 'gap': float(p['gap']),
+            'front_t0_s': float(p['front_t0']) + shift, 'X_s': float(p['X']) + shift, 'Dlc': p['Dlc'], 'gap': float(p['gap']),
             'return_start': p.get('return_start'), 'vE': p['vE'], 'vN': p['vN']}
+    if shift:
+        out.update(site_shift_s=shift, site_shift_travel_m=out['sign'] * shift)
+    return out
 
 
 def lane_rows(m, road, lane, s_from, s_to):
@@ -122,11 +131,12 @@ def rear_station(actor, route):
 
 def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     g = geometry(c); sg = g['sign']; L = 2 * bbox['extent'][0]
+    runin = float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1', 'recipe_version': 'io-v1.1', 'geometry': g, 'bbox': bbox,
-           'runin_m': RUNIN_M, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
+           'runin_m': runin, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
            **({'m56_recipe': 'v6'} if V6 else {})}
-    s_e0, s_end = g['front_t0_s'] - sg * RUNIN_M, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
+    s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
     s_n0 = g['front_t0_s'] + sg * (g['gap'] + L)            # first guess: NPC rear `gap` ahead at time 0
     rows = {'EGO': lane_rows(m, g['road'], g['ego_lane'], s_e0, s_end),
             'EGO_TARGET': lane_rows(m, g['road'], g['target_lane'], s_e0, s_end),

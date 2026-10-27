@@ -235,7 +235,7 @@ def main(outdir, identity_path, *prep_dirs):
             report.append({'id': c.id, 'status': p['status'], 'reason': p.get('reason')}); continue
         pp = {k: (v if k == 'poses' else plain(v)) for k, v in p.items()}
         routes, _, _ = io_routes(pp, plain, c.town)
-        d = catalog_offset(c, routes)
+        d = catalog_offset(c, routes, pp)
         geo = io_geometry(c, pp, routes, d, plain)
         if geo.get('reason'):
             done[i] = replace(c, environment={**c.environment, 'runtime_recipe_v2': {'status': 'BLOCKED_FIXTURE', 'reason': geo['reason'], **pref}})
