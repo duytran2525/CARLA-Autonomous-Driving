@@ -294,8 +294,9 @@ def _lateral_departure(frames,fixture,selected):
         difference=abs(offsets[1]-offsets[0])
         if difference>2*proof.uncertainty:
             return frame,None
-        if difference:
-            return None,'LANE_CHANGE_ONSET_UNCERTAIN'
+        # v8 (docs/m56/PREREG_M56_V8_IO_ONSET_AXIS_20261027.md, Duy 2026-10-27): a change <= 2u is noise and is skipped.
+        # OLD RULE (v7): the first non-zero change decided, so 0 < change <= 2u gave LANE_CHANGE_ONSET_UNCERTAIN; native
+        # lateral jitter (~0.02 mm/frame, never exactly 0) made every native onset unprovable (O03 2026-10-27).
     return None,None
 
 
@@ -357,7 +358,7 @@ def _o_return_action(frames,fixture,events,selected,states):
         proof=_continuous_proof(by_frame[frame.frame-1],frame,binding)
         if reached_target and previous_offset is not None and offset<previous_offset:
             if previous_offset-offset<=2*proof.uncertainty:
-                unknown.append('RETURN_LATERAL_START_UNCERTAIN')
+                pass  # v8: a decrease <= 2u is noise (OLD RULE v7: RETURN_LATERAL_START_UNCERTAIN)
             else:
                 front=_section_margin(world_vertices(ego.body,ego.pose),section)
                 if (marker is not None and frame.frame<=marker.frame) or (front is not None and max(front)+proof.uncertainty<0):

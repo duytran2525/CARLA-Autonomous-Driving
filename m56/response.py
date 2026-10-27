@@ -488,7 +488,7 @@ def step_response(frame: FrameRecord, state: ScriptState, response: FrozenRespon
             # A target-plan switch can put the return in a single future segment.
             # Moving toward the initial centre still needs independent return
             # permission; a valid outbound path cannot authorize that motion.
-            separation=Number(reference.route.transforms[0].y)-Number(response.route.transforms[0].y)
+            separation=_lateral_separation(reference.route,response.route)
             returning=(len(segments)>1 and arc>segments[1]['start_arc_m']) or offset*separation<0
             if returning:
                 if not {'TRIGGER','RETURN_MARKER','RETURN_CLEAR_CONFIRMED','RETURN_PATH_CLEAR'}.issubset(events):
@@ -1517,6 +1517,18 @@ def _lateral_route_v5(response, fixture):
             or any(not isinstance(w,Number) or w<=0 for w in widths.values())):
         raise ValueError('LATERAL_WIDTH_UNPROVEN')
     return geo['separation_m']
+
+
+def _lateral_separation(reference, route):
+    """v8 (docs/m56/PREREG_M56_V8_IO_ONSET_AXIS_20261027.md, Duy 2026-10-27): signed lateral separation of the reference
+    route from the response route along the CARLA right vector (_axis_right, as _lateral_axis_v5). OLD RULE (v7): the y
+    difference only, right only for +x roads (yaw 0): reversed at yaw 180, zero at yaw +-90. Identical on +x routes."""
+    a,b=reference.transforms[0],route.transforms[0]
+    axis=_axis_right(b.yaw)
+    if axis is None:
+        return Number(a.y)-Number(b.y)
+    k,sign=axis
+    return (Number((a.x,a.y)[k])-Number((b.x,b.y)[k]))*sign
 
 
 def _axis_right(yaw):
