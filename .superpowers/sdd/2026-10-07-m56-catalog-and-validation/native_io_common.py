@@ -97,6 +97,13 @@ def io_geometry(c, prep, routes, d, plain):
     w = {k: plain(v) for k, v in prep['lane_width_m'].items()}
     ci, ct = pi[lat], pt[lat]
     sep = F(round((ct - ci) * sign * 1000), 1000)
+    mid_anchor = prep.get('box_anchor') == 'midpoint'
+    if mid_anchor:
+        # io-v1.2 (O01/O02 extension prereg, pending Duy): lane boxes centred on the lane centres at the midpoint of
+        # [O_DECISION, DESTINATION + 3 m], so a road up to 1 deg off-axis drifts at most half its run inside the box
+        # (O02: 1.03 m over decision -> X at 0.84 deg). v1/v1.1 (O03): anchored at O_DECISION.
+        anchor = (dec + ego.destination + 3) / 2
+        ci, ct = _point(ego, anchor)[0][lat], _point(tgt, anchor)[0][lat]
     moving = [s for s in a_resp.profile['segments'] if s['start_offset_m'] != s['end_offset_m']]
     if len(moving) != 1 or moving[0]['end_offset_m'] != sep:
         return {'reason': 'IO_LANE_SEPARATION_MISMATCH', 'separation_m': sep}
@@ -115,6 +122,10 @@ def io_geometry(c, prep, routes, d, plain):
         return tuple(out)
     regions = {'EGO_INITIAL': vbox(t_lo, t_hi, lo_i, hi_i), 'EGO_TARGET': vbox(t_lo, t_hi, lo_t, hi_t)}
     l_lo, l_hi = min(lo_i, lo_t), max(hi_i, hi_t)
+    if mid_anchor:  # io-v1.2: section planes span both lanes over the whole route (drift included), + 0.5 m
+        lats = [(t.x, t.y)[lat] for r in (ego, tgt) for t in r.transforms]
+        half = max(w.values()) / 2 + .5
+        l_lo, l_hi = min(l_lo, min(lats) - half), max(l_hi, max(lats) + half)
 
     def section(station):
         p, _ = _point(ego, station)

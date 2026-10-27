@@ -73,6 +73,9 @@ def geometry(c):
     return out
 
 
+BOX_ANCHOR = __import__('os').environ.get('M56_IO_BOX_ANCHOR')  # 'midpoint' = io-v1.2 lane boxes (pending Duy); unset = v1.1
+
+
 def lane_rows(m, road, lane, s_from, s_to):
     """Lane-centre waypoint rows of `road`/`lane` from road-s s_from to s_to in the driving direction (chord <= 0.24)."""
     w = m.get_waypoint_xodr(road, lane, s_from)
@@ -133,7 +136,9 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     g = geometry(c); sg = g['sign']; L = 2 * bbox['extent'][0]
     runin = float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
-    out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1', 'recipe_version': 'io-v1.1', 'geometry': g, 'bbox': bbox,
+    out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1',
+           'recipe_version': 'io-v1.2' if BOX_ANCHOR == 'midpoint' else 'io-v1.1',
+           **({'box_anchor': 'midpoint'} if BOX_ANCHOR == 'midpoint' else {}), 'geometry': g, 'bbox': bbox,
            'runin_m': runin, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
            **({'m56_recipe': 'v6'} if V6 else {})}
     s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
