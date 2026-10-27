@@ -1,9 +1,9 @@
-# M56 I/O recipe io-v1.2: mở rộng sang O01 (Town04) và O02 (Town05), bản đăng ký trước (DỰ THẢO, CHỜ DUY DUYỆT)
+# M56 I/O recipe io-v1.2: mở rộng sang O01 (Town04) và O02 (Town05), bản đăng ký trước (ĐÃ DUYỆT)
 
 **Thẩm quyền đã có:** [chat] 27/10/2026, Duy: "chuẩn bị O01/O02 theo recipe I/O v1.1 + consumer v8 (chỉ chuẩn bị), rồi soạn bản
 đăng ký trước mở rộng recipe cho hai site này để tôi duyệt trước A/B".
 
-**Chưa có:** quyền chạy A/B cho O01/O02.
+**Duyệt:** [chat] 27/10/2026, Duy: "duyệt PREREG_M56_IO_RECIPE_V1_1_O01_O02_20261027 (io-v1.2: dời cửa sổ site O01 +95, O02 +24; RUNIN theo vE; mốc hộp làn trung điểm) tại 90bc7a3; chạy đúng một A/B mỗi cảnh với consumer v8, báo theo v8 và v7." Văn bản được duyệt là bytes tại `90bc7a3`.
 
 **Nhãn:** independent review waived by Duy 2026-10-24; CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
 
