@@ -140,6 +140,30 @@ def additions(out, decision_ref, xodr, weather, identity_pairs):
     return adds, report
 
 
+F25_REASON = ('re-bound 2026-11-07 after F2-5 (fill v2 prereg 409911e, approved 2026-10-24): the I/O index k is not a model '
+              'unit, so it leaves the parameters; its value stays in every other parameter rationale (series, k=...)')
+
+
+def f25_index_k(done):
+    """F2-5 for the six fill20-v1 I/O candidates (I04/O04/I05/O05/I07/O07): they still carried k as a ParameterProposal
+    with units 'index', which the product schema rejects (UNSUPPORTED_UNIT), so they never decoded. Same handling as the
+    v2/v3 additions (k in the rationale, not a parameter). The parameter-rationale and selection reviews keep their
+    evidence, reviewer and reasons and are re-bound to the new digests with F25_REASON (Claude under Duy's full
+    delegation 2026-11-07; PREREG_M56_IO_RECIPE_V1_3_FILL_O addendum A). Other candidates: unchanged objects."""
+    def rebind(raw, digest):
+        raw = dict(raw) if isinstance(raw, Mapping) else json.loads(json.dumps(encode_record(raw), default=str))
+        return {**raw, 'object_hash': digest, 'reasons': [*raw['reasons'], F25_REASON]}
+    out = []
+    for c in done:
+        if any(p.units == 'index' for p in c.parameters.values()):
+            c = replace(c, parameters={n: p for n, p in c.parameters.items() if p.units != 'index'})
+            c = replace(c, environment={**c.environment, 'rationale_review': rebind(c.environment['rationale_review'], _digest(c.parameters))})
+            bare = replace(c, environment={k: v for k, v in c.environment.items() if k != 'selection_review'})
+            c = replace(c, environment={**c.environment, 'selection_review': rebind(c.environment['selection_review'], _digest(bare))})
+        out.append(c)
+    return out
+
+
 def main(outdir, identity_path, *prep_dirs):
     out = Path(outdir); out.mkdir(parents=False, exist_ok=False)
     guard = {n: (rev2.V1.parent / n).read_bytes() for n in ('duy-decision-receipt.json', 'm01-r2-evidence.json')}
@@ -153,6 +177,7 @@ def main(outdir, identity_path, *prep_dirs):
     v1 = json.loads(rev2.V1.read_text(encoding='utf-8'))['candidates']
     mine = json.loads(json.dumps([encode_record(c) for c in done], default=str))
     assert len(v1) == len(mine) and all(c == d for c, d in zip(v1, mine)), 'V1_REBUILD_MISMATCH'
+    done = f25_index_k(done)
     import glob
     weather = {}
     for f in sorted(glob.glob(str(WORK / 'outputs/m56_native_weather_*/weather-light.json'))):

@@ -45,6 +45,9 @@ def io_candidates(ids):
     out = []
     for item in load_json(REV)['candidates']:
         if item['id'] in ids:
+            # F2-5 (409911e): the index k (units 'index', fill20-v1 I/O) is not a model unit; dropped before decoding (its
+            # value stays in the other parameters' rationale). The revision builder applies the same rule (f25_index_k).
+            item = {**item, 'parameters': {n: p for n, p in item['parameters'].items() if p.get('units') != 'index'}}
             c = decode_record('Candidate', item)
             assert not hasattr(c, 'errors'), (item['id'], c)
             out.append(c)

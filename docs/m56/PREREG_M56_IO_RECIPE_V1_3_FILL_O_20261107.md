@@ -57,3 +57,27 @@ học tĩnh: OpenDRIVE và route catalog đóng băng (§2).
 4. **Không chỉnh tham số sau khi thấy số.** Cảnh nào không đạt bước 2 thì để BLOCKED, ghi lý do, và **không** chạy lại với
    tham số khác trong phiên này. Muốn đổi thì phải có một prereg mới, công khai là đặt sau khi thấy số chuẩn bị.
 5. **Báo cáo:** nguyên trạng theo v9 và v8 × hai cận (§1).
+
+## Addendum A (07/11/2026): F2-5 cho sáu candidate I/O của fill20 v1, trước mọi lần chuẩn bị có kết quả
+
+**Phát hiện:** lần chạy `run-io-prepare.sh` đầu tiên (`outputs/m56_prep_fillO_v13_20261107.*`) dừng ngay ở bước đọc catalog,
+trước khi chạm CARLA.
+- Lỗi: `SchemaErrors: parameters.k.units UNSUPPORTED_UNIT`.
+- I04/O04, I05/O05, I07/O07 vẫn mang k là một ParameterProposal có đơn vị `index`. Schema của product chỉ nhận
+  m / m/s / s / m/s² / deg.
+- Vì vậy sáu candidate này **chưa bao giờ decode được**. Đây là lỗi khách quan đã nêu ở F2-5 (fill v2, `409911e`, Duy duyệt
+  24/10), nhưng mới chỉ được sửa cho các phần bổ sung v2/v3.
+- Lần chạy đó không sinh số nào về cảnh.
+
+**Sửa (cùng cách đã cài cho v2/v3: k nằm trong rationale, không phải tham số):**
+- `native-v5-revision.py` `f25_index_k`: bỏ k khỏi `parameters`. Giá trị k vẫn có trong rationale của mọi tham số còn lại
+  ("series, k=…").
+- Rationale review và selection review giữ nguyên bằng chứng, reviewer và lý do, rồi được ràng buộc lại vào digest mới kèm lý do
+  F2-5.
+- `native-io-prepare.py` bỏ tham số đơn vị `index` trước khi decode.
+
+**Kiểm (offline):**
+- Revision `outputs/m56_c0_partial_io_f25check_20261107T140758Z`.
+- Sáu candidate decode được, hai review ràng buộc đúng, k vẫn nằm trong rationale.
+- Mọi candidate khác giống hệt revision dựng ngay trước đó, sau khi chuẩn hóa đường dẫn output. Khác biệt duy nhất là digest
+  `selection_review` của các phần bổ sung M/F, vốn đổi theo thư mục build ở mọi lần dựng.
