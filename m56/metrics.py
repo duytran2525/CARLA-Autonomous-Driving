@@ -272,6 +272,27 @@ def _io_action(frames,fixture,events):
     return PhysicalState.UNKNOWN,('IO_FULL_ACTION_REVIEW_PENDING',)
 
 
+_EGO_OFFSET_CACHE={}
+
+
+def _ego_map_offset(sample, reference):
+    """The EGO map offset of one frame (_map_offset of its own metric context), memoized by frame identity (strong ref).
+    Perf 2026-11-06 (M56 O01/O02 native B episodes hit the 300 s outer deadline): under v8 the onset scan no longer stops
+    at the first sub-uncertainty change, so a FOLLOW action re-evaluated every post-TRIGGER frame on every tick (O(n^2)).
+    Identical values (pure in the immutable frame). ponytail: bounded clear-all cache."""
+    key=(id(sample),reference);hit=_EGO_OFFSET_CACHE.get(key)
+    if hit is not None and hit[0] is sample:
+        return hit[1]
+    context=sample.integrity.get('metric_context')
+    actors=tuple(a for a in sample.actors if a.role=='EGO')
+    offset=(_map_offset(actors[0].pose,context.get('map_reference'),reference)
+            if isinstance(context,Mapping) and len(actors)==1 else None)
+    if len(_EGO_OFFSET_CACHE)>65536:
+        _EGO_OFFSET_CACHE.clear()
+    _EGO_OFFSET_CACHE[key]=(sample,offset)
+    return offset
+
+
 def _lateral_departure(frames,fixture,selected):
     """First witnessed lateral motion relative to the frozen initial-map lane."""
     by_frame={f.frame:f for f in frames};binding=_digest(fixture)
@@ -281,10 +302,7 @@ def _lateral_departure(frames,fixture,selected):
             return None,'LANE_CHANGE_ONSET_UNPROVEN'
         offsets=[]
         for sample in (previous,frame):
-            context=sample.integrity.get('metric_context')
-            actors=tuple(a for a in sample.actors if a.role=='EGO')
-            offset=(_map_offset(actors[0].pose,context.get('map_reference'),fixture.pair.reference)
-                    if isinstance(context,Mapping) and len(actors)==1 else None)
+            offset=_ego_map_offset(sample,fixture.pair.reference)
             if offset is None:
                 return None,'LANE_CHANGE_ONSET_UNPROVEN'
             offsets.append(offset)
@@ -1004,17 +1022,46 @@ def compare_ab(a: EpisodeEvidence, b: EpisodeEvidence, pair: FrozenMetricPair,
     return ABVerdict(proofs,metrics,(None,None),review,status)
 
 
+_CONTIGUOUS_CACHE={}
+
+
 def _contiguous(frames: tuple[FrameRecord,...]) -> bool:
+    # Perf 2026-11-06 (M56 O01/O02): resumes from a saved prefix of the very same frame objects that was contiguous
+    # (identical result: the check is pairwise). ponytail: bounded clear-all cache.
     if not frames:
         return False
-    if any(f.dt!=Fraction(1,20) for f in frames):
+    hit=_CONTIGUOUS_CACHE.get(id(frames[0]));start=0
+    if hit is not None and len(hit)<=len(frames) and all(a is b for a,b in zip(hit,frames)):
+        start=len(hit)-1
+    tail=frames[start:]
+    if any(f.dt!=Fraction(1,20) for f in tail):
         return False
-    return all(b.frame==a.frame+1 and b.simtime-a.simtime==b.dt
-               and (a.boot,a.world)==(b.boot,b.world)
-               for a,b in zip(frames,frames[1:]))
+    ok=all(b.frame==a.frame+1 and b.simtime-a.simtime==b.dt
+           and (a.boot,a.world)==(b.boot,b.world)
+           for a,b in zip(tail,tail[1:]))
+    if ok:
+        if len(_CONTIGUOUS_CACHE)>256:
+            _CONTIGUOUS_CACHE.clear()
+        _CONTIGUOUS_CACHE[id(frames[0])]=tuple(frames)
+    return ok
+
+
+_PREDICATE_CACHE={}
 
 
 def _predicate(frame: FrameRecord, name: str):
+    # Perf 2026-11-06: pure in the immutable frame; memoized by identity (strong ref). ponytail: bounded clear-all cache.
+    key=(id(frame),name);hit=_PREDICATE_CACHE.get(key)
+    if hit is not None and hit[0] is frame:
+        return hit[1]
+    out=_predicate_uncached(frame,name)
+    if len(_PREDICATE_CACHE)>65536:
+        _PREDICATE_CACHE.clear()
+    _PREDICATE_CACHE[key]=(frame,out)
+    return out
+
+
+def _predicate_uncached(frame, name):
     predicates=frame.integrity.get('predicates')
     if not isinstance(predicates,Mapping):
         return None
@@ -1366,6 +1413,21 @@ def _speed_markers(fixture):
     return tuple(out)
 
 
+_STATION_CACHE={}
+
+
+def _route_station_memo(frame, actor, route):
+    """_metric_station of the actor's pose on route, memoized by (frame, actor, route) identity (perf 2026-11-06)."""
+    key=(id(frame),id(actor),id(route));hit=_STATION_CACHE.get(key)
+    if hit is not None and hit[0] is frame and hit[1] is route:
+        return hit[2]
+    station=_metric_station((actor.pose.x,actor.pose.y,actor.pose.z),route)
+    if len(_STATION_CACHE)>65536:
+        _STATION_CACHE.clear()
+    _STATION_CACHE[key]=(frame,route,station)
+    return station
+
+
 def _reference_marker_events(frames,fixture):
     """First actual fixed-reference station observations; no moved marker/timer."""
     result=[]
@@ -1375,7 +1437,7 @@ def _reference_marker_events(frames,fixture):
                 actors=tuple(a for a in frame.actors if a.role==response.actor_role)
                 if len(actors)!=1 or actors[0].route_valid is not True:
                     continue
-                a=actors[0];station=_metric_station((a.pose.x,a.pose.y,a.pose.z),response.route)
+                a=actors[0];station=_route_station_memo(frame,a,response.route)
                 refs=_frame_refs(frame)
                 if station is not None and station>=switch['marker_arc_m'] and refs:
                     result.append(EventRecord('REFERENCE_MARKER:'+('NPC:' if response.actor_role=='NPC' else '')+switch['cause'],frame.frame,frame.simtime,refs));break
@@ -2236,6 +2298,26 @@ def _post_trigger_stop(frames,fixture,trigger):
     return None
 
 
+_LANE_HOLD_CACHE={}
+
+
+def _lane_hold_inside(frame, ego, region, uncertainty):
+    """Whole EGO body inside the box by uncertainty + 0.15 m horizontally (footprint buffer horizontal; vertical
+    uncertainty separate). Pure; memoized by (frame, region) identity + uncertainty (perf 2026-11-06, M56 O01/O02)."""
+    key=(id(frame),id(region),uncertainty);hit=_LANE_HOLD_CACHE.get(key)
+    if hit is not None and hit[0] is frame and hit[1] is region:
+        return hit[2]
+    low=tuple(Fraction(min(p[k] for p in region)) for k in range(3))
+    high=tuple(Fraction(max(p[k] for p in region)) for k in range(3))
+    inside=all(low[k]+uncertainty+(Fraction(3,20) if k<2 else 0)<=Fraction(v[k])<=
+               high[k]-uncertainty-(Fraction(3,20) if k<2 else 0)
+               for v in world_vertices(ego.body,ego.pose) for k in range(3))
+    if len(_LANE_HOLD_CACHE)>65536:
+        _LANE_HOLD_CACHE.clear()
+    _LANE_HOLD_CACHE[key]=(frame,region,inside)
+    return inside
+
+
 def _lane_confirmation_events(frames,fixture,events):
     """Actual wholebody, conservative margin and contiguous .25s lane holds.
 
@@ -2262,12 +2344,7 @@ def _lane_confirmation_events(frames,fixture,events):
         proof=_continuous_proof(previous,current,binding);ego=next((a for a in current.actors if a.role=='EGO'),None)
         inside=False
         if proof is not None and ego is not None and ego.route_valid is True:
-            # Footprint buffer is horizontal; vertical uncertainty stays separate.
-            low=tuple(Fraction(min(p[k] for p in region)) for k in range(3))
-            high=tuple(Fraction(max(p[k] for p in region)) for k in range(3))
-            inside=all(low[k]+proof.uncertainty+(Fraction(3,20) if k<2 else 0)<=Fraction(v[k])<=
-                       high[k]-proof.uncertainty-(Fraction(3,20) if k<2 else 0)
-                       for v in world_vertices(ego.body,ego.pose) for k in range(3))
+            inside=_lane_hold_inside(current,ego,region,proof.uncertainty)
         if not inside:
             hold=[];continue
         if hold and (current.frame!=hold[-1].frame+1 or current.simtime-hold[-1].simtime!=Fraction(1,20)):
