@@ -77,3 +77,14 @@ băng, spec và hình học tĩnh.
 **Sửa:** `frows` có thêm `NPC_TARGET` khi rows có bộ đó. O không đổi.
 
 **P5:** dùng lần chạy lại duy nhất cho I03, cùng revision, cùng prereg.
+
+## Addendum C (07/11/2026): rows NPC_TARGET ngoài route NPC (lỗi code, bước dựng revision io-i-v1.1)
+
+**Phát hiện:** bước dựng revision của lần chuẩn bị io-i-v1.1 / io-v1.4 (`outputs/m56_prep_v14_20261107.*`) hỏng với
+`NPC_TARGET_ARC_NOT_INCREASING`, trước compile.
+- Nguyên nhân: các row NPC_TARGET trên connector ở hai đầu được chiếu lên đúng điểm mút của route NPC, nên arc không còn tăng ngặt.
+
+**Sửa:** `io_routes` chỉ giữ các row NPC_TARGET có arc chiếu nằm bên trong route NPC và tăng ngặt.
+- Hệ quả: route NPC_TARGET là đoạn làn EGO song song với route NPC.
+- Revision được dựng lại từ đúng các prep đã có (`m56_v2_prepare_Town06_20261107T161454Z`,
+  `m56_v2_prepare_Town04_20261107T162202Z`). Không chuẩn bị lại.

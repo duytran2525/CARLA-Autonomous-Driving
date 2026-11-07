@@ -46,9 +46,15 @@ def io_routes(prep, plain, town):
     rows['EGO_TARGET'] = (t, a)
     routes['EGO_TARGET'] = directed(t, a, prep['map_hash'], town, f"{g['road']}/{g['target_lane']}", cont, dest['EGO'])
     if 'NPC_TARGET' in rows_all:  # io-i-v1 3.c: the NPC cut-in target (EGO) lane in the NPC route's arc frame
-        t = rows_all['NPC_TARGET']
-        a = [q6(project_route((r['x'], r['y'], r['z']), routes['NPC'])) for r in t]
-        assert all(y > x for x, y in zip(a, a[1:])), 'NPC_TARGET_ARC_NOT_INCREASING'
+        # Only the rows whose projection lies strictly inside the NPC route and strictly increases (connector rows past
+        # the NPC route ends project onto its end points; io-i-v1 addendum C, 2026-11-07).
+        lo, hi = routes['NPC'].arc[0], routes['NPC'].arc[-1]
+        t, a = [], []
+        for r in rows_all['NPC_TARGET']:
+            x = q6(project_route((r['x'], r['y'], r['z']), routes['NPC']))
+            if lo < x < hi and (not a or x > a[-1]):
+                t.append(r); a.append(x)
+        assert len(t) > 2, 'NPC_TARGET_ROUTE_EMPTY'
         rows['NPC_TARGET'] = (t, a)
         routes['NPC_TARGET'] = directed(t, a, prep['map_hash'], town, f"{g['road']}/{g['npc_target_lane']}", cont, dest['NPC'])
     return routes, rows, cont
