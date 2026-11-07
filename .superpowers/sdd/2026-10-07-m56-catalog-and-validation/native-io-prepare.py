@@ -74,6 +74,8 @@ def geometry_fill(c, m):
     i = next(j for j, a in enumerate(A.route.arc) if a >= 1)
     pt = A.route.transforms[i]
     w = m.get_waypoint(carla.Location(pt.x, pt.y, pt.z), project_to_road=True, lane_type=carla.LaneType.Driving)
+    if I and w.road_id == road and w.lane_id == e1:  # io-i-v1 addendum A: a fill I lists (source, EGO); the EGO lane is
+        e0, e1 = e1, e0                              # the one the frozen catalog EGO route lies on
     assert (w.road_id, w.lane_id) == (road, e0), ('CATALOG_ROUTE_NOT_ON_SITE_LANE', w.road_id, w.lane_id)
     first_s = w.s - sign * float(A.route.arc[i])
     if I:  # spec 7.4: I front_t0 -> X = 4 vE + Dlc + 3.75, the lane change starting 4 vE after t0

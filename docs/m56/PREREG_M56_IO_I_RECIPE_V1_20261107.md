@@ -51,3 +51,13 @@ băng, spec và hình học tĩnh.
 - **Lỗi code của tooling** (lỗi khiến chương trình dừng hoặc tính sai, không phải kết quả của cảnh) được sửa trước kết quả, mỗi
   lần bằng một addendum có ghi rõ, giống io-v1.3.
 - Nếu một lỗi chỉ lộ ra sau khi A/B đã chạy, việc chạy lại theo P5 cần chứng minh offline trên dữ liệu đã seal.
+
+## Addendum A (07/11/2026): thứ tự làn của cảnh I trong catalog fill (lỗi đọc catalog)
+
+**Phát hiện:** lần chuẩn bị đầu (`outputs/m56_prep_I_v1_20261107.*`, tooling `8fd07bd`):
+- I03: PREPARED.
+- I04 và I07 dừng trước probe với `CATALOG_ROUTE_NOT_ON_SITE_LANE (37, −7)` / `(38, −4)`.
+- Nguyên nhân: route EGO của catalog nằm trên `lanes[1]`, không phải `lanes[0]`. Bảng §2 viết sai thứ tự làn cho cảnh I fill.
+
+**Sửa:** làn EGO là làn mà route EGO đã đóng băng trong catalog nằm trên; làn còn lại là làn nguồn. Kiểm ở bước compile
+(`end_offset` của đoạn đổi làn đã đóng băng của EGO B phải bằng separation đo được) bảo đảm hai vai không bị đảo.
