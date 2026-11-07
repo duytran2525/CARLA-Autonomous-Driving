@@ -53,3 +53,31 @@ byte của chúng không đổi.
 - Mỗi cảnh PREPARED chạy đúng một A/B (`native-v2-ab.py`), rồi tính kết quả pair bằng `native-v6-pair.py`, dưới consumer v9 và
   v6. Báo cáo theo cả hai luật.
 - Cảnh hỏng hay bị chặn ở bất kỳ bước nào thì ghi lại, không chỉnh thêm và không chạy lại trong phiên này.
+
+## Addendum A (08/11/2026, sau lần chuẩn bị thứ nhất, trước mọi A/B)
+
+**Kết quả lần chuẩn bị thứ nhất** (`outputs/m56_cl_v1_20261107T232433Z`, tooling `c737a2c`): không cảnh nào PREPARED.
+
+| Cảnh | Diễn biến | Kết quả |
+|---|---|---|
+| M01 | Luật b kích hoạt. probe1-long tìm được T_end (khoảng cách 47 m = G + 1), cửa sổ EGO ổn định (biên độ 0,068). Probe 2 (60 s): NPC dừng đèn đỏ từ giây 22,3 tới giây 59,5 | BLOCKED_FIXTURE `NPC_SIGNAL_HOLD_IN_PROBE2` |
+| M02, M08 | Luật a: nâng 4,44 / 2,43 cm, spawn được, nhưng `SETTLE_MOVEMENT` ngay frame đầu | BLOCKED_FIXTURE `READINESS_NOT_STEADY` |
+
+**Lỗi của luật a, chứng minh offline:** `m56/runtime.py:912` ghi `SETTLE_MOVEMENT` khi có xe nào vượt 0,1 m/s trước khi settle.
+Xe nâng 2–4 cm vẫn đang rơi ở frame đầu (0,05 s), với tốc độ khoảng 0,5 m/s. Vậy luật a không bao giờ dùng được dưới runtime đã
+đóng băng. Đây là lỗi thiết kế của Claude, không phải kết quả của cảnh.
+
+**Lỗi phụ của luật b:** luật b kích hoạt cả với probe chỉ có 1 frame (M02, M08), vì nó chỉ kiểm T_end. Lỗi này không đổi kết quả,
+nhưng sai ý định của luật.
+
+**Sửa:**
+- **a (thay thế):** khi gặp `SPAWN_ERROR:<role>`, role đó lấy pitch của waypoint CARLA tại điểm xuất phát; x, y, z (ground + 1 cm) và
+  yaw giữ nguyên. Chạy lại probe 1 một lần (`probe1-pitch`). Chẩn đoán spawn cho thấy M02 spawn được theo cách này, còn M08 thì
+  không. M08 vẫn được chạy theo luật chung, và nhiều khả năng bị chặn.
+- **b:** chỉ kích hoạt khi verdict của probe 1 có `READINESS_NOT_REACHED` và T_end thiếu.
+
+**M01 giữ nguyên BLOCKED.** Kiểm hold ở probe 2 không được nới. Lần hold ở giây 22,3 nằm trong giai đoạn NPC còn đang tiếp cận
+xung đột (EGO tới T_end ở khoảng giây 20), nên đây là lỗi canh pha thật của cảnh trên đoạn tiếp cận dài. M01 không được chuẩn bị
+lại.
+
+**Chạy:** chuẩn bị lại M02 (Town04) và M08 (Town07) một lần theo addendum A, rồi chạy A/B cho cảnh nào PREPARED, như §3.

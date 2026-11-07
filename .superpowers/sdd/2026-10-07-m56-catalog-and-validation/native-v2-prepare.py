@@ -106,9 +106,9 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
 
 LAST_REASONS = []
 # addendum cl-v1 (docs/m56/PREREG_M56_CL_V1_SPAWN_PROBE_20261108.md), two once-only preparation retries:
-# (a) SPAWN_ERROR of a role in probe 1 -> that role's z = highest ground_projection under its 4 footprint corners and centre
-#     + 1 cm (x, y, pitch 0, yaw unchanged); the ground proof then measures the lift (must stay <= 0.05 - 0.0011);
-# (b) probe 1 never brings the EGO front within G + 1 m of e_entry (T_end missing, product READY_LIMIT_S 15 s) -> every
+# (a, addendum A) SPAWN_ERROR of a role in probe 1 -> that role takes the CARLA waypoint pitch at its start (x, y, z,
+#     yaw unchanged); the first rule (z lift) is void: a lifted body falls > 0.1 m/s in frame 1 (SETTLE_MOVEMENT);
+# (b) probe 1 ends READINESS_NOT_REACHED and never brings the EGO front within G + 1 m of e_entry (T_end missing, product READY_LIMIT_S 15 s) -> every
 #     preparation probe of the scene runs with READY_LIMIT_S = LONG_PROBE_S. The A/B runner keeps its own 15 s.
 LONG_PROBE_S = 60
 
@@ -242,23 +242,17 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
     cl_v1 = {}
     lifted = [r_ for r_ in ('EGO', 'NPC') if f'SPAWN_ERROR:{r_}' in LAST_REASONS]
-    if not p1 and lifted:  # cl-v1 a
+    if not p1 and lifted:  # cl-v1 a, addendum A: the lift fell > 0.1 m/s in frame 1 (product SETTLE_MOVEMENT);
+        # instead the role keeps x, y, z (ground + 1 cm), yaw and takes the CARLA waypoint pitch at its start
         for r_ in lifted:
-            q_ = poses[r_]; h = math.radians(q_.yaw); ex, ey = float(bbox['extent'][0]), float(bbox['extent'][1])
-            pts = [(q_.x, q_.y)] + [(q_.x + sx * ex * math.cos(h) - sy * ey * math.sin(h),
-                                    q_.y + sx * ex * math.sin(h) + sy * ey * math.cos(h)) for sx in (-1, 1) for sy in (-1, 1)]
-            gz = [world.ground_projection(carla.Location(px, py, q_.z + 2.), 10.) for px, py in pts]
-            assert all(g_ is not None for g_ in gz), f'SPAWN_GROUND_UNPROJECTED:{r_}'
-            z = max(g_.location.z for g_ in gz) + .01
-            lift = z - .01 - grounds[r_]
-            cl_v1[r_] = {'lift_m': lift, 'corner_grounds': [g_.location.z for g_ in gz]}
-            if lift + .0011 > .05:
-                out_ = {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': 'SPAWN_GROUND_LIFT', 'cl_v1': cl_v1}
-                return finish(c, out_)
-            poses[r_] = Transform6(q_.x, q_.y, _f32(z), 0., q_.yaw, 0.)
-        log(event='CL_V1_SPAWN_LIFT', scene=c.id, **cl_v1)
-        p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1-lift', pred1)
-    if p1 and not any(e_entry - front_station(next(x for x in f.actors if x.role == 'EGO'), routes['EGO']) <= float(G) + 1
+            q_ = poses[r_]
+            wp = m.get_waypoint(carla.Location(q_.x, q_.y, q_.z))
+            pitch = (wp.transform.rotation.pitch + 180.) % 360. - 180.
+            cl_v1[r_] = {'pitch_deg': pitch, 'waypoint': [wp.road_id, wp.lane_id, wp.is_junction]}
+            poses[r_] = Transform6(q_.x, q_.y, q_.z, _f32(pitch), q_.yaw, 0.)
+        log(event='CL_V1_SPAWN_PITCH', scene=c.id, **cl_v1)
+        p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1-pitch', pred1)
+    if p1 and 'READINESS_NOT_REACHED' in LAST_REASONS and not any(e_entry - front_station(next(x for x in f.actors if x.role == 'EGO'), routes['EGO']) <= float(G) + 1
                       for f in p1):  # cl-v1 b
         runtime.READY_LIMIT_S = LONG_PROBE_S
         cl_v1['probe_ready_limit_s'] = LONG_PROBE_S

@@ -9,7 +9,7 @@ PY=../../../.venv-m56-native-v1/Scripts/python.exe
 REV_M=$(ls -d $A/m56_c0_partial_v5g_2*/c0-partial-v5-frozen-revision.json | tail -1)
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
 echo "product $(git -C $M56_CODE log -1 --format=%h) tooling $(git -C ../../.. log -1 --format=%h)" | tee $LOG/head.txt
-SPECS="Town04:M56-P-M01,M56-P-M02 Town07:M56-P-M08"
+SPECS=${CLV1_SPECS:-"Town04:M56-P-M01,M56-P-M02 Town07:M56-P-M08"}
 NEW=""
 for spec in $SPECS; do
   t=${spec%%:*}; s=${spec#*:}
