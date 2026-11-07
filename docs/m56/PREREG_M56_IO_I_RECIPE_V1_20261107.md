@@ -88,3 +88,14 @@ băng, spec và hình học tĩnh.
 - Hệ quả: route NPC_TARGET là đoạn làn EGO song song với route NPC.
 - Revision được dựng lại từ đúng các prep đã có (`m56_v2_prepare_Town06_20261107T161454Z`,
   `m56_v2_prepare_Town04_20261107T162202Z`). Không chuẩn bị lại.
+
+## Addendum D (07/11/2026): rows NPC_TARGET bị cắt sai ở bước chuẩn bị trên route nhiều road (lỗi code)
+
+**Phát hiện:** compile của I04 và I07 (`outputs/m56_compile_v14b_20261107.*`) cho kiểm response NPC `REFERENCE_SWITCH_UNSUPPORTED`.
+- Chẩn đoán offline: route NPC_TARGET có một bước dài 114,2 m (I04, road 37 → 1037) và 142,0 m (I07).
+- Nguyên nhân: bước chuẩn bị cắt các row theo khoảng road-s lấy từ row đầu và row cuối của route NPC. Hai row đó nằm trên road
+  khác, nên khoảng s bị sai.
+- I03 (một road) không bị ảnh hưởng.
+
+**Sửa:** bước chuẩn bị lưu toàn bộ row liên tục của làn đích NPC; compile cắt theo phép chiếu (addendum C). I04 và I07 (và I05 nếu
+bị) được chuẩn bị lại. Chưa có A/B nào của các cảnh này.

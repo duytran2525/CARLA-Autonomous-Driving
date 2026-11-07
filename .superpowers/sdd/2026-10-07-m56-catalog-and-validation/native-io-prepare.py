@@ -384,11 +384,9 @@ def _prepare_o(c, client, proc, start, world, m, identity, body, bbox, runin_m=N
     poses2 = {'EGO': poses['EGO'], 'NPC': pose_on(world, prow2['NPC'][0], 0)}
     grounds = {'EGO': pose_on.grounds[id(rows['EGO'])], 'NPC': pose_on.grounds[id(prow2['NPC'][0])]}
     io_rows = {'EGO': rows['EGO'], 'EGO_TARGET': rows['EGO_TARGET'], 'NPC': prow2['NPC'][0]}
-    if I:  # io-i-v1 3.c: the NPC target (EGO) lane over the NPC route's own road-s span (projected onto it at compile)
-        lo_s, hi_s = sorted((prow2['NPC'][0][0]['s'], prow2['NPC'][0][-1]['s']))
-        io_rows['NPC_TARGET'] = [r for r in rows['NPC_TARGET'] if r['road'] != R or lo_s <= r['s'] <= hi_s]
-        first = next(i for i, r in enumerate(io_rows['NPC_TARGET']) if r['road'] == R)
-        io_rows['NPC_TARGET'] = io_rows['NPC_TARGET'][first:]
+    if I:  # io-i-v1 3.c + addendum D: the full continuous NPC target (EGO) lane rows; the compile keeps the part that
+        # projects strictly inside the NPC route (addendum C). A road-s window cut them wrongly on multi-road routes.
+        io_rows['NPC_TARGET'] = rows['NPC_TARGET']
     cont2 = write_ref(P.root / c.id / 'routes-io.json', io_rows, 'NATIVE_ROUTE')
     p2 = run('probe2', routes2, prow2, poses2, npc_gains, ego_gains)
     plat2 = P.plateaus(p2, routes2, body, float(dec), 0) if p2 else {'reason': 'PROBE2_NO_FRAMES'}
