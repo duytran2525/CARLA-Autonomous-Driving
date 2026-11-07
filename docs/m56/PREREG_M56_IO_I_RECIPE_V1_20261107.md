@@ -99,3 +99,13 @@ băng, spec và hình học tĩnh.
 
 **Sửa:** bước chuẩn bị lưu toàn bộ row liên tục của làn đích NPC; compile cắt theo phép chiếu (addendum C). I04 và I07 (và I05 nếu
 bị) được chuẩn bị lại. Chưa có A/B nào của các cảnh này.
+
+## Addendum E (08/11/2026): I01 và I02 (cửa sổ spec trên road cong), chọn từ hình học trước khi có số
+
+- **I01** (Town04 R45, làn +4, đi theo chiều s giảm):
+  - Đoạn thẳng s 282,59–404,31; hai đầu là cung.
+  - Cửa sổ spec front_t0 320 → X 274,25 có X nằm trên cung.
+  - **Dời +18:** front_t0 338, X 292,25. Run-in 64 m bắt đầu ở s 402, trong đoạn thẳng; X cách đầu cung 9,7 m.
+  - Cách làm giống O01/O02 (io-v1.2, `M56_IO_SITE_SHIFT`).
+- **I02** (Town05 R37, làn +3): cửa sổ spec 380 → 323,75 nằm trọn trong đoạn thẳng 304,28–397,88. **Không dời.**
+- **Recipe:** io-i-v1.1 với addendum A–D. Mỗi cảnh một A/B. A/B chỉ chạy khi admission ADMITTED và cả ba kiểm response đều OK.
