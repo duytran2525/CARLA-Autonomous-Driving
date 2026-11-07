@@ -30,6 +30,9 @@ AB = '--ab' in sys.argv[4:]
 APPROVED = os.environ.get('M56_IO_PREREG_APPROVED', '')
 if AB and not APPROVED:
     sys.exit('REFUSED: --ab needs M56_IO_PREREG_APPROVED=<commit of the I/O recipe prereg Duy approved>')
+AB_AUTHORITY = os.environ.get('M56_AB_AUTHORITY', '')  # 2026-11-07: the run's own authority, sealed in the receipt
+if AB and not AB_AUTHORITY:
+    sys.exit('REFUSED: --ab needs M56_AB_AUTHORITY=<who authorised this A/B, quoted source, erratum/decision commit>')
 root = WORK / f"outputs/m56_io_{'ab' if AB else 'compile'}_{TOWN}_{now()}"
 root.mkdir(parents=False, exist_ok=False)
 log_rows = []
@@ -47,6 +50,8 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
     'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent); independent review waived by Duy 2026-10-24',
     'stage': 'I/O A/B' if AB else 'I/O fixture compile + admission only (no episode)',
     'io_prereg_approved': APPROVED or None, 'carla_no_rendering_mode': NO_RENDER,
+    'ab_authority': AB_AUTHORITY or None,
+    'kit_lateral_bound': 'pointwise (post-number, 2026-11-06)' if os.environ.get('M56_IO_KAPPA') == 'pointwise' else 'window-max-sum (io-v1.2)',
     'm56_code': os.environ.get('M56_CODE', str(WORK))}, 'OPERATOR_RECEIPT')
 review = reviewer(authority)
 OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
