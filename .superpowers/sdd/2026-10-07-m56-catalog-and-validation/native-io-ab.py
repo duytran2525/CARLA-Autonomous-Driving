@@ -210,7 +210,7 @@ def run_scene(c, client, proc, start, world, m, identity):
         return review(p, 'CAPABILITY:CONTINUOUS_GEOMETRY', tuple(p['raw_refs']),
                       ('dt 1/20; observed consecutive frames of owned actors; not independent',))
     gains = {k: (None if raw_prep.get(k) is None else tuple(F(g) for g in raw_prep[k])) for k in ('npc_longitudinal', 'ego_longitudinal')}
-    frows = {'EGO': rows['EGO'], 'NPC': rows['NPC'], 'EGO_TARGET': rows['EGO_TARGET']}
+    frows = {k: rows[k] for k in ('EGO', 'NPC', 'EGO_TARGET', 'NPC_TARGET') if k in rows}  # io-i-v1: NPC switch plan
     backend.bind(fixture, io_policy(fixture, frows, source, fref, gains['npc_longitudinal'], gains['ego_longitudinal']),
                  geometry_review, kit)
     out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)

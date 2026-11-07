@@ -61,3 +61,19 @@ băng, spec và hình học tĩnh.
 
 **Sửa:** làn EGO là làn mà route EGO đã đóng băng trong catalog nằm trên; làn còn lại là làn nguồn. Kiểm ở bước compile
 (`end_offset` của đoạn đổi làn đã đóng băng của EGO B phải bằng separation đo được) bảo đảm hai vai không bị đảo.
+
+## Addendum B (07/11/2026): lỗi harness ở A/B đầu tiên của I03, đã chứng minh offline
+
+**A/B đầu tiên:** `outputs/m56_io_ab_Town06_20261107T144959Z` (tooling `682a162`).
+- Cả A và B dừng ở frame 21, lúc xe vẫn đang ổn định, với `TICK_ERROR: KeyError('NPC_TARGET')`. Không có trajectory nào.
+- Nguyên nhân: `native-io-ab.py` đưa vào policy stock chỉ ba bộ rows (EGO, NPC, EGO_TARGET). Plan cho switch của NPC
+  (`io_phase_plans`) cần cả rows `NPC_TARGET`.
+- Đây là lỗi harness, không phải kết quả của cảnh.
+
+**Chứng minh offline:** `native-io-i-policy-check.py` chạy trên fixture đã seal của chính A/B đó.
+- Rows cũ: `KeyError('NPC_TARGET')`.
+- Rows đã sửa: plan `NPC_TARGET` có 52 waypoint. `I POLICY CHECK PASS`.
+
+**Sửa:** `frows` có thêm `NPC_TARGET` khi rows có bộ đó. O không đổi.
+
+**P5:** dùng lần chạy lại duy nhất cho I03, cùng revision, cùng prereg.
