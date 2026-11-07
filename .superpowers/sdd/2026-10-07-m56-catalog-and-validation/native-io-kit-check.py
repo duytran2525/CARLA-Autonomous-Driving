@@ -1,5 +1,5 @@
 """I/O tooling: synthetic check of Kit.io_paths (x-axis travel, EGO lane y=0, target lane y=+3.5) and profile_kappa. No server."""
-import sys
+import math, sys
 from fractions import Fraction as F
 from itertools import product
 from types import SimpleNamespace
@@ -35,4 +35,13 @@ a = SimpleNamespace(profile={'segments': ({'start_arc_m': F(100), 'length_m': F(
                     phases={})
 assert abs(profile_kappa(a, SimpleNamespace(arc=110)) * (75 / 8) ** 2 - 2.2454) < 1e-3
 assert profile_kappa(a, SimpleNamespace(arc=200)) == 0
+# Pointwise proposal (M56_IO_KAPPA=pointwise): a lane change ending at 146.1 and a road curve from 160 share the +-10 m
+# window around arc 150 but no point, so the pointwise bound is the lane-change term alone, below the old window-max sum.
+yaw = [0.] * 161 + [math.degrees(.0107) * i for i in range(1, 140)]
+kit.fixture = SimpleNamespace(routes={'EGO': SimpleNamespace(transforms=[SimpleNamespace(yaw=v) for v in yaw], arc=list(range(len(yaw))))})
+b = SimpleNamespace(profile={'segments': ({'start_arc_m': F(120), 'length_m': F(261, 10), 'start_offset_m': F(0), 'end_offset_m': F(7, 2)},)},
+                    phases={})
+at = SimpleNamespace(arc=150)
+old, new = kit.kappa('EGO', at) + profile_kappa(b, at), kit.lateral_kappa('EGO', b, at)
+assert abs(new - profile_kappa(b, at)) < 1e-12 and new < old - .005, (old, new)
 print('KIT IO CHECK PASS')

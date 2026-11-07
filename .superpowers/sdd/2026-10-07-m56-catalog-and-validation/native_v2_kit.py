@@ -12,6 +12,9 @@ from fractions import Fraction
 from pathlib import Path
 import hashlib, json, math, os
 V6 = os.environ.get('M56_RECIPE', 'v5') == 'v6'  # same switch as native_v2_common (prereg v6)
+# PROPOSAL 2026-11-06, set AFTER seeing O02 A's 2.844 > 2.5: pointwise lateral bound (Kit.lateral_kappa). Pending Duy;
+# unset = the io-v1.2 bound (sum of the two window maxima), byte-identical to tooling 070aa0d.
+KAPPA_POINTWISE = os.environ.get('M56_IO_KAPPA') == 'pointwise'
 
 from m56.catalog import _digest
 from m56.evidence import append_record
@@ -269,11 +272,33 @@ class Kit:
             box = tuple(tuple(high[k] if s[k] else low[k] for k in range(3)) for s in product((0, 1), repeat=3))
             response = next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash)
             target = (active_target(response, y.commands[0].cause) if V6 else max(v for v in response.targets.values()))
+            kap = (self.lateral_kappa(x.role, response, y) if KAPPA_POINTWISE
+                   else self.kappa(x.role, y) + profile_kappa(response, y))
             actors[x.role] = {'actor_id': x.id, 'response_hash': y.commands[0].response_hash, 'envelope': box,
-                              'reference_lateral_acceleration_bound_mps2': q_up(float(target) ** 2 * (self.kappa(x.role, y)
-                                                                                                    + profile_kappa(response, y)))}
+                              'reference_lateral_acceleration_bound_mps2': q_up(float(target) ** 2 * kap)}
         return {'boot': a.boot, 'world': a.world, 'first_frame': a.frame, 'last_frame': b.frame,
                 'first_actors_hash': _digest(a.actors), 'last_actors_hash': _digest(b.actors), 'actors': actors}
+
+    def lateral_kappa(self, role, response, actor, window=10.):
+        """PROPOSAL (2026-11-06, after the number; active only with M56_IO_KAPPA=pointwise): max over the route points within +-window m of the actor of (route curvature at the point +
+        the planned quintic curvature at that point). io-v1.1 added the two window MAXIMA, which double-counts when a
+        lane-change segment and a road curve are both in the window but never at the same point (O02: 2.844 > 2.5 m/s^2
+        while the pointwise bound is 2.245). C/L/M (no lateral segment): identical to kappa()."""
+        segs = [(float(g['start_arc_m']), float(g['length_m']), abs(float(g['end_offset_m'] - g['start_offset_m'])))
+                for p in (response.profile, *(w['profile'] for w in response.phases.get('reference_switches', ())))
+                for g in p['segments'] if g['end_offset_m'] != g['start_offset_m']]
+        if not segs:
+            return self.kappa(role, actor, window)
+        route = self.fixture.routes[role]
+        s = float(actor.arc) if actor.arc is not None else 0.
+        t, arc = route.transforms, [float(x) for x in route.arc]
+        k = 0.
+        for i in range(1, len(t) - 1):
+            if abs(arc[i] - s) <= window:
+                dyaw = math.radians((t[i + 1].yaw - t[i - 1].yaw + 180) % 360 - 180)
+                prof = max((10 / math.sqrt(3) * d / L ** 2 for a0, L, d in segs if a0 <= arc[i] <= a0 + L), default=0.)
+                k = max(k, abs(dyaw) / (arc[i + 1] - arc[i - 1]) + prof)
+        return k
 
     def kappa(self, role, actor, window=10.):
         """Max |curvature| of the frozen reference route within +-window m of the actor's station."""
