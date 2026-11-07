@@ -51,8 +51,82 @@ def io_candidates(ids):
     return out
 
 
-def geometry(c):
+def geometry_fill(c, m):
+    """io-v1.3 (PREREG_M56_IO_RECIPE_V1_3_FILL_O_20261107): an O scene of the fill20/v2/v3 catalog (no spec 7.4 road-s
+    table). The site window is the one FROZEN in the catalog EGO A profile (no shift): decision = start of its lane-change
+    segment (road-s of the catalog route's first point + that arc); Dlc = the frozen segment length (= 3 vE, spec 7.4);
+    gap = G_m; return_start = returnstart_m; X = decision + return_start + Dlc + 3.75 (spec 7.4)."""
+    import carla
+    p = {k: v.values[0] for k, v in c.parameters.items()}
+    rr = next(a for a in c.actors if a.role == 'EGO').route_recipe
+    road, (e0, e1) = int(rr['road']), [int(x) for x in rr['lanes']]
+    sign = 1 if e0 < 0 else -1
+    assert rr['travel'] == ('increasing s' if sign > 0 else 'decreasing s'), rr
+    A = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
+    seg = next(s for s in A.profile['segments'] if s['end_offset_m'] != s['start_offset_m'])
+    assert seg['length_m'] == 3 * p['vE'], (seg['length_m'], p['vE'])
+    first = A.route.transforms[0]
+    w = m.get_waypoint(carla.Location(first.x, first.y, first.z), project_to_road=True, lane_type=carla.LaneType.Driving)
+    assert (w.road_id, w.lane_id) == (road, e0), ('CATALOG_ROUTE_NOT_ON_SITE_LANE', w.road_id, w.lane_id)
+    dec_s = w.s + sign * float(seg['start_arc_m'])
+    xd = float(p['returnstart_m']) + float(seg['length_m']) + 3.75
+    return {'road': road, 'ego_lane': e0, 'target_lane': e1, 'npc_lane': e0, 'sign': sign, 'through': True,
+            'catalog_first_point_s': w.s, 'front_t0_s': dec_s, 'X_s': dec_s + sign * xd, 'Dlc': seg['length_m'],
+            'gap': float(p['G_m']), 'return_start': p['returnstart_m'], 'vE': p['vE'], 'vN': p['vN'], 'k': p.get('k')}
+
+
+def road_length(m, road, _cache={}):
+    """Length of an OpenDRIVE road of the loaded map (parsed once from m.to_opendrive())."""
+    if not _cache:
+        import xml.etree.ElementTree as ET
+        _cache.update({int(r.get('id')): float(r.get('length')) for r in ET.fromstring(m.to_opendrive()).iter('road')})
+    return _cache[road]
+
+
+MAX_YAW_DEV = 1.  # io-v1.3: every row of a native I/O route within 1 deg of the main-road heading (consumer axis rule: 1 deg)
+
+
+def lane_rows_through(m, road, lane, s_from, s_to, strict=True):
+    """io-v1.3: lane_rows that may leave the site road. Inside the road it is lane_rows; beyond its ends it follows the
+    CARLA lane continuation (next/previous waypoint with the closest yaw) through junction connectors by the missing
+    distance. A row more than MAX_YAW_DEV from the main-road heading: strict -> AssertionError (scene BLOCKED, EGO);
+    not strict -> the route is cut before it (NPC tail, recorded). Returns (rows, cut_m)."""
+    sign, L = (1 if lane < 0 else -1), road_length(m, road)
+    lo, hi = .01, L - .01
+    clamp = lambda s: min(max(s, lo), hi)
+    a0, a1 = clamp(s_from), clamp(s_to)
+    w0 = m.get_waypoint_xodr(road, lane, a0)
+    assert w0 is not None, f'NO_WAYPOINT:{road}/{lane}@{a0}'
+    yaw0 = w0.transform.rotation.yaw
+    dev = lambda w: abs((w.transform.rotation.yaw - yaw0 + 180) % 360 - 180)
+    best = lambda ws, w: min(ws, key=lambda p: abs((p.transform.rotation.yaw - w.transform.rotation.yaw + 180) % 360 - 180))
+
+    def walk(w, forward, metres):
+        out, d = [], 0.
+        while d < metres - 1e-9:
+            nxt = _step(w, forward)
+            if not nxt:
+                return out, metres - d, 'LANE_ENDS'
+            p = best(nxt, w)
+            if dev(p) > MAX_YAW_DEV:
+                return out, metres - d, 'YAW'
+            d += math.dist((p.transform.location.x, p.transform.location.y), (w.transform.location.x, w.transform.location.y))
+            w = p; out.append(_wp_row(w))
+        return out, 0., None
+    back = sign * (a0 - s_from)
+    pre, miss, why = walk(w0, False, back) if back > 0 else ([], 0., None)
+    assert not miss, f'RUNIN_NOT_STRAIGHT:{road}/{lane}:{why}:{miss:.2f}m'
+    rows = lane_rows(m, road, lane, a0, a1)
+    fwd = sign * (s_to - a1)
+    post, miss, why = walk(m.get_waypoint_xodr(road, lane, rows[-1]['s']), True, fwd) if fwd > 0 else ([], 0., None)
+    assert not (miss and strict), f'TAIL_NOT_STRAIGHT:{road}/{lane}:{why}:{miss:.2f}m'
+    return pre[::-1] + rows + post, miss
+
+
+def geometry(c, m=None):
     """Spec 7.4 site geometry of an O scene from the frozen candidate."""
+    if 'aliases' not in c.environment:
+        return geometry_fill(c, m)
     road = int(c.site_id.split('-R')[1])
     lanes = c.environment['aliases']['lanes']            # e.g. 'E-3→-4→-3,N-3'
     e, n = lanes.split(',')
@@ -88,9 +162,12 @@ def lane_rows(m, road, lane, s_from, s_to):
     return rows
 
 
-def station_at_s(rows, arc, s):
-    """Route arc of road-s s (linear in s between rows)."""
+def station_at_s(rows, arc, s, road=None):
+    """Route arc of road-s s (linear in s between rows). road: only rows of that road (io-v1.3 routes leave the site road;
+    road-s of another road would match by accident); a single-road route is unaffected."""
     for (r0, a0), (r1, a1) in zip(zip(rows, arc), zip(rows[1:], arc[1:])):
+        if road is not None and not r0['road'] == r1['road'] == road:
+            continue
         lo, hi = sorted((r0['s'], r1['s']))
         if lo <= s <= hi:
             f = 0. if r1['s'] == r0['s'] else (s - r0['s']) / (r1['s'] - r0['s'])
@@ -112,9 +189,11 @@ def pose_on(world, rows, i):
 pose_on.grounds = {}
 
 
-def s_at_station(rows, arc, station):
-    """Road-s of a route station (inverse of station_at_s; linear between rows)."""
+def s_at_station(rows, arc, station, road=None):
+    """Road-s of a route station (inverse of station_at_s; linear between rows); road: as station_at_s."""
     for (r0, a0), (r1, a1) in zip(zip(rows, arc), zip(rows[1:], arc[1:])):
+        if road is not None and not r0['road'] == r1['road'] == road:
+            continue
         if float(a0) <= station <= float(a1):
             return r0['s'] + (station - float(a0)) / (float(a1) - float(a0)) * (r1['s'] - r0['s'])
     return None
@@ -133,7 +212,7 @@ def rear_station(actor, route):
 
 
 def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
-    g = geometry(c); sg = g['sign']; L = 2 * bbox['extent'][0]
+    g = geometry(c, m); sg = g['sign']; L = 2 * bbox['extent'][0]; R = g['road']
     runin = float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1',
@@ -143,15 +222,21 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
            **({'m56_recipe': 'v6'} if V6 else {})}
     s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
     s_n0 = g['front_t0_s'] + sg * (g['gap'] + L)            # first guess: NPC rear `gap` ahead at time 0
-    rows = {'EGO': lane_rows(m, g['road'], g['ego_lane'], s_e0, s_end),
-            'EGO_TARGET': lane_rows(m, g['road'], g['target_lane'], s_e0, s_end),
-            'NPC': lane_rows(m, g['road'], g['npc_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M)}
+    if g.get('through'):  # io-v1.3: run-in / tails may continue through straight junction connectors
+        rows = {'EGO': lane_rows_through(m, R, g['ego_lane'], s_e0, s_end)[0],
+                'EGO_TARGET': lane_rows_through(m, R, g['target_lane'], s_e0, s_end)[0]}
+        rows['NPC'], cut = lane_rows_through(m, R, g['npc_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M, strict=False)
+        out.update(npc_tail_cut_m=cut, roads={k: list(dict.fromkeys(r['road'] for r in v)) for k, v in rows.items()})
+    else:
+        rows = {'EGO': lane_rows(m, g['road'], g['ego_lane'], s_e0, s_end),
+                'EGO_TARGET': lane_rows(m, g['road'], g['target_lane'], s_e0, s_end),
+                'NPC': lane_rows(m, g['road'], g['npc_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M)}
     arc = {k: arcs(v) for k, v in rows.items()}
-    dec = station_at_s(rows['EGO'], arc['EGO'], g['front_t0_s'])
-    xs = station_at_s(rows['EGO'], arc['EGO'], g['X_s'])
+    dec = station_at_s(rows['EGO'], arc['EGO'], g['front_t0_s'], R)
+    xs = station_at_s(rows['EGO'], arc['EGO'], g['X_s'], R)
     out.update(decision_station=dec, X_station=xs, return_start_station=(dec + g['return_start'])
                if g['return_start'] is not None else None)
-    k0 = next(i for i, r in enumerate(rows['NPC']) if (r['s'] - s_n0) * sg >= 0)
+    k0 = next(i for i, r in enumerate(rows['NPC']) if r['road'] == R and (r['s'] - s_n0) * sg >= 0)
     cont = write_ref(P.root / c.id / 'routes-io-probe1.json', rows, 'NATIVE_ROUTE')
     notation = {'EGO': f"{g['road']}/{g['ego_lane']}", 'NPC': f"{g['road']}/{g['npc_lane']}"}
 
@@ -206,10 +291,10 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     if t0 is None:
         out.update(status='BLOCKED_FIXTURE', reason='EGO_NOT_AT_DECISION_IN_PROBE1'); return P.finish(c, out)
     # decision road-s on the NPC lane, in the probe-1 NPC route frame (the route starts at k0, ahead of the decision)
-    dec_npc = station_at_s(rows['NPC'], arc['NPC'], g['front_t0_s']) - arc['NPC'][k0]
+    dec_npc = station_at_s(rows['NPC'], arc['NPC'], g['front_t0_s'], R) - arc['NPC'][k0]
     shift = float(dec_npc) + g['gap'] - rear                   # metres along the NPC lane (positive = further ahead)
     s_n = rows['NPC'][k0]['s'] + sg * shift
-    k = next(i for i, r in enumerate(rows['NPC']) if (r['s'] - s_n) * sg >= 0)
+    k = next(i for i, r in enumerate(rows['NPC']) if r['road'] == R and (r['s'] - s_n) * sg >= 0)
     out.update(t0_probe1=t0, npc_rear_at_t0_probe1=rear, npc_shift_m=shift, npc_start_s=rows['NPC'][k]['s'])
     routes2, prow2 = routes_for(k)
     poses2 = {'EGO': poses['EGO'], 'NPC': pose_on(world, prow2['NPC'][0], 0)}
@@ -230,7 +315,7 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     ego_ready = P.front_station(next(x for x in fr.actors if x.role == 'EGO'), routes2['EGO'])
     t0b, rear_b, front_b = t0_and_rear(p2, routes2)
     # realised gap at t0 in road-s (the two stations live on different routes): NPC rear - EGO front
-    gap_real = None if t0b is None else sg * (s_at_station(*prow2['NPC'], rear_b) - s_at_station(rows['EGO'], arc['EGO'], front_b))
+    gap_real = None if t0b is None else sg * (s_at_station(*prow2['NPC'], rear_b, R) - s_at_station(rows['EGO'], arc['EGO'], front_b, R))
     lw = {lane: m.get_waypoint_xodr(g['road'], lane, g['front_t0_s']).lane_width for lane in (g['ego_lane'], g['target_lane'])}
     out.update(targets=targets, markers=markers, ready_time=float(fr.simtime), ego_front_at_ready=ego_ready,
                ego_ready_before_decision=ego_ready < float(dec), t0_probe2=t0b, gap_at_t0_probe2=gap_real,
