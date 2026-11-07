@@ -17,5 +17,6 @@ $P -I -X utf8 native-pair-per-scene.py "$J" \
   "$O\\m56_v2_ab_Town05_20261026T133919Z\\M56-P-C05"
 r=$?; echo "STEP1_END exit $r $(date -u +%FT%TZ)"; [ $r -eq 0 ] || exit $r
 $P -I -X utf8 native-io-online-timing.py "$O\\m56_io_ab_Town06_20261026T193247Z\\M56-P-O03:B" \
-  "$O\\m56_io_ab_Town04_20261027T055306Z\\M56-P-O01:A" "$O\\m56_io_ab_Town04_20261027T055306Z\\M56-P-O01:B"
+  "$O\\m56_io_ab_Town04_20261027T055306Z\\M56-P-O01:A" "$O\\m56_io_ab_Town04_20261027T055306Z\\M56-P-O01:B" \
+  "$O\\m56_io_ab_Town05_20261027T065150Z\\M56-P-O02:A" "$O\\m56_io_ab_Town05_20261027T065150Z\\M56-P-O02:B"
 r=$?; echo "STEP2_END exit $r $(date -u +%FT%TZ)"; exit $r
