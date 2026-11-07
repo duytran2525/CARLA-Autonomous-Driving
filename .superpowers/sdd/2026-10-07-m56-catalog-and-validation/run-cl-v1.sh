@@ -15,7 +15,7 @@ for spec in $SPECS; do
   t=${spec%%:*}; s=${spec#*:}
   while tasklist | grep -qi CarlaUE4; do sleep 15; done
   M56_REV=$REV_M $PY -I -X utf8 native-v2-prepare.py $t $s > $LOG/prep-$t.log 2>&1
-  grep -v "^INFO" $LOG/prep-$t.log | grep -E '"event": "(SCENE|SCENE_ERROR|CL_V1_SPAWN_LIFT|CL_V1_LONG_PROBE)"|^DONE|^Traceback' | cut -c1-400
+  grep -v "^INFO" $LOG/prep-$t.log | grep -E '"event": "(SCENE|SCENE_ERROR|CL_V1_SPAWN_PITCH|CL_V1_LONG_PROBE)"|^DONE|^Traceback' | cut -c1-400
   NEW="$NEW $(done_path $LOG/prep-$t.log)"
 done
 R=$(bash run-io-revision.sh clv1 $NEW | tee $LOG/revision.log | grep -o 'REVISION .*' | tail -1 | cut -d' ' -f2 | tr -d '\r')
