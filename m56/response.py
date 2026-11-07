@@ -1295,7 +1295,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1319,7 +1319,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1341,7 +1341,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1366,7 +1366,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1410,6 +1410,18 @@ def _nominal_v5(response):
     nominal_old_rule): readiness.targets_mps['EGO'], which E6 sets to the measured stock plateau, so it can never equal
     6 / 7.5 / 75/8 natively."""
     return response.targets.get('NOMINAL')
+
+
+_IO_SERIES=frozenset(6*Number(5,4)**(k-1) for k in range(-4,9))
+
+
+def _io_nominal_ok(nominal, npc=False):
+    """v9 (prereg PREREG_M56_V9_IO_NOMINAL_SERIES_20261107): an I/O EGO nominal is 6*(5/4)^(k-1) for an integer k in
+    [-4, 8], exact (FILL20 dd2954c series); the NPC of an I scene is vE - 1. OLD RULE v8 (report-only): EGO in
+    {6, 15/2, 75/8}, NPC in {5, 13/2, 67/8} = k 1..3 only, so every k outside 1..3 was blocked at admission."""
+    if type(nominal) not in (Number,int):
+        return False
+    return (nominal+1 if npc else nominal) in _IO_SERIES
 
 
 def nominal_old_rule(fixture, role='EGO'):
@@ -1460,7 +1472,7 @@ def _lateral_contract(response, fixture):
     switches=response.phases.get('reference_switches',())
     _reference_response(response,_program(response)['initial'])
     if category in ('I','O'):
-        if nominal not in ((Number(5),Number(13,2),Number(67,8)) if npc else (Number(6),Number(15,2),Number(75,8))):
+        if not _io_nominal_ok(nominal,npc=npc):  # v9; OLD RULE v8: NPC in (5, 13/2, 67/8), EGO in (6, 15/2, 75/8)
             raise ValueError('LATERAL_NOMINAL_INVALID')
         if not separation or moving[0]['start_offset_m']!=0 or moving[0]['end_offset_m']!=separation:
             raise ValueError('LATERAL_SEPARATION_INVALID')
