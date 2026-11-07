@@ -45,6 +45,12 @@ def io_routes(prep, plain, town):
     assert all(y > x for x, y in zip(a, a[1:])), 'TARGET_ARC_NOT_INCREASING'
     rows['EGO_TARGET'] = (t, a)
     routes['EGO_TARGET'] = directed(t, a, prep['map_hash'], town, f"{g['road']}/{g['target_lane']}", cont, dest['EGO'])
+    if 'NPC_TARGET' in rows_all:  # io-i-v1 3.c: the NPC cut-in target (EGO) lane in the NPC route's arc frame
+        t = rows_all['NPC_TARGET']
+        a = [q6(project_route((r['x'], r['y'], r['z']), routes['NPC'])) for r in t]
+        assert all(y > x for x, y in zip(a, a[1:])), 'NPC_TARGET_ARC_NOT_INCREASING'
+        rows['NPC_TARGET'] = (t, a)
+        routes['NPC_TARGET'] = directed(t, a, prep['map_hash'], town, f"{g['road']}/{g['npc_target_lane']}", cont, dest['NPC'])
     return routes, rows, cont
 
 
@@ -87,7 +93,11 @@ def io_geometry(c, prep, routes, d, plain):
     """Axis, lane boxes, domain box, sections, lane_geometry, map_reference, pair. Returns a dict, or {'reason'} (blocked)."""
     ego, tgt = routes['EGO'], routes['EGO_TARGET']
     a_resp = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
-    dec = F(prep['decision_station']); xs = F(prep['X_station']); ret = F(prep['return_start_station'])
+    I = c.category == 'I'
+    if I:  # io-i-v1: the frozen lane change is EGO B (into the vacated source lane); no return
+        a_resp = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'B')
+    dec = F(prep['decision_station']); xs = F(prep['X_station'])
+    ret = None if prep.get('return_start_station') is None else F(prep['return_start_station'])
     (pi, yaw), (pt, _) = _point(ego, dec), _point(tgt, dec)
     axis = _axis_right(yaw)
     if axis is None:
@@ -136,15 +146,28 @@ def io_geometry(c, prep, routes, d, plain):
         return Section(tuple(verts), tuple(n), station, {})
     t_dec, t_x = _point(ego, dec)[0][trv], _point(ego, xs)[0][trv]
     region = vbox(min(t_dec, t_x), max(t_dec, t_x), l_lo, l_hi)
-    sections = {'O_DECISION': section(dec), 'O_RETURN_START': section(ret), 'X': section(xs),
-                'DESTINATION': section(ego.destination)}
+    if I:  # io-i-v1 3.g: the source -> EGO lane boundary = the shared edge of the two boxes, normal into the EGO lane
+        verts = []
+        for tv, zv in product((t_lo, t_hi), (z_lo, z_hi)):
+            v = [0., 0., zv]; v[trv] = tv; v[lat] = mid; verts.append(tuple(v))
+        n = [0., 0., 0.]; n[lat] = 1. if ci > ct else -1.
+        sections = {'I_SOURCE_BOUNDARY': Section(tuple(verts), tuple(n), dec, {}), 'X': section(xs),
+                    'DESTINATION': section(ego.destination)}
+    else:
+        sections = {'O_DECISION': section(dec), 'O_RETURN_START': section(ret), 'X': section(xs),
+                    'DESTINATION': section(ego.destination)}
     normals = tuple((-(b.y - a.y), b.x - a.x, 0.) for a, b in zip(ego.transforms, ego.transforms[1:]))
     reference = {'method': 'segment-map-normal-v1', 'route': ego, 'normals': normals, 'refs': ego.continuity}  # admitted SourceRefs
     spec = (('v_mean_E', 'e_lat_peak'), ('m/s', 'm'), ('mean_speed', 'map_lateral_peak'), (('TRIGGER', 'X_END'),) * 2,
             'map:' + _digest(reference))
     pair = FrozenMetricPair(*spec, _digest(spec), 'APPROVED_PROPOSAL_NOT_READY')
     lane_geometry = {'EGO': {'separation_m': sep, 'lane_width_m': {k: F(str(v)) for k, v in w.items()}}}
-    return {'axis': (trv, tsg), 'lateral_axis': (lat, sign), 'regions': regions, 'region': region, 'sections': sections,
+    extra = {}
+    if I:  # io-i-v1 3.f: source = EGO_TARGET box; the NPC goes from it into the EGO lane (opposite signed separation)
+        lane_geometry['NPC'] = {'separation_m': -sep, 'lane_width_m': {'initial': F(str(w['target'])), 'target': F(str(w['initial']))}}
+        extra = {'source_region': regions['EGO_TARGET'],
+                 'npc_regions': {'NPC_INITIAL': regions['EGO_TARGET'], 'NPC_TARGET': regions['EGO_INITIAL']}}
+    return {**extra, 'axis': (trv, tsg), 'lateral_axis': (lat, sign), 'regions': regions, 'region': region, 'sections': sections,
             'map_reference': reference, 'pair': pair, 'lane_geometry': lane_geometry, 'separation_m': sep,
             'z': (z_lo, z_hi), 'decision': dec, 'X': xs, 'return_start': ret}
 
@@ -152,10 +175,27 @@ def io_geometry(c, prep, routes, d, plain):
 def io_phase_plans(response, rows, every=2.):
     """Stock plan per reference switch: the switched lane's waypoints (road/lane/s) every 2 m from the switch marker."""
     from native_v2_common import plan_rows
-    key = {'TARGET_LANE_CONFIRMED': 'EGO_TARGET', 'RETURN_LANE_CONFIRMED': 'EGO'}
+    key = {'TARGET_LANE_CONFIRMED': 'EGO_TARGET', 'RETURN_LANE_CONFIRMED': 'EGO', 'NPC_TARGET_LANE_CONFIRMED': 'NPC_TARGET'}
     return {s['cause']: plan_rows(*rows[key[s['event']]], float(s['marker_arc_m']), every)
             for s in response.phases.get('reference_switches', ())}
 
 
-def io_npc(c, routes):
-    return npc_response(c.category, c.parameters['vN'].values[0], routes['NPC'])
+def io_npc(c, routes, prep=None, geo=None):
+    """O: the v5 annex NPC (straight). I (io-i-v1 3.a-c): the annex program + NPC_TARGET at NPC_TARGET_LANE_CONFIRMED,
+    one 3 vN quintic cut-in from the prepared start into the EGO lane, then the NPC target-lane switch."""
+    vN = c.parameters['vN'].values[0]
+    base = npc_response(c.category, vN, routes['NPC'])
+    if c.category != 'I':
+        return base
+    cut = prep['npc_cut']; start, length = F(cut['start_arc_m']), F(cut['length_m'])
+    sep = geo['lane_geometry']['NPC']['separation_m']
+    program = dict(base.phases['program'])
+    program['transitions'] = (*program['transitions'], {'cause': 'NPC_TARGET', 'after_event': 'NPC_TARGET_LANE_CONFIRMED',
+                                                       'delay_s': F(0), 'requires': ('REFERENCE_MARKER:NPC:NPC_TARGET',)})
+    seg = lambda a, l, o0, o1: {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': a, 'length_m': l,
+                                                                          'start_offset_m': o0, 'end_offset_m': o1},)}
+    phases = {**base.phases, 'program': program, 'annex': 'io-i-v1 NPC cut-in (PREREG_M56_IO_I_RECIPE_V1): never catalog',
+              'reference_switches': ({'cause': 'NPC_TARGET', 'event': 'NPC_TARGET_LANE_CONFIRMED', 'marker_arc_m': start + length,
+                                      'route': routes['NPC_TARGET'], 'profile': seg(start + length, F(1), F(0), F(0))},)}
+    return hashed(replace(base, targets={**base.targets, 'NPC_TARGET': vN}, profile=seg(start, length, F(0), sep),
+                          phases=phases, hash=''))

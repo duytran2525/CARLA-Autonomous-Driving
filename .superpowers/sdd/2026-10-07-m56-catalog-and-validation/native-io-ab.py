@@ -103,7 +103,7 @@ def compile_scene(c, world, m, identity, proc, start, sd):
     dref = SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')
     z_lo, z_hi = geo['z']
     driving = {role: driving_boxes(drivable, froutes[role], z_lo, z_hi) for role in froutes}
-    responses = (*c.responses, io_npc(c, routes))
+    responses = (*c.responses, io_npc(c, routes, prep, geo))
     policies = PolicyBundle('m56-io-fixture', 'f' * 64, {}, {}, {}, (prep_ref,))
     mp = {'town': c.town, 'opendrive_sha256': identity.map}
     boot, wid = f'pid{proc.pid}@{start}', str(world.id)
@@ -133,9 +133,12 @@ def compile_scene(c, world, m, identity, proc, start, sd):
             cap('DESTINATION_ROOM', {'exit_to_destination_m': q(float(ego.destination - geo['X'])),
                                      'destination_to_plan_end_m': q(float(ego.arc[-1] - ego.destination))},
                 (prep_ref,), binding, 'exit = X; destination = X + 5 m; plan extends 15 m further'))
-    topology = {'category': c.category, 'kind': 'lane-change-pass', 'action_regions': geo['regions'],
+    topology = {'category': c.category, 'kind': 'cut-in' if c.category == 'I' else 'lane-change-pass',
+                'action_regions': geo['regions'],
                 'driving_regions': driving, 'drivable_ref': dref, 'lane_geometry': geo['lane_geometry'],
                 'map_reference': geo['map_reference'], 'io_axis': geo['axis'], 'io_dlc': frozen_dlc(c)}
+    if c.category == 'I':  # io-i-v1 3.f
+        topology.update(source_region=geo['source_region'], npc_regions=geo['npc_regions'])
     packet = {'region': geo['region'], 'topology': topology, 'proof': (prep_ref, cont, dref), 'G': None,
               'sections': geo['sections'], 'responses': responses, 'pair': geo['pair']}
     queries = QueryBundle(boot, wid, mp, froutes, {'EGO': body, 'NPC': body}, poses, grounds,
@@ -167,7 +170,7 @@ def frozen_dlc(c):
     none, so the length of its frozen EGO A lane-change segment (= 3 vE; io-v1.3 3.a)."""
     if 'Dlc' in c.parameters:
         return c.parameters['Dlc'].values[0]
-    a = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
+    a = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == ('B' if c.category == 'I' else 'A'))
     return next(s['length_m'] for s in a.profile['segments'] if s['end_offset_m'] != s['start_offset_m'])
 
 

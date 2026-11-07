@@ -65,7 +65,8 @@ def geometry_fill(c, m):
     road, (e0, e1) = int(rr['road']), [int(x) for x in rr['lanes']]
     sign = 1 if e0 < 0 else -1
     assert rr['travel'] == ('increasing s' if sign > 0 else 'decreasing s'), rr
-    A = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
+    I = c.category == 'I'  # io-i-v1: the frozen lane change is EGO B's (I-B changes into the vacated source lane)
+    A = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == ('B' if I else 'A'))
     seg = next(s for s in A.profile['segments'] if s['end_offset_m'] != s['start_offset_m'])
     assert seg['length_m'] == 3 * p['vE'], (seg['length_m'], p['vE'])
     # The catalog route starts AT the road boundary (s ~ 0), where CARLA may project onto the adjoining connector: project
@@ -75,6 +76,12 @@ def geometry_fill(c, m):
     w = m.get_waypoint(carla.Location(pt.x, pt.y, pt.z), project_to_road=True, lane_type=carla.LaneType.Driving)
     assert (w.road_id, w.lane_id) == (road, e0), ('CATALOG_ROUTE_NOT_ON_SITE_LANE', w.road_id, w.lane_id)
     first_s = w.s - sign * float(A.route.arc[i])
+    if I:  # spec 7.4: I front_t0 -> X = 4 vE + Dlc + 3.75, the lane change starting 4 vE after t0
+        dec_s = first_s + sign * (float(seg['start_arc_m']) - 4 * float(p['vE']))
+        return {'road': road, 'ego_lane': e0, 'target_lane': e1, 'npc_lane': e1, 'npc_target_lane': e0, 'sign': sign,
+                'through': True, 'catalog_first_point_s': first_s, 'front_t0_s': dec_s,
+                'X_s': dec_s + sign * (4 * float(p['vE']) + float(seg['length_m']) + 3.75), 'Dlc': seg['length_m'],
+                'gap': float(p['gap_m']), 'return_start': None, 'vE': p['vE'], 'vN': p['vN'], 'category': 'I'}
     dec_s = first_s + sign * float(seg['start_arc_m'])
     xd = float(p['returnstart_m']) + float(seg['length_m']) + 3.75
     return {'road': road, 'ego_lane': e0, 'target_lane': e1, 'npc_lane': e0, 'sign': sign, 'through': True,
@@ -138,17 +145,21 @@ def geometry(c, m=None):
     lanes = c.environment['aliases']['lanes']            # e.g. 'E-3→-4→-3,N-3'
     e, n = lanes.split(',')
     e_lanes = [int(x) for x in e[1:].split('→')]
-    n_lane = int(n[1:])
+    n_lanes = [int(x) for x in n[1:].split('→')]   # O: 'N-3'; I (io-i-v1): 'N-3→-4' = source lane -> EGO lane
+    n_lane = n_lanes[0]
     p = {k: v.values[0] for k, v in c.parameters.items()}
     # Site-window shift PROPOSAL (I/O recipe extension prereg, pending Duy): front_t0 and X move together by `shift` m of
     # road-s, every spec distance kept; recorded in prepare.json. Default 0 = the spec window (O03 bytes unchanged).
     import os
     shift = dict(kv.split('=') for kv in filter(None, os.environ.get('M56_IO_SITE_SHIFT', '').split(','))).get(c.id)
     shift = float(shift) if shift else 0.
-    out = {'road': road, 'ego_lane': e_lanes[0], 'target_lane': e_lanes[1], 'npc_lane': n_lane,
+    out = {'road': road, 'ego_lane': e_lanes[0], 'target_lane': e_lanes[1] if len(e_lanes) > 1 else n_lane, 'npc_lane': n_lane,
             'sign': 1 if e_lanes[0] < 0 else -1,             # negative lanes increase road-s
             'front_t0_s': float(p['front_t0']) + shift, 'X_s': float(p['X']) + shift, 'Dlc': p['Dlc'], 'gap': float(p['gap']),
             'return_start': p.get('return_start'), 'vE': p['vE'], 'vN': p['vN']}
+    if c.category == 'I':  # io-i-v1 2: EGO B changes into the source lane; the NPC cuts from it into the EGO lane
+        assert len(e_lanes) == 1 and n_lanes[1] == e_lanes[0], lanes
+        out.update(target_lane=n_lane, npc_target_lane=e_lanes[0], category='I')
     if shift:
         out.update(site_shift_s=shift, site_shift_travel_m=out['sign'] * shift)
     return out
@@ -218,6 +229,37 @@ def rear_station(actor, route):
     return min(s) if s else None
 
 
+def npc_cut(frames, routes, t0, g, lw, bbox, ready_frame):
+    """io-i-v1 3.b/3.e: the NPC cut-in segment on its (probe-2) route frame. Length 3 vN (exact); start = NPC station at
+    t0 - u_i * length, q(u_i) = (w_source/2 - NPC half width) / separation (edge reaches the lane boundary from the source
+    lane centre); separation = (w_source + w_EGO)/2 (adjacent lanes). The NPC must be at its readiness before the start."""
+    length = 3 * F(g['vN'])
+    sep = (lw[g['target_lane']] + lw[g['ego_lane']]) / 2
+    r = (lw[g['target_lane']] / 2 - bbox['extent'][1]) / sep
+    q = lambda u: 10 * u ** 3 - 15 * u ** 4 + 6 * u ** 5
+    lo, hi = 0., 1.
+    for _ in range(60):
+        mid = (lo + hi) / 2; lo, hi = (mid, hi) if q(mid) < r else (lo, mid)
+    u = (lo + hi) / 2
+    f = next((x for x in frames if float(x.simtime) == t0), None)
+    if f is None:
+        return {'reason': 'NPC_CUT_T0_FRAME_MISSING'}
+    npc = next(a for a in f.actors if a.role == 'NPC')
+    st = _metric_station((npc.pose.x, npc.pose.y, npc.pose.z), routes['NPC'])
+    if st is None or hasattr(st, 'reasons'):
+        return {'reason': 'NPC_CUT_STATION_UNKNOWN'}
+    start = F(round((float(st) - u * float(length)) * 10 ** 6), 10 ** 6)
+    route = routes['NPC']
+    out = {'start_arc_m': start, 'length_m': length, 'u_intrusion': u, 'edge_ratio': r, 'separation_m_abs': sep,
+           'npc_station_at_t0': st, 'ready_time': float(ready_frame.simtime),
+           'cut_start_time_estimate': t0 - u * float(length) / float(g['vN'])}
+    if not route.arc[0] < start or not start + length < route.destination:
+        out['reason'] = 'NPC_CUT_OUTSIDE_ROUTE'
+    elif out['cut_start_time_estimate'] <= out['ready_time']:
+        out['reason'] = 'NPC_CUT_BEFORE_READY'
+    return out
+
+
 def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     g = geometry(c, m); sg = g['sign']; L = 2 * bbox['extent'][0]; R = g['road']
     runin = float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
@@ -228,16 +270,24 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
            'runin_m': runin, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
            **({'m56_recipe': 'v6'} if V6 else {})}
     s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
+    I = c.category == 'I'
     s_n0 = g['front_t0_s'] + sg * (g['gap'] + L)            # first guess: NPC rear `gap` ahead at time 0
+    if I:  # io-i-v1 3.d: the NPC is slower than the EGO, so the first guess is beside the EGO start (rear gap ahead)
+        s_n0 = s_e0 + sg * (g['gap'] + L)
     if g.get('through'):  # io-v1.3: run-in / tails may continue through straight junction connectors
         rows = {'EGO': lane_rows_through(m, R, g['ego_lane'], s_e0, s_end)[0],
                 'EGO_TARGET': lane_rows_through(m, R, g['target_lane'], s_e0, s_end)[0]}
         rows['NPC'], cut = lane_rows_through(m, R, g['npc_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M, strict=False)
+        if I:
+            rows['NPC_TARGET'] = lane_rows_through(m, R, g['npc_target_lane'], s_n0 - sg * NPC_BACK_M,
+                                                   s_end + sg * NPC_TAIL_M - sg * cut, strict=False)[0]
         out.update(npc_tail_cut_m=cut, roads={k: list(dict.fromkeys(r['road'] for r in v)) for k, v in rows.items()})
     else:
         rows = {'EGO': lane_rows(m, g['road'], g['ego_lane'], s_e0, s_end),
                 'EGO_TARGET': lane_rows(m, g['road'], g['target_lane'], s_e0, s_end),
                 'NPC': lane_rows(m, g['road'], g['npc_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M)}
+        if I:
+            rows['NPC_TARGET'] = lane_rows(m, g['road'], g['npc_target_lane'], s_n0 - sg * NPC_BACK_M, s_end + sg * NPC_TAIL_M)
     arc = {k: arcs(v) for k, v in rows.items()}
     dec = station_at_s(rows['EGO'], arc['EGO'], g['front_t0_s'], R)
     xs = station_at_s(rows['EGO'], arc['EGO'], g['X_s'], R)
@@ -254,7 +304,7 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
         return r, {'EGO': (rows['EGO'], arc['EGO']), 'NPC': (nr, na)}
     routes, prow = routes_for(k0)
     poses = {'EGO': pose_on(world, rows['EGO'], 0), 'NPC': pose_on(world, prow['NPC'][0], 0)}
-    ego_b = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'B')
+    ego_b = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == ('A' if I else 'B'))  # probe: NOMINAL only
     npc = npc_response(c.category, g['vN'], routes['NPC'])     # prereg v2 2.2 annex NPC program (v5 bytes)
     responses = (relabel(ego_b, routes['EGO'], 'A'), relabel(npc, routes['NPC']))
 
@@ -306,8 +356,13 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     routes2, prow2 = routes_for(k)
     poses2 = {'EGO': poses['EGO'], 'NPC': pose_on(world, prow2['NPC'][0], 0)}
     grounds = {'EGO': pose_on.grounds[id(rows['EGO'])], 'NPC': pose_on.grounds[id(prow2['NPC'][0])]}
-    cont2 = write_ref(P.root / c.id / 'routes-io.json', {'EGO': rows['EGO'], 'EGO_TARGET': rows['EGO_TARGET'],
-                                                          'NPC': prow2['NPC'][0]}, 'NATIVE_ROUTE')
+    io_rows = {'EGO': rows['EGO'], 'EGO_TARGET': rows['EGO_TARGET'], 'NPC': prow2['NPC'][0]}
+    if I:  # io-i-v1 3.c: the NPC target (EGO) lane over the NPC route's own road-s span (projected onto it at compile)
+        lo_s, hi_s = sorted((prow2['NPC'][0][0]['s'], prow2['NPC'][0][-1]['s']))
+        io_rows['NPC_TARGET'] = [r for r in rows['NPC_TARGET'] if r['road'] != R or lo_s <= r['s'] <= hi_s]
+        first = next(i for i, r in enumerate(io_rows['NPC_TARGET']) if r['road'] == R)
+        io_rows['NPC_TARGET'] = io_rows['NPC_TARGET'][first:]
+    cont2 = write_ref(P.root / c.id / 'routes-io.json', io_rows, 'NATIVE_ROUTE')
     p2 = run('probe2', routes2, prow2, poses2, npc_gains, ego_gains)
     plat2 = P.plateaus(p2, routes2, body, float(dec), 0) if p2 else {'reason': 'PROBE2_NO_FRAMES'}
     out['probe2'] = plat2
@@ -332,6 +387,11 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
                destinations={'EGO': routes2['EGO'].destination, 'NPC': routes2['NPC'].destination})
     if not out['ego_ready_before_decision']:
         out.update(status='BLOCKED_FIXTURE', reason='EGO_READY_AFTER_DECISION'); return P.finish(c, out)
+    if I:
+        cut = npc_cut(p2, routes2, t0b, g, lw, bbox, fr)
+        out['npc_cut'] = cut
+        if cut.get('reason'):
+            out.update(status='BLOCKED_FIXTURE', reason=cut['reason']); return P.finish(c, out)
     out['status'] = 'PREPARED'
     return P.finish(c, out)
 
@@ -352,7 +412,7 @@ def main():
         body = body_record(bbox, write_ref(P.root / 'a2-bbox.json', {'town': TOWN, 'bbox': bbox}, 'NATIVE_BODY'))
         for c in scenes:
             try:
-                assert c.category == 'O', 'pilot: O scenes only'
+                assert c.category in ('O', 'I'), 'I/O scenes only'
                 prepare_o(c, client, proc, start, world, m, identity, body, bbox)
             except Exception as e:  # recorded, scene stays blocked; never retried with other values
                 log(event='SCENE_ERROR', scene=c.id, error=repr(e), trace=traceback.format_exc()[-2500:])
