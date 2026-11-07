@@ -263,15 +263,25 @@ def npc_cut(frames, routes, t0, g, lw, bbox, ready_frame):
 
 
 def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
+    """io-v1.4 c/d (PREREG_M56_IO_I_V1_1_AND_IO_V1_4_20261107): at most one re-preparation with a changed run-in."""
+    r = _prepare_o(c, client, proc, start, world, m, identity, body, bbox)
+    if isinstance(r, tuple) and r[0] == 'RETRY':
+        log(event='PREP_RETRY', scene=c.id, runin_m=r[1], reason=r[2])
+        _prepare_o(c, client, proc, start, world, m, identity, body, bbox, runin_m=r[1], sfx='-r2', retry=False, why=r[2])
+
+
+def _prepare_o(c, client, proc, start, world, m, identity, body, bbox, runin_m=None, sfx='', retry=True, why=None):
     g = geometry(c, m); sg = g['sign']; L = 2 * bbox['extent'][0]; R = g['road']
-    runin = float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
+    runin = float(runin_m) if runin_m is not None else float(math.ceil(RUNIN_M * float(g['vE']) / 9.375 - 1e-9))
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'recipe': 'io-v1',
            'recipe_version': 'io-v1.2' if BOX_ANCHOR == 'midpoint' else 'io-v1.1',
            **({'box_anchor': 'midpoint'} if BOX_ANCHOR == 'midpoint' else {}), 'geometry': g, 'bbox': bbox,
            'runin_m': runin, 'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER,
            **({'m56_recipe': 'v6'} if V6 else {})}
-    s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M)
+    # io-i-v1.1 b: an I EGO route also covers 10 s of NPC travel ahead (the NPC pulls away while EGO A stops)
+    i_tail = 10 * float(g['vN']) if c.category == 'I' else 0.
+    s_e0, s_end = g['front_t0_s'] - sg * runin, g['X_s'] + sg * (g['gap'] + 2 * L + EGO_TAIL_M + i_tail)
     I = c.category == 'I'
     s_n0 = g['front_t0_s'] + sg * (g['gap'] + L)            # first guess: NPC rear `gap` ahead at time 0
     if I:  # io-i-v1 3.d: the NPC is slower than the EGO, so the first guess is beside the EGO start (rear gap ahead)
@@ -296,7 +306,9 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     out.update(decision_station=dec, X_station=xs, return_start_station=(dec + g['return_start'])
                if g['return_start'] is not None else None)
     k0 = next(i for i, r in enumerate(rows['NPC']) if r['road'] == R and (r['s'] - s_n0) * sg >= 0)
-    cont = write_ref(P.root / c.id / 'routes-io-probe1.json', rows, 'NATIVE_ROUTE')
+    cont = write_ref(P.root / c.id / f'routes-io-probe1{sfx}.json', rows, 'NATIVE_ROUTE')
+    out.update(rules=('io-i-v1.1' if c.category == 'I' else 'io-v1.4') if g.get('through') or c.category == 'I' else None,
+               retry_reason=why)
     notation = {'EGO': f"{g['road']}/{g['ego_lane']}", 'NPC': f"{g['road']}/{g['npc_lane']}"}
 
     def routes_for(npc_k):
@@ -312,8 +324,11 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
 
     def run(label, rts, pr, ps, ng=None, eg=None):
         resp = (relabel(ego_b, rts['EGO'], 'A'), relabel(npc, rts['NPC']))
-        return P.probe(client, proc, start, world, identity, c.id, rts, pr, ps, resp, label, None, ng, eg)
+        return P.probe(client, proc, start, world, identity, c.id, rts, pr, ps, resp, label + sfx, None, ng, eg)
     p1 = run('probe1', routes, prow, poses)
+    if not p1 and retry and g.get('through') and rows['EGO'][0]['road'] != R:  # io-v1.4 d: spawn failed off the site road
+        site0 = .5 if sg > 0 else road_length(m, R) - .5
+        return ('RETRY', math.floor(sg * (g['front_t0_s'] - site0)), 'io-v1.4 d: probe 1 spawn failed; run-in clipped to the site road')
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES'); return P.finish(c, out)
     # PID grids exactly as the C/L/M preparation (v5 erratum 2 for the EGO, P-NPC for the NPC); e_entry = decision, G = 0
@@ -339,10 +354,16 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     if plat.get('reason') or plat.get('NPC') is None:
         out.update(status='BLOCKED_FIXTURE', reason=plat.get('reason') or 'READINESS_NOT_STEADY'); return P.finish(c, out)
     # t0 = the first frame whose EGO front reaches the decision station
+    # io-i-v1.1 a: the I TRIGGER aims at EGO front = front_t0 + 4 vE - 3.3 x (EGO plateau), so the frozen lane change
+    # (4 vE after front_t0) starts ~3.3 s after TRIGGER. O and io-i-v1: the decision station.
+    dec_t = float(dec) + 4 * float(g['vE']) - 3.3 * float(plat['EGO']) if I else float(dec)
+    s_t = g['front_t0_s'] + sg * (dec_t - float(dec))
+    out.update(trigger_target_station=dec_t)
+
     def t0_and_rear(frames, rts):
         for f in frames:
             ego = next(x for x in f.actors if x.role == 'EGO')
-            if P.front_station(ego, rts['EGO']) >= float(dec):
+            if P.front_station(ego, rts['EGO']) >= dec_t:
                 npc_a = next(x for x in f.actors if x.role == 'NPC')
                 return float(f.simtime), rear_station(npc_a, rts['NPC']), P.front_station(ego, rts['EGO'])
         return None, None, None
@@ -350,10 +371,14 @@ def prepare_o(c, client, proc, start, world, m, identity, body, bbox):
     if t0 is None:
         out.update(status='BLOCKED_FIXTURE', reason='EGO_NOT_AT_DECISION_IN_PROBE1'); return P.finish(c, out)
     # decision road-s on the NPC lane, in the probe-1 NPC route frame (the route starts at k0, ahead of the decision)
-    dec_npc = station_at_s(rows['NPC'], arc['NPC'], g['front_t0_s'], R) - arc['NPC'][k0]
+    dec_npc = station_at_s(rows['NPC'], arc['NPC'], s_t, R) - arc['NPC'][k0]
     shift = float(dec_npc) + g['gap'] - rear                   # metres along the NPC lane (positive = further ahead)
     s_n = rows['NPC'][k0]['s'] + sg * shift
     k = next(i for i, r in enumerate(rows['NPC']) if r['road'] == R and (r['s'] - s_n) * sg >= 0)
+    ahead = (rows['NPC'][k]['s'] - g['front_t0_s']) * sg   # NPC start relative to the decision (domain entry), road-s
+    if retry and c.category == 'O' and g.get('through') and ahead > -5:  # io-v1.4 c: the NPC must start before the domain
+        return ('RETRY', runin + math.ceil((ahead + 5) * float(g['vE']) / float(g['vN'])),
+                f'io-v1.4 c: NPC start {ahead:.2f} m past the decision; run-in extended')
     out.update(t0_probe1=t0, npc_rear_at_t0_probe1=rear, npc_shift_m=shift, npc_start_s=rows['NPC'][k]['s'])
     routes2, prow2 = routes_for(k)
     poses2 = {'EGO': poses['EGO'], 'NPC': pose_on(world, prow2['NPC'][0], 0)}
