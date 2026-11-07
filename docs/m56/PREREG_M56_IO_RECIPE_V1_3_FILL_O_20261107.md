@@ -81,3 +81,16 @@ trước khi chạm CARLA.
 - Sáu candidate decode được, hai review ràng buộc đúng, k vẫn nằm trong rationale.
 - Mọi candidate khác giống hệt revision dựng ngay trước đó, sau khi chuẩn hóa đường dẫn output. Khác biệt duy nhất là digest
   `selection_review` của các phần bổ sung M/F, vốn đổi theo thư mục build ở mọi lần dựng.
+
+## Addendum B (07/11/2026): lỗi code ở ranh giới road, trước mọi kết quả chuẩn bị
+
+**Phát hiện:** lần chạy (b) (`outputs/m56_prep_fillO_v13b_20261107.*`) hỏng ở O04 và O05 với
+`CATALOG_ROUTE_NOT_ON_SITE_LANE (1149, −6)` / `(1091, −2)`, ngay sau khi nạp map, trước mọi probe.
+- Nguyên nhân: điểm đầu của route catalog nằm đúng s ≈ 0 của road, nên CARLA chiếu nó vào connector liền kề.
+- Đây là lỗi code của `geometry_fill`, không phải kết quả của cảnh.
+- O07 bị dừng tay trước khi khởi động server: lần gọi đó đã đọc file đã sửa nhưng chưa commit.
+
+**Sửa:**
+- Chiếu điểm catalog đầu tiên có arc ≥ 1 m, rồi trừ lại arc của nó (road thẳng, nên arc = khoảng cách road-s).
+- Luật hình học §3.a không đổi.
+- Chạy lại cả ba cảnh trên tooling đã commit.

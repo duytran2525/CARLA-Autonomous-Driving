@@ -68,13 +68,17 @@ def geometry_fill(c, m):
     A = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
     seg = next(s for s in A.profile['segments'] if s['end_offset_m'] != s['start_offset_m'])
     assert seg['length_m'] == 3 * p['vE'], (seg['length_m'], p['vE'])
-    first = A.route.transforms[0]
-    w = m.get_waypoint(carla.Location(first.x, first.y, first.z), project_to_road=True, lane_type=carla.LaneType.Driving)
+    # The catalog route starts AT the road boundary (s ~ 0), where CARLA may project onto the adjoining connector: project
+    # the first catalog point at least 1 m inside, and take its arc back off (straight lane: arc = road-s distance).
+    i = next(j for j, a in enumerate(A.route.arc) if a >= 1)
+    pt = A.route.transforms[i]
+    w = m.get_waypoint(carla.Location(pt.x, pt.y, pt.z), project_to_road=True, lane_type=carla.LaneType.Driving)
     assert (w.road_id, w.lane_id) == (road, e0), ('CATALOG_ROUTE_NOT_ON_SITE_LANE', w.road_id, w.lane_id)
-    dec_s = w.s + sign * float(seg['start_arc_m'])
+    first_s = w.s - sign * float(A.route.arc[i])
+    dec_s = first_s + sign * float(seg['start_arc_m'])
     xd = float(p['returnstart_m']) + float(seg['length_m']) + 3.75
     return {'road': road, 'ego_lane': e0, 'target_lane': e1, 'npc_lane': e0, 'sign': sign, 'through': True,
-            'catalog_first_point_s': w.s, 'front_t0_s': dec_s, 'X_s': dec_s + sign * xd, 'Dlc': seg['length_m'],
+            'catalog_first_point_s': first_s, 'front_t0_s': dec_s, 'X_s': dec_s + sign * xd, 'Dlc': seg['length_m'],
             'gap': float(p['G_m']), 'return_start': p['returnstart_m'], 'vE': p['vE'], 'vN': p['vN'], 'k': p.get('k')}
 
 
