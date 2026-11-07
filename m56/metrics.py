@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from fractions import Fraction
 from dataclasses import replace
 from math import sqrt, isfinite
+import weakref
 
 from .model import (FrameRecord, EventRecord, Number, SourceRef, CapabilityProof,
                     CompiledFixture, BlockedFixture, FrozenMetricPair, MetricValue, DirectedRoute,
@@ -272,25 +273,39 @@ def _io_action(frames,fixture,events):
     return PhysicalState.UNKNOWN,('IO_FULL_ACTION_REVIEW_PENDING',)
 
 
+def _frame_memo(cache, frame, key, compute, guards=()):
+    """compute() memoized by (frame identity, key); frames are deep-frozen records, so the value is pure in them.
+    Weak on the frame: the entry is dropped when its frame dies, so a cache never keeps an episode alive (1fc1ac6 held
+    strong refs, which retained every episode of a multi-scene process). guards: fixture-lived objects that must be the
+    very same (held strongly). Objects without weakref support (test doubles) are not cached. ponytail: bounded clear-all."""
+    k=(id(frame),key);hit=cache.get(k)
+    if hit is not None and hit[0]() is frame and len(hit[1])==len(guards) and all(a is b for a,b in zip(hit[1],guards)):
+        return hit[2]
+    out=compute()
+    try:
+        ref=weakref.ref(frame,lambda _,k=k,c=cache: c.pop(k,None))
+    except TypeError:
+        return out
+    if len(cache)>65536:
+        cache.clear()
+    cache[k]=(ref,tuple(guards),out)
+    return out
+
+
 _EGO_OFFSET_CACHE={}
 
 
 def _ego_map_offset(sample, reference):
-    """The EGO map offset of one frame (_map_offset of its own metric context), memoized by frame identity (strong ref).
+    """The EGO map offset of one frame (_map_offset of its own metric context), memoized by frame identity (weak).
     Perf 2026-11-06 (M56 O01/O02 native B episodes hit the 300 s outer deadline): under v8 the onset scan no longer stops
     at the first sub-uncertainty change, so a FOLLOW action re-evaluated every post-TRIGGER frame on every tick (O(n^2)).
-    Identical values (pure in the immutable frame). ponytail: bounded clear-all cache."""
-    key=(id(sample),reference);hit=_EGO_OFFSET_CACHE.get(key)
-    if hit is not None and hit[0] is sample:
-        return hit[1]
-    context=sample.integrity.get('metric_context')
-    actors=tuple(a for a in sample.actors if a.role=='EGO')
-    offset=(_map_offset(actors[0].pose,context.get('map_reference'),reference)
-            if isinstance(context,Mapping) and len(actors)==1 else None)
-    if len(_EGO_OFFSET_CACHE)>65536:
-        _EGO_OFFSET_CACHE.clear()
-    _EGO_OFFSET_CACHE[key]=(sample,offset)
-    return offset
+    Identical values (pure in the immutable frame)."""
+    def compute():
+        context=sample.integrity.get('metric_context')
+        actors=tuple(a for a in sample.actors if a.role=='EGO')
+        return (_map_offset(actors[0].pose,context.get('map_reference'),reference)
+                if isinstance(context,Mapping) and len(actors)==1 else None)
+    return _frame_memo(_EGO_OFFSET_CACHE,sample,reference,compute)
 
 
 def _lateral_departure(frames,fixture,selected):
@@ -1027,11 +1042,12 @@ _CONTIGUOUS_CACHE={}
 
 def _contiguous(frames: tuple[FrameRecord,...]) -> bool:
     # Perf 2026-11-06 (M56 O01/O02): resumes from a saved prefix of the very same frame objects that was contiguous
-    # (identical result: the check is pairwise). ponytail: bounded clear-all cache.
+    # (identical result: the check is pairwise). The prefix is kept as weak refs, so it never keeps an episode alive.
+    # ponytail: bounded clear-all cache.
     if not frames:
         return False
     hit=_CONTIGUOUS_CACHE.get(id(frames[0]));start=0
-    if hit is not None and len(hit)<=len(frames) and all(a is b for a,b in zip(hit,frames)):
+    if hit is not None and len(hit)<=len(frames) and all(r() is b for r,b in zip(hit,frames)):
         start=len(hit)-1
     tail=frames[start:]
     if any(f.dt!=Fraction(1,20) for f in tail):
@@ -1040,9 +1056,13 @@ def _contiguous(frames: tuple[FrameRecord,...]) -> bool:
            and (a.boot,a.world)==(b.boot,b.world)
            for a,b in zip(tail,tail[1:]))
     if ok:
+        try:
+            refs=tuple(weakref.ref(f) for f in frames)
+        except TypeError:  # test doubles: not cached
+            return ok
         if len(_CONTIGUOUS_CACHE)>256:
             _CONTIGUOUS_CACHE.clear()
-        _CONTIGUOUS_CACHE[id(frames[0])]=tuple(frames)
+        _CONTIGUOUS_CACHE[id(frames[0])]=refs
     return ok
 
 
@@ -1050,15 +1070,8 @@ _PREDICATE_CACHE={}
 
 
 def _predicate(frame: FrameRecord, name: str):
-    # Perf 2026-11-06: pure in the immutable frame; memoized by identity (strong ref). ponytail: bounded clear-all cache.
-    key=(id(frame),name);hit=_PREDICATE_CACHE.get(key)
-    if hit is not None and hit[0] is frame:
-        return hit[1]
-    out=_predicate_uncached(frame,name)
-    if len(_PREDICATE_CACHE)>65536:
-        _PREDICATE_CACHE.clear()
-    _PREDICATE_CACHE[key]=(frame,out)
-    return out
+    # Perf 2026-11-06: pure in the immutable frame; memoized by identity (weak).
+    return _frame_memo(_PREDICATE_CACHE,frame,name,lambda: _predicate_uncached(frame,name))
 
 
 def _predicate_uncached(frame, name):
@@ -1417,15 +1430,10 @@ _STATION_CACHE={}
 
 
 def _route_station_memo(frame, actor, route):
-    """_metric_station of the actor's pose on route, memoized by (frame, actor, route) identity (perf 2026-11-06)."""
-    key=(id(frame),id(actor),id(route));hit=_STATION_CACHE.get(key)
-    if hit is not None and hit[0] is frame and hit[1] is route:
-        return hit[2]
-    station=_metric_station((actor.pose.x,actor.pose.y,actor.pose.z),route)
-    if len(_STATION_CACHE)>65536:
-        _STATION_CACHE.clear()
-    _STATION_CACHE[key]=(frame,route,station)
-    return station
+    """_metric_station of the actor's pose on route, memoized by (frame, actor, route) identity (perf 2026-11-06); the
+    actor lives in the frame, so its id is unique while the (weakly held) frame lives."""
+    return _frame_memo(_STATION_CACHE,frame,(id(actor),id(route)),
+                       lambda: _metric_station((actor.pose.x,actor.pose.y,actor.pose.z),route),guards=(route,))
 
 
 def _reference_marker_events(frames,fixture):
@@ -2304,18 +2312,13 @@ _LANE_HOLD_CACHE={}
 def _lane_hold_inside(frame, ego, region, uncertainty):
     """Whole EGO body inside the box by uncertainty + 0.15 m horizontally (footprint buffer horizontal; vertical
     uncertainty separate). Pure; memoized by (frame, region) identity + uncertainty (perf 2026-11-06, M56 O01/O02)."""
-    key=(id(frame),id(region),uncertainty);hit=_LANE_HOLD_CACHE.get(key)
-    if hit is not None and hit[0] is frame and hit[1] is region:
-        return hit[2]
-    low=tuple(Fraction(min(p[k] for p in region)) for k in range(3))
-    high=tuple(Fraction(max(p[k] for p in region)) for k in range(3))
-    inside=all(low[k]+uncertainty+(Fraction(3,20) if k<2 else 0)<=Fraction(v[k])<=
-               high[k]-uncertainty-(Fraction(3,20) if k<2 else 0)
-               for v in world_vertices(ego.body,ego.pose) for k in range(3))
-    if len(_LANE_HOLD_CACHE)>65536:
-        _LANE_HOLD_CACHE.clear()
-    _LANE_HOLD_CACHE[key]=(frame,region,inside)
-    return inside
+    def compute():
+        low=tuple(Fraction(min(p[k] for p in region)) for k in range(3))
+        high=tuple(Fraction(max(p[k] for p in region)) for k in range(3))
+        return all(low[k]+uncertainty+(Fraction(3,20) if k<2 else 0)<=Fraction(v[k])<=
+                   high[k]-uncertainty-(Fraction(3,20) if k<2 else 0)
+                   for v in world_vertices(ego.body,ego.pose) for k in range(3))
+    return _frame_memo(_LANE_HOLD_CACHE,frame,(id(region),uncertainty),compute,guards=(region,))
 
 
 def _lane_confirmation_events(frames,fixture,events):
