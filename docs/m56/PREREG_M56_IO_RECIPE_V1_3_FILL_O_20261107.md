@@ -94,3 +94,13 @@ trước khi chạm CARLA.
 - Chiếu điểm catalog đầu tiên có arc ≥ 1 m, rồi trừ lại arc của nó (road thẳng, nên arc = khoảng cách road-s).
 - Luật hình học §3.a không đổi.
 - Chạy lại cả ba cảnh trên tooling đã commit.
+
+## Addendum C (07/11/2026): lề kẹp ở hai đầu road (lỗi code)
+
+**Phát hiện:** lần chạy (c) (`outputs/m56_prep_fillO_v13c_20261107.*`) hỏng ở O04 với `LANE_ENDS:37/-6@199.41`, khi đang dựng
+route, trước mọi probe.
+- Nguyên nhân: điểm cuối trong road bị kẹp ở L − 0,01 m. Bước 0,2 m tiếp theo của `lane_rows` ra khỏi road trước khi kịp chuyển
+  sang đoạn đi qua connector.
+- O05 và O07 bị dừng tay.
+
+**Sửa:** kẹp ở [0,5; L − 0,5] m. Luật §3.b không đổi.

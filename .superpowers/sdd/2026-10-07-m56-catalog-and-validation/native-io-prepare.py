@@ -99,7 +99,7 @@ def lane_rows_through(m, road, lane, s_from, s_to, strict=True):
     distance. A row more than MAX_YAW_DEV from the main-road heading: strict -> AssertionError (scene BLOCKED, EGO);
     not strict -> the route is cut before it (NPC tail, recorded). Returns (rows, cut_m)."""
     sign, L = (1 if lane < 0 else -1), road_length(m, road)
-    lo, hi = .01, L - .01
+    lo, hi = .5, L - .5  # > one 0.2 m lane_rows step from each end, so lane_rows never steps off the road
     clamp = lambda s: min(max(s, lo), hi)
     a0, a1 = clamp(s_from), clamp(s_to)
     w0 = m.get_waypoint_xodr(road, lane, a0)
