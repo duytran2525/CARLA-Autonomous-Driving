@@ -46,8 +46,31 @@ Chuẩn bị: lần (d), revision `outputs/m56_c0_partial_io_fillOv13d_20261107T
 - O05: spawn bên trong R39, với run-in ngắn hơn hoặc điểm spawn được kiểm va chạm.
 - O04: route NPC bắt đầu trước hộp domain, ví dụ NPC chờ ở điểm xa hơn rồi xuất phát theo timer.
 
-## 3. A/B O07 (đang chạy)
+## 3. A/B O07: một lần theo P5, kết quả nguyên trạng
 
-- Một A/B theo P5: `M56_IO_PREREG_APPROVED=7206078`, `M56_IO_KAPPA=pointwise`, product v9 `1db746f`.
-- Pair theo v9 và theo v8.
-- Theo v8, các cảnh có k ∉ {1, 2, 3} bị chặn ngay lúc admission.
+**Output:**
+- A/B: `outputs/m56_io_ab_Town06_20261107T142405Z`. Log: `outputs/m56_io_ab_M56-P-O07_io13-20261107.log`.
+- Bytes: product v9 `1db746f`, tooling `7206078`, prereg `7206078`, cận lateral theo điểm.
+
+| Consumer | A (PASS) | B (FOLLOW) | Pair |
+|---|---|---|---|
+| **v9** | FAILED / UNCERTAIN: `RETURN_STARTED_BEFORE_FIXED_MARKER`, `RETURN_MARKER_CLEARANCE_NOT_MET`, `RETURN_PATH_UNPROVEN`. Runner dừng ở frame 666 với `RESPONSE_BLOCKED` (`RETURN_GUARD_MISSING`) | COMPLETE, VALID | **FAILED** |
+| v8 | như v9 | như v9 | FAILED |
+
+**Diễn giải** (nhận định của Claude, từ trajectory đã seal):
+- EGO A không bao giờ vượt được NPC. Ở frame cuối, đuôi EGO còn sau đầu NPC 10,5 m.
+- Lúc đổi làn ở 3,7 m/s, stock `BasicAgent` lạng mạnh: thân xe xoay khoảng 35°, xe vọt quá tâm làn đích khoảng 4,4 m và gần như không
+  tiến dọc trong khoảng 5 s.
+- Chênh tốc độ EGO−NPC chỉ 1,33 m/s, nên không bù lại được.
+- Guard quay về từ chối đúng như thiết kế. Đây là kết quả của cảnh, không phải lỗi harness, nên **không chạy lại**.
+
+## 4. Tổng
+
+| Cảnh | Kết quả |
+|---|---|
+| O04 | BLOCKED_FIXTURE (`DOMAIN_CROSSING_UNBRACKETED`) |
+| O05 | BLOCKED_FIXTURE (`SPAWN_ERROR:EGO`) |
+| O07 | Pair FAILED (v9, v8) |
+
+Mục c (consumer v9) đã mở được admission cho các cảnh có k ∉ {1, 2, 3}: O07 là cảnh đầu tiên như vậy chạy A/B. Nhưng không cảnh fill
+O nào ra cặp hợp lệ.
