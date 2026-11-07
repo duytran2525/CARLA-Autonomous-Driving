@@ -135,7 +135,7 @@ def compile_scene(c, world, m, identity, proc, start, sd):
                 (prep_ref,), binding, 'exit = X; destination = X + 5 m; plan extends 15 m further'))
     topology = {'category': c.category, 'kind': 'lane-change-pass', 'action_regions': geo['regions'],
                 'driving_regions': driving, 'drivable_ref': dref, 'lane_geometry': geo['lane_geometry'],
-                'map_reference': geo['map_reference'], 'io_axis': geo['axis'], 'io_dlc': c.parameters['Dlc'].values[0]}
+                'map_reference': geo['map_reference'], 'io_axis': geo['axis'], 'io_dlc': frozen_dlc(c)}
     packet = {'region': geo['region'], 'topology': topology, 'proof': (prep_ref, cont, dref), 'G': None,
               'sections': geo['sections'], 'responses': responses, 'pair': geo['pair']}
     queries = QueryBundle(boot, wid, mp, froutes, {'EGO': body, 'NPC': body}, poses, grounds,
@@ -160,6 +160,15 @@ def io_policy(fixture, rows, source, fref, npc_gains, ego_gains):
         r = review(b, 'STOCK_FORWARD_BINDING', (source, fref))
         return PolicyBundle('m56-v2', 'f' * 64, {}, {'stock_binding': {**b, 'review': r}}, {}, (source, fref))
     return policy_for
+
+
+def frozen_dlc(c):
+    """Dlc of an O scene: the spec 7.4 catalog parameter when present (O01-O03, bytes unchanged); a fill-catalog scene has
+    none, so the length of its frozen EGO A lane-change segment (= 3 vE; io-v1.3 3.a)."""
+    if 'Dlc' in c.parameters:
+        return c.parameters['Dlc'].values[0]
+    a = next(r for r in c.responses if r.actor_role == 'EGO' and r.action_id == 'A')
+    return next(s['length_m'] for s in a.profile['segments'] if s['end_offset_m'] != s['start_offset_m'])
 
 
 def run_scene(c, client, proc, start, world, m, identity):

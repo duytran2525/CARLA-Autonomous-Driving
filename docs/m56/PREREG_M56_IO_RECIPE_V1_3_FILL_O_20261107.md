@@ -104,3 +104,23 @@ route, trước mọi probe.
 - O05 và O07 bị dừng tay.
 
 **Sửa:** kẹp ở [0,5; L − 0,5] m. Luật §3.b không đổi.
+
+## Addendum D (07/11/2026): `io_dlc` ở bước compile (lỗi code)
+
+**Kết quả chuẩn bị, lần (d)** (tooling `e5b09b0`, revision `outputs/m56_c0_partial_io_fillOv13d_20261107T141635Z`):
+
+| Cảnh | Kết quả |
+|---|---|
+| O04 | **PREPARED** |
+| O05 | **BLOCKED_FIXTURE** `PROBE1_NO_FRAMES` (`SPAWN_ERROR:EGO`, "collision at spawn position"; điểm spawn đầu run-in nằm trên connector 1091 trong junction 1082) |
+| O07 | **PREPARED** (NPC tail cut 9,39 m) |
+
+- Theo §4.4, O05 **giữ BLOCKED**: không dời điểm spawn, không đổi run-in trong phiên này.
+
+**Lỗi ở bước compile:** O04 và O07 hỏng với `KeyError('Dlc')`.
+- Nguyên nhân: `native-io-ab.py` đọc `c.parameters['Dlc']`, mà candidate fill không có tham số này.
+- Đây là lỗi code. Chưa có fixture nào được dựng.
+
+**Sửa:**
+- `frozen_dlc(c)` lấy tham số Dlc nếu có (O01–O03, bytes không đổi). Nếu không có, lấy độ dài đoạn đổi làn đã đóng băng (§3.a).
+- Chỉ chạy lại compile, admission và self-check trên revision trên. Không chuẩn bị lại.
