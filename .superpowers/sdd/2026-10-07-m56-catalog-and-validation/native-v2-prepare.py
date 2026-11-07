@@ -100,7 +100,17 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
                 and a.commands[0].cause == 'NPC_TRAFFIC_HOLD')
     log(event='PROBE', scene=scene, label=label, frames=len(ev.raw), npc_hold_frames=holds, predicate=predicate,
         reasons=list(ev.verdict.reasons) if ev.verdict else None)
+    LAST_REASONS[:] = list(ev.verdict.reasons) if ev.verdict else []
     return ev.raw
+
+
+LAST_REASONS = []
+# addendum cl-v1 (docs/m56/PREREG_M56_CL_V1_SPAWN_PROBE_20261108.md), two once-only preparation retries:
+# (a) SPAWN_ERROR of a role in probe 1 -> that role's z = highest ground_projection under its 4 footprint corners and centre
+#     + 1 cm (x, y, pitch 0, yaw unchanged); the ground proof then measures the lift (must stay <= 0.05 - 0.0011);
+# (b) probe 1 never brings the EGO front within G + 1 m of e_entry (T_end missing, product READY_LIMIT_S 15 s) -> every
+#     preparation probe of the scene runs with READY_LIMIT_S = LONG_PROBE_S. The A/B runner keeps its own 15 s.
+LONG_PROBE_S = 60
 
 
 def main():
@@ -228,7 +238,32 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
     # fixture environment (product change after suite 9), and preparation probes apply the same value here.
     wait_s = max(60., cycle['cycle_ticks'] / 20 + 2.) if sig else 60.
     runtime.PHASE_LIMIT_S = wait_s
+    runtime.READY_LIMIT_S = 15
     p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1', pred1)
+    cl_v1 = {}
+    lifted = [r_ for r_ in ('EGO', 'NPC') if f'SPAWN_ERROR:{r_}' in LAST_REASONS]
+    if not p1 and lifted:  # cl-v1 a
+        for r_ in lifted:
+            q_ = poses[r_]; h = math.radians(q_.yaw); ex, ey = float(bbox['extent'][0]), float(bbox['extent'][1])
+            pts = [(q_.x, q_.y)] + [(q_.x + sx * ex * math.cos(h) - sy * ey * math.sin(h),
+                                    q_.y + sx * ex * math.sin(h) + sy * ey * math.cos(h)) for sx in (-1, 1) for sy in (-1, 1)]
+            gz = [world.ground_projection(carla.Location(px, py, q_.z + 2.), 10.) for px, py in pts]
+            assert all(g_ is not None for g_ in gz), f'SPAWN_GROUND_UNPROJECTED:{r_}'
+            z = max(g_.location.z for g_ in gz) + .01
+            lift = z - .01 - grounds[r_]
+            cl_v1[r_] = {'lift_m': lift, 'corner_grounds': [g_.location.z for g_ in gz]}
+            if lift + .0011 > .05:
+                out_ = {'scene': c.id, 'status': 'BLOCKED_FIXTURE', 'reason': 'SPAWN_GROUND_LIFT', 'cl_v1': cl_v1}
+                return finish(c, out_)
+            poses[r_] = Transform6(q_.x, q_.y, _f32(z), 0., q_.yaw, 0.)
+        log(event='CL_V1_SPAWN_LIFT', scene=c.id, **cl_v1)
+        p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1-lift', pred1)
+    if p1 and not any(e_entry - front_station(next(x for x in f.actors if x.role == 'EGO'), routes['EGO']) <= float(G) + 1
+                      for f in p1):  # cl-v1 b
+        runtime.READY_LIMIT_S = LONG_PROBE_S
+        cl_v1['probe_ready_limit_s'] = LONG_PROBE_S
+        log(event='CL_V1_LONG_PROBE', scene=c.id, frames_short=len(p1))
+        p1 = probe(client, proc, start, world, identity, c.id, routes, rows, poses, responses, 'probe1-long', pred1)
     out = {'scene': c.id, 'town': c.town, 'category': c.category, 'G': G, 'vE': vE, 'vN': vN, 'LrefN': LrefN,
            'e_entry': e_entry, 'n_entry_probe1': n_entry, 'region': region, 'overlap_connected': connected,
            'grounds': grounds, 'bbox': bbox, 'rule': 'prereg v2 + erratum 3 (E6) + signal-phase v1 + v3 + v4 (P1, P2, P3) + v5 (P-NPC, C4)',
@@ -236,7 +271,7 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
            'npc_outgoing_wanted_m': 15. + 60. * float(vN),
            'signal': signal, 'cycle': None if cycle is None else {k: v for k, v in cycle.items() if k != 'sequence'},
            'phase_predicate_probe1': pred1, 'phase_wait_limit_s': wait_s, 'conflict_component': component,
-           'carla_no_rendering_mode': NO_RENDER, **({'m56_recipe': 'v6'} if V6 else {})}
+           'carla_no_rendering_mode': NO_RENDER, **({'m56_recipe': 'v6'} if V6 else {}), **({'cl_v1': cl_v1} if cl_v1 else {})}
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES')
         return finish(c, out)
