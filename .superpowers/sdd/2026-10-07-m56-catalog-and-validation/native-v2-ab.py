@@ -44,6 +44,7 @@ authority = write_ref(root / 'duy-delegation-receipt.json', {
     'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent)', 'stage': 'G4 fixture freeze + G5 local A/B',
     'carla_no_rendering_mode': NO_RENDER,
     **({'m56_recipe': 'v6', 'm56_code': __import__('os').environ.get('M56_CODE', str(WORK))} if V6 else {}),
+    **({'m56_drivable': 'dv1 (PREREG_M56_DRIVABLE_DV1_20261108, post-number)'} if __import__('os').environ.get('M56_DRIVABLE') == 'dv1' else {}),
     'approvals': ['[chat] 2026-10-24 Duy: v3 prereg ab1fb09 + signal-phase erratum 4 (7374ed7), run C01/C02 once',
                   '[chat] 2026-10-24 Duy: "cho chạy A/B C01, C02 thêm đúng một lần với hai bản sửa harness (cùng '
                   'fixture/recipe v3), sau khi full suite 9 qua; ghi nguyên kết quả" (harness fixes 962febb, 153678a)',
@@ -150,6 +151,9 @@ def run_scene(c, client, proc, start, world, m, identity):
     # 92-146 m from the conflict centre, outside the old fixed 90 m radius, so BODY_FIT failed (edge = -1) before any
     # episode for C03, L04, L05, L06 (and M05). Radius = max(90 m, farthest start + 20 m).
     radius = max(90., max(math.dist((poses[r].x, poses[r].y), center) for r in poses) + 20.)
+    from native_v2_common import DV1
+    if DV1:  # dv1 (post-number): the union covers every route point, not only the starts
+        radius = max(radius, max(math.dist((float(t.x), float(t.y)), center) for r in routes.values() for t in r.transforms) + 20.)
     drivable = drivable_union(m, center, radius, world, routes) if V6 else drivable_union(m, center, radius)
     dpath = sd / 'drivable-union.wkt'
     dpath.write_text(drivable.wkt, encoding='utf-8')

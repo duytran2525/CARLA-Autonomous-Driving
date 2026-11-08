@@ -108,6 +108,9 @@ NO_RENDER = os.environ.get('M56_NO_RENDER', '0') == '1'
 # v6 (docs/m56/PREREG_M56_V6_20261026.md): M56_RECIPE=v6 turns on items a-d of the bundled v6 recipe; the default
 # (unset) keeps every v5 byte. Recorded in every v6 receipt / preparation record.
 V6 = os.environ.get('M56_RECIPE', 'v5') == 'v6'
+# dv1 (docs/m56/PREREG_M56_DRIVABLE_DV1_20261108.md, POST-NUMBER): drivable union with Shoulder lanes, a 0.25 m paved raster
+# eroded 0.125 m, and coverage of the whole routes. Unset keeps every v6 byte.
+DV1 = os.environ.get('M56_DRIVABLE', '') == 'dv1'
 
 
 def load(client, town):
@@ -428,7 +431,7 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
     from shapely.prepared import prep
     quads = []
     for w in m.generate_waypoints(.5):
-        if w.lane_type != carla.LaneType.Driving:
+        if w.lane_type != carla.LaneType.Driving and not (DV1 and w.lane_type == carla.LaneType.Shoulder):
             continue
         loc = w.transform.location
         if math.dist((loc.x, loc.y), center) > radius:
@@ -448,7 +451,10 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
     assert world is not None and routes, 'V6_DRIVABLE_NEEDS_WORLD_AND_ROUTES'
     ref = [(float(t.x), float(t.y), float(t.z)) for r in routes.values() for t in r.transforms]
     corridor = unary_union([LineString([(x, y) for x, y, _ in [(float(t.x), float(t.y), 0) for t in r.transforms]]).buffer(12.)
-                            for r in routes.values()]).intersection(Point(center).buffer(radius))
+                            for r in routes.values()])
+    if not DV1:  # dv1: the raster covers the whole route corridor
+        corridor = corridor.intersection(Point(center).buffer(radius))
+    cell = .25 if DV1 else .5  # dv1: finer raster, eroded by half a cell
     zcell = {}
     for x, y, z in ref:  # local route z on a 2 m hash
         zcell.setdefault((round(x / 2), round(y / 2)), z)
@@ -462,9 +468,9 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
         return None
     pc = prep(corridor); cells = []
     x0, y0, x1, y1 = corridor.bounds
-    for i in range(int((x1 - x0) / .5) + 1):
-        for j in range(int((y1 - y0) / .5) + 1):
-            x, y = x0 + .5 * i, y0 + .5 * j
+    for i in range(int((x1 - x0) / cell) + 1):
+        for j in range(int((y1 - y0) / cell) + 1):
+            x, y = x0 + cell * i, y0 + cell * j
             if not pc.contains(Point(x, y)):
                 continue
             z = local_z(x, y)
@@ -472,8 +478,8 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
                 continue
             hits = world.cast_ray(carla.Location(x, y, z + 3.), carla.Location(x, y, z - 3.))
             if hits and str(hits[0].label) in ('Roads', 'RoadLines'):
-                cells.append(box(x - .25, y - .25, x + .25, y + .25))
-    paved = unary_union(cells).buffer(-.25) if cells else Polygon()
+                cells.append(box(x - cell / 2, y - cell / 2, x + cell / 2, y + cell / 2))
+    paved = unary_union(cells).buffer(-cell / 2) if cells else Polygon()
     return unary_union([union, paved]).buffer(0)
 
 
