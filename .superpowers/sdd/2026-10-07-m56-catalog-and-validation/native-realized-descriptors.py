@@ -5,7 +5,7 @@ frame (= the frozen t0 event of the category's metric window), then
          (product m56.geometry project_route / world_vertices on the frozen EGO route);
   I/O:   vE_r = EGO mean planar speed over [T - 1 s, T].
 Each value is exact (Fraction of the binary64 result) and bound to the sha256 of the observation file of frame T.
-gap_r (I/O): not implemented yet (reported missing; the comparison then stays BLOCKED, never guessed).
+I/O: gap_r / G_r = longitudinal body gap EGO front -> NPC rear along the EGO route at TRIGGER (> 0 only).
 usage: python -I native-realized-descriptors.py OUT.json SCENE_AB_DIR [SCENE_AB_DIR ...]"""
 import glob, hashlib, json, math, sys
 from fractions import Fraction as F
@@ -24,9 +24,36 @@ def speed(actor):
     return math.hypot(v[0], v[1])
 
 
-def scene(d):
+def triggers_from_pair(pair):
+    """Fallback for I/O A/B dirs (no ab-result.json): TRIGGER frame = first frame of the frozen metric window
+    (TRIGGER -> X_END) of A (metrics[0]) and B (metrics[2]) in the pair-result written by native-v6-pair.py."""
+    import re
+    out = {}
+    for act, i in (('A', 0), ('B', 2)):
+        m = re.search(r"window=\('TRIGGER'.*?frames=\((\d+)", pair['metrics'][i]) if pair and len(pair.get('metrics', ())) > i else None
+        if m:
+            out[act] = int(m.group(1))
+    return out
+
+
+def gap_at(obs, route):
+    """Longitudinal gap (m) along the EGO route between the NPC body (min station) and the EGO body (max station)."""
+    st = {}
+    for a in obs['actors']:
+        body = decode_record('BodyRecord', a['body']); pose = decode_record('Transform6', a['pose'])
+        s = [project_route(p, route) for p in world_vertices(body, pose)]
+        st[a['role']] = [F(x) for x in s if not hasattr(x, 'reasons')]
+    if not st.get('EGO') or not st.get('NPC'):
+        return None
+    return min(st['NPC']) - max(st['EGO'])
+
+
+def scene(d, pair=None):
     d = Path(d); fx = json.loads((d / 'fixture-frozen.json').read_text(encoding='utf-8'))
-    ab = json.loads((d / 'ab-result.json').read_text(encoding='utf-8'))
+    abp = d / 'ab-result.json'
+    ab = json.loads(abp.read_text(encoding='utf-8')) if abp.exists() else None
+    trig = ({act: dict((k, v) for k, v in ab['episodes'][act]['events']).get('TRIGGER') for act in ('A', 'B')} if ab
+            else triggers_from_pair(pair))
     cat = d.name.split('-')[2][0]
     files = {}
     for f in glob.glob(str(d / 'run' / 'native' / 'observation' / '*.json')):
@@ -38,8 +65,7 @@ def scene(d):
         if cat in 'CLM' else None
     out = {}
     for act in ('A', 'B'):
-        ev = dict((k, v) for k, v in ab['episodes'][act]['events'])
-        T = ev.get('TRIGGER')
+        T = trig.get(act)
         if T is None or T not in files:
             continue
         path, obs = files[T]
@@ -49,6 +75,10 @@ def scene(d):
         role = 'NPC' if cat in 'CLM' else 'EGO'
         sp = [speed(next(a for a in o['actors'] if a['role'] == role)) for o in win]
         out.setdefault('vN' if cat in 'CLM' else 'vE', {})[act] = (str(F(sum(sp) / len(sp))), ref, len(sp))
+        if cat in 'IO':  # gap_r (I) / G_r (O): longitudinal body gap to the NPC at TRIGGER
+            gp = gap_at(obs, route)
+            if gp is not None and gp > 0:
+                out.setdefault('gap' if cat == 'I' else 'G', {})[act] = (str(gp), ref, 1)
         if cat in 'CLM':
             ego = next(a for a in obs['actors'] if a['role'] == 'EGO')
             body = decode_record('BodyRecord', ego['body']); pose = decode_record('Transform6', ego['pose'])
