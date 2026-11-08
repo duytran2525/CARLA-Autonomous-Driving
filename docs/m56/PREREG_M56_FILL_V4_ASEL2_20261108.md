@@ -126,3 +126,25 @@ Commit tooling ghi ở output của bộ sinh; product `m56-v9` `1db746f`, rồi
 - seed, sha256 của prereg này, hash các XODR, kích thước pool;
 - với mỗi slot: ứng viên được gán và hàng thay thế, với đủ trường để dựng candidate (notation road/lane→connector/lane→road/lane
   cho C/L/M; road/section/lanes/travel cho I/O), tham số và lý do loại cho từng ứng viên bị bỏ qua (đếm).
+
+## Addendum A (08/11/2026): first-fit có nhìn trước
+
+**Thời điểm:** viết sau lần chạy đầu của bộ sinh, commit `90c1be5`. Output `outputs/m56_fill_v4_20261108.json` (sha256
+`3c750762…`) được giữ nguyên. Lần chạy đó lấp 28/30 slot; M05 và M07 rỗng. Chưa có cảnh nào được chuẩn bị hay chạy A/B, nên
+đây là đổi thuật toán chọn sau khi thấy output chọn. Nó không phải luật đặt sau khi thấy số đo.
+
+**Lý do (khách quan):**
+- First-fit tham lam ở §5.2 cho 6 slot M đầu lấy các giá trị G 14 / 18 / 22,5 / 28,5 / 36 / 48 m, mỗi bước cách nhau 1,25–1,33
+  lần. Không còn khe nào cho M05 (k = 5) và M07 (k = 6): lý do loại là `LADDER` (191 lần) và `TOWN_CAP`.
+- Census `asel2-census.py` đã chứng minh có cách gán cả 8 slot M. Vậy chỗ trống đến từ thứ tự tham lam, không phải từ nguồn site.
+
+**Luật mới cho §5.2:**
+- Mỗi slot vẫn duyệt ứng viên theo đúng thứ tự xáo.
+- Một ứng viên chỉ được nhận nếu, sau khi nhận nó, **các slot còn lại của cùng loại vẫn còn ít nhất một cách gán**. Cách gán đó
+  phải thỏa §3–§5: junction hoặc road chưa dùng, cap (loại, town), độ dài, và thang §4. Việc kiểm do một phép tìm vét cạn tất
+  định thực hiện.
+- Nếu không ứng viên nào giữ được tính khả thi cho các slot còn lại, slot lấy ứng viên first-fit cũ như §5.2. Các slot sau có
+  thể rỗng.
+- Hàng thay thế (§5.4) dùng cùng luật này với tập cảnh đang giữ lúc thay.
+
+Mọi điều khác của prereg giữ nguyên.
