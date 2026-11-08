@@ -131,3 +131,29 @@ của loại mình.
 
 **Đặt sau khi thấy:** đây là đổi input §8 đã duyệt, sau khi biết rằng input cũ không đạt được cổng so sánh. Nó không đặt sau số
 đo nào của F. Báo cáo F phải ghi điều này, và ghi input §8 gốc bên cạnh input mới.
+
+## 6. Bổ sung 3 (08/11/2026): pitch/roll ban đầu so với tư thế spawn
+
+**Phát hiện (Claude):**
+- `m56/evidence.py` `_initial_state_matches` đòi |pitch|, |roll| ≤ 0,1° **tuyệt đối** ở frame quan sát đầu tiên.
+- Một xe đứng yên trên dốc 1° tất yếu có pitch 1°. Vì thế cảnh chỉ hợp lệ khi xuất phát trên mặt gần như phẳng tuyệt đối (độ
+  dốc ≤ 0,0017).
+- Hệ quả: trên map lớn, cổng B4 (addendum D của fill v4) loại khoảng 99% site, loại M hết ứng viên (lần thay cảnh 2), và 46
+  cảnh trở nên bất khả thi.
+- Các cảnh đã hỏng hoặc sẽ hỏng vì luật này: M02 gốc (`INITIALIZATION_INVALID`), C04-S1 (pitch 0,70°), M05-S1 (−0,97°), C06-S1 và
+  M02-S1 (NPC khoảng 1°).
+
+**Quyết định:** [chat] Duy, ngày 08/11/2026, chọn "So với tư thế spawn (Recommended)".
+- **Luật mới** (consumer `m56-v11`): |pitch_quan_sát − pitch_spawn| ≤ 0,1° và |roll_quan_sát − roll_spawn| ≤ 0,1°. Tư thế spawn
+  là tư thế đã đóng băng trong fixture.
+- Tooling spawn mọi xe theo pitch/roll của waypoint CARLA tại điểm spawn (tổng quát hóa cl-v1 a), cờ `M56_SPAWN_TILT=1`.
+- **Luật cũ được giữ nguyên văn** (|pitch|, |roll| ≤ 0,1° tuyệt đối). Mọi kết quả phải báo theo cả hai luật.
+
+**Đặt sau khi thấy số.** Lập luận "sai khách quan": docstring của luật cũ nói rõ nó so "first observation vs the frozen spawn
+pose". So với 0 chỉ đúng khi tư thế spawn có pitch 0, tức chỉ đúng trên mặt phẳng.
+
+**Hệ quả:**
+- Cổng B4 (addendum D) được rút lại. Lần thay cảnh 2 (`m56_fill_v4_replace2_20261108.json`) được tính dưới B4 và chưa admit
+  cảnh nào, nên nó chỉ được giữ làm hồ sơ.
+- Các cảnh trên dốc được chuẩn bị lại dưới `M56_SPAWN_TILT` và chạy A/B dưới v11. Theo P5, đó là version mới, nên mỗi cảnh được
+  một A/B.
