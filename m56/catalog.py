@@ -247,7 +247,7 @@ def compare_parameters(a: Candidate, b: Candidate, policies: PolicyBundle,
     invalid=a.category!=b.category or a.id==b.id or not policies.receipt_refs
     keys={'unit','source_actions','aggregation','event','window','reference','physical_quantity','refs'}
     specs=policies.descriptor_specs
-    if set(specs)=={'by_category'}:  # A-SEL2: one descriptor set per category (C/L: vN, G, LrefN; M: vN, G; ...)
+    if 'by_category' in specs:  # A-SEL2: one descriptor set per category (C/L: vN, G, LrefN; M: vN, G; ...)
         specs=specs['by_category'].get(a.category,{}) if isinstance(specs['by_category'],Mapping) else {}
         invalid=invalid or not specs
     for name,descriptor in specs.items():
@@ -286,6 +286,56 @@ def compare_parameters(a: Candidate, b: Candidate, policies: PolicyBundle,
     # No epsilon/automatic near-zero cutoff: every prospective pass needs bound D09 review.
     return ComparisonRecord((a.id,b.id),tuple(refs),tuple(dict.fromkeys(actions)),
                             'declared_scalar',tuple(values),tuple(deltas),status,review,'DECLARED')
+
+
+REALIZED_AGGREGATION = 'mean_of_A_and_B'
+
+
+def compare_realized(a: Candidate, b: Candidate, realized: Mapping, policies: PolicyBundle,
+                     reviews: tuple[ReviewRecord,...]) -> ComparisonRecord:
+    """A-SEL2 realized inter-scene comparison (docs/m56/DESCRIPTOR_SPECS_M56_ASEL2_20261108.md, frozen 8bdf074).
+
+    realized = {scene_id: {descriptor: {'A': (value, SourceRef), 'B': (value, SourceRef)}}}: one exact value per action,
+    each bound to a sha-verified raw source. The aggregate is computed HERE (mean of A and B, never the more favourable
+    action); a missing/zero/negative action value or an unverified source makes the descriptor uncountable
+    (BLOCKED_COMPARABILITY). PASS also needs a REALIZED_COMPARABILITY_D09 review bound to both scenes' values."""
+    keys={'unit','source_actions','aggregation','event','window','reference','physical_quantity','refs'}
+    values=[];deltas=[];refs=[];quantities=[]
+    specs=policies.descriptor_specs.get('realized_by_category',{}) if isinstance(policies.descriptor_specs,Mapping) else {}
+    specs=specs.get(a.category,{}) if isinstance(specs,Mapping) else {}
+    invalid=a.category!=b.category or a.id==b.id or not policies.receipt_refs or not specs
+    side=lambda c: realized.get(c.id) if isinstance(realized,Mapping) else None
+    ra,rb=side(a),side(b)
+    invalid=invalid or not isinstance(ra,Mapping) or not isinstance(rb,Mapping)
+    for name,descriptor in (specs.items() if not invalid else ()):
+        if (not keys<=set(descriptor) or set(descriptor)-keys-{'aliases'} or not all(descriptor.get(k) for k in keys)
+                or descriptor['aggregation']!=REALIZED_AGGREGATION or tuple(descriptor['source_actions'])!=('A','B')
+                or descriptor['unit'] not in ('m','m/s','s','m/s^2')
+                or descriptor['physical_quantity'] in quantities):
+            invalid=True;continue
+        quantities.append(descriptor['physical_quantity'])
+        pair=[]
+        for r in (ra,rb):
+            entry=r.get(name)
+            try:
+                (va,sa),(vb,sb)=entry['A'],entry['B']
+            except (TypeError,KeyError,ValueError):
+                invalid=True;break
+            if (any(isinstance(v,bool) or not isinstance(v,(int,Fraction)) or v<=0 for v in (va,vb))
+                    or not all(isinstance(s,SourceRef) and _source_verified(s) for s in (sa,sb))):
+                invalid=True;break
+            refs.extend((sa,sb));pair.append((Fraction(va)+Fraction(vb))/2)
+        if len(pair)!=2:
+            continue
+        values.append(tuple(pair));deltas.append(delta(*pair))
+    need=2 if a.category in ('C','L') or len(specs)==2 else len(specs)
+    binding=_digest({'a':a.id,'b':b.id,'realized':{a.id:ra,b.id:rb},'policy':policies})
+    review=next((r for r in reviews if _review_binds(r,binding,('REALIZED_COMPARABILITY_D09',))),None)
+    status=('BLOCKED_COMPARABILITY' if invalid or len(values)<need else
+            'DIVERSITY_DEFICIT' if sum(d is not None and d>=Fraction(1,5) for d in deltas)<need else
+            'REVIEW_REQUIRED' if review is None else 'PASS')
+    return ComparisonRecord((a.id,b.id),tuple(dict.fromkeys(refs)),('A','B'),REALIZED_AGGREGATION,tuple(values),
+                            tuple(deltas),status,review,'REALIZED')
 
 
 def _exact_inputs(*values):
