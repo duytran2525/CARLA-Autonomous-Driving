@@ -31,7 +31,8 @@ EXCLUDE = {'M56-P-F02': 'RECIPE_BUILDER_MISSING: catalog-recipes f_recipe has no
            'M56-P-I06': 'RECIPE_BUILDER_MISSING: io_recipe supports one road; corridor 47 -> J764 -> 48',
            'M56-P-O06': 'RECIPE_BUILDER_MISSING: io_recipe supports one road; corridor 47 -> J764 -> 48'}
 REVIEWER = rev2.REVIEWER
-TOWNCODE = {'Town04': 'P04', 'Town05': 'P05', 'Town06': 'P06', 'Town07': 'P07'}
+TOWNCODE = {'Town04': 'P04', 'Town05': 'P05', 'Town06': 'P06', 'Town07': 'P07',  # A-SEL2 towns below
+            'Town01': 'P01', 'Town02': 'P02', 'Town10HD': 'P10', 'Town11': 'P11', 'Town12': 'P12', 'Town13': 'P13', 'Town15': 'P15'}
 RUNTIME_PREREGS = [WORK / 'docs/m56' / n for n in ('PREREG_M56_RUNTIME_RECIPE_V2_20261023.md', 'PREREG_M56_V5_CONSUMER_PID_20261024.md',
                                                     'PREREG_M56_V5_ERRATUM1_C3_20261024.md', 'PREREG_M56_V5_ERRATUM2_EGO_PID_20261024.md')]
 
@@ -172,6 +173,87 @@ C0_LANE_ERRATUM = {'M56-P-C07': {'EGO': '13/-3→453/-3→14/-3'},
                    'M56-P-C08': {'EGO': '55/+4→652/+4→54/+4', 'NPC': '50/-3→680/-3→51/-3'}}
 
 
+ASEL2_FILL = __import__('os').environ.get('M56_ASEL2_FILL')  # A-SEL2 fill v4 output (PREREG_M56_FILL_V4_ASEL2_20261108)
+ASEL2_PREREG = WORK / 'docs/m56/PREREG_M56_FILL_V4_ASEL2_20261108.md'
+
+
+def asel2_additions(done, out, decision_ref, xodr, weather):
+    """A-SEL2: C/L/M slots of the fill v4 output become candidates (junction_recipe, same path as the fill v2/v3 M
+    additions). A slot that had a C0 candidate gets the successor id M56-P-<slot>-S1 and its predecessor leaves the run
+    revision (recorded REPLACED_BY); an empty slot keeps M56-P-<slot>. I/O/F slots: not built here (report only)."""
+    fill = json.loads(Path(ASEL2_FILL).read_text(encoding='utf-8'))
+    fill_ref, prereg_ref = cr.st.ref(Path(ASEL2_FILL), 'M56_SELECTION_RECEIPT'), cr.st.ref(ASEL2_PREREG, 'PREREGISTRATION')
+    def attest(digest, scope, why):
+        return ReviewRecord(digest, scope, (fill_ref, prereg_ref), 'CLAUDE_MECHANICAL_ATTESTATION_UNDER_DUY_DELEGATION',
+                            '2026-11-08', 'APPROVED', (why,), decision_ref)
+    by_slot = {c.slot: c for c in done}
+    keep, adds, report = list(done), [], []
+    for e in fill['entries']:
+        if e['status'] != 'PROPOSED' or e['category'] not in ('C', 'L', 'M'):
+            report.append({'slot': e['slot'], 'status': 'ASEL2_NOT_BUILT', 'category': e['category'],
+                           'reason': 'I/O/F builder pending' if e['status'] == 'PROPOSED' else e['status']}); continue
+        s, cat, slot = e['site'], e['category'], e['slot']
+        old = by_slot.get(slot)
+        cid = f'M56-P-{slot}-S1' if old is not None else f'M56-P-{slot}'
+        site_id = f"{TOWNCODE[s['town']]}-J{s['junction']}"
+        conn = {'EGO': s['ego'], 'NPC': s['npc']}
+        actors = tuple(ActorRecipe(r, 'vehicle.audi.a2', F(0), None, {'pose': 'PENDING_RUNTIME_QUERY'},
+                                   {'connection': f"c{conn[r]['connecting']}", 'notation': 'road/lane→connector/lane→outgoing/lane',
+                                    'route': s['notation'][r]}, None) for r in ('EGO', 'NPC'))
+        d = {n: F(v) for n, v in e['descriptors'].items()}
+        vE = F(2) if cat == 'L' else F(4)
+        why = f"fill v4 A-SEL2 slot {slot} k={e['k']} (registered series); LrefN = NPC connector road/@length; G = derive_g"
+        params = {'G': ParameterProposal('G', (d['G'],), 'm', why + '; spec 6.2 G0, ceil 0.50 m', (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY'),
+                  'LrefN': ParameterProposal('LrefN', (d['LrefN'],), 'm', 'spec 6.2: NPC connector road/@length', (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY'),
+                  'vN': ParameterProposal('vN', (d['vN'],), 'm/s', why, (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY'),
+                  'vE': ParameterProposal('vE', (vE,), 'm/s', 'spec 6.1 Ego nominal (C/M 4, L 2)', (prereg_ref, fill_ref), 'PROPOSED_PREREG_NOT_READY')}
+        bare = Candidate(cid, slot, '1', ('FILL-V4-ASEL2-PREREG-ddce811',) + ((old.id,) if old else ()), cat, s['town'], site_id,
+                         actors, params, (), {'poses': 'PENDING_RUNTIME_QUERY', 'destination': 'PENDING_RUNTIME_QUERY',
+                                             'weather_light': 'PENDING_RUNTIME_QUERY', 'selector': e['selector'],
+                                             'asel2': {'predecessor': old.id if old else None, 'rule': e.get('rule')}},
+                         (fill_ref, prereg_ref))
+        fields = [getattr(bare, f) for f in ('id', 'slot', 'version', 'lineage', 'category', 'town', 'site_id', 'actors',
+                                             'parameters', 'responses')]
+        env = {**bare.environment, 'rationale_review': encode_record(attest(
+            _digest(params), 'PARAMETER_RATIONALE', 'registered k series + spec 6.2 G0 from the pinned connector length; no hand tuning'))}
+        with_rationale = Candidate(*fields, env, bare.refs)
+        env = {**env, 'selection_review': encode_record(attest(
+            _digest(with_rationale), 'M56_SELECTION', 'generated by the pre-registered fill v4 algorithm (03fb2ca + addendum A '
+            'ddce811); mechanical attestation, not an independent selector review'))}
+        c = Candidate(*fields, env, bare.refs)
+        try:
+            dest, responses, flags, _ = cr.junction_recipe(c, xodr[c.town])
+        except Exception as ex:  # recorded, never guessed
+            report.append({'id': cid, 'status': 'RECIPE_ERROR', 'error': repr(ex)[:500]}); continue
+        if any(f.startswith('OUTGOING_ROOM_BLOCKED') for f in flags):
+            report.append({'id': cid, 'status': 'EXCLUDED', 'reason': 'RECIPE_FLAG', 'flags': list(flags)}); continue
+        actors = tuple(replace(a, destination=dest.get(a.role), pose=None,
+                               pose_recipe={'pose': 'PENDING_RUNTIME_QUERY', 'at': 'route start (arc 0) + rest height + 1 cm'})
+                       for a in c.actors)
+        w = weather[c.town]
+        env = {**{k: v for k, v in c.environment.items() if k not in ('weather', 'light', 'weather_light')},
+               'weather': w['weather'], 'light': w['light'], 'recipe_flags': tuple(flags)}
+        c = replace(c, actors=actors, responses=responses, environment=env)
+        ev = out / f'{cid}-category-evidence.json'
+        ev.write_text(json.dumps({'candidate': cid, 'category': cat, 'junction': s['junction'], 'town': s['town'],
+                                  'ego_dheading_deg': s['ego'].get('dh', s['ego'].get('dheading_deg')),
+                                  'npc_dheading_deg': s['npc'].get('dh', s['npc'].get('dheading_deg')),
+                                  'rule': 'fill v4 3 (C: both straight, approaches 60-120 deg; L: EGO left, NPC opposite straight; '
+                                          'M: fill v2 R2 + F2-1 + F2-2)'}, indent=1), encoding='utf-8')
+        mref = cr.st.ref(ev, 'CATEGORY_EVIDENCE')
+        if cat == 'M':
+            mref = replace(mref, method='branch-to-mainflow-geometry-topology')
+        rv = ReviewRecord(_digest((c.id, c.category, c.actors)), 'CATEGORY:' + cat, (mref,), REVIEWER, '2026-11-08', 'APPROVED',
+                          (f'fill v4 category rule; connector headings recorded in {ev.name}',), decision_ref)
+        c = replace(c, environment={**c.environment, 'category_review': encode_record(rv)})
+        if old is not None:
+            keep = [x for x in keep if x.id != old.id]
+            report.append({'id': old.id, 'status': 'REPLACED_BY', 'successor': cid})
+        adds.append(c)
+        report.append({'id': cid, 'status': 'ADDED', 'site': site_id, 'flags': list(flags), 'fill': 'v4'})
+    return keep + adds, report
+
+
 def c0_erratum_lanes(done, xodr):
     out = []
     for c in done:
@@ -222,6 +304,9 @@ def main(outdir, identity_path, *prep_dirs):
     dref = cr.st.ref(decision, 'OPERATOR_RECEIPT')
     adds, add_report = additions(out, dref, xodr, weather, identity['pairs'])
     done = done + adds
+    if ASEL2_FILL:  # A-SEL2 fill v4 successors / new slots (C/L/M)
+        done, a2_report = asel2_additions(done, out, dref, xodr, weather)
+        add_report = list(add_report) + a2_report
     preps = rev2.prepared(prep_dirs)
     prereg_sha = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in RUNTIME_PREREGS}
     report = list(add_report)
@@ -309,7 +394,7 @@ def main(outdir, identity_path, *prep_dirs):
     sites, assignments = {}, {}
     for c in done:
         if c.site_id not in sites:
-            rec = SiteRecord(c.site_id, 'JUNCTION' if c.site_id.startswith('P0') else 'NONJUNCTION',
+            rec = SiteRecord(c.site_id, 'JUNCTION' if c.site_id.startswith('P') and '-J' in c.site_id else 'NONJUNCTION',
                              {'town': c.town, 'site': c.site_id}, {'method_hash': method.hash}, ev, None)
             rv = ReviewRecord(_site_digest(rec), 'SITE_IDENTITY', ev, REVIEWER, '2026-10-24', 'APPROVED',
                               ('distinct physical place under touching-cross-section-v1',), dref)
