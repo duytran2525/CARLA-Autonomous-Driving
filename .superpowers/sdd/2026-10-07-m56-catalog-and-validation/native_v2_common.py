@@ -117,6 +117,17 @@ DV1 = os.environ.get('M56_DRIVABLE', '') == 'dv1'
 # dormant and tiles are not streamed. M56_SPECTATOR=1 puts the spectator 50 m above the scene centre (top-down) and streams
 # 20 ticks BEFORE any spawn / ground query of a scene. Unset keeps every byte of the earlier behaviour.
 SPECTATOR = os.environ.get('M56_SPECTATOR', '') == '1'
+# A-SEL2 addendum 6 (Duy 2026-11-08): spawn every actor with the CARLA waypoint pitch/roll at its spawn point (consumer v11
+# compares the first observation with this frozen pose). Unset keeps pitch = roll = 0.
+SPAWN_TILT = os.environ.get('M56_SPAWN_TILT', '') == '1'
+
+
+def spawn_tilt(m, x, y, z):
+    """(pitch, roll) in degrees of the driving-lane waypoint at (x, y, z), normalised to [-180, 180)."""
+    import carla
+    w = m.get_waypoint(carla.Location(float(x), float(y), float(z)))
+    n = lambda a: (a + 180.) % 360. - 180.
+    return n(w.transform.rotation.pitch), n(w.transform.rotation.roll)
 
 
 def stream_to(world, x, y, z):

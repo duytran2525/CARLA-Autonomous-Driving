@@ -203,7 +203,9 @@ def pose_on(world, rows, i):
     g = world.ground_projection(carla.Location(t.x, t.y, t.z + 2.), 10.)
     z = (g.location.z if g is not None else t.z) + .01
     pose_on.grounds[id(rows)] = None if g is None else g.location.z
-    return Transform6(_f32(t.x), _f32(t.y), _f32(z), 0., _f32(t.yaw), 0.)
+    from native_v2_common import SPAWN_TILT, spawn_tilt
+    pr = spawn_tilt(world.get_map(), t.x, t.y, z) if SPAWN_TILT else (0., 0.)  # A-SEL2 addendum 6
+    return Transform6(_f32(t.x), _f32(t.y), _f32(z), _f32(pr[0]), _f32(t.yaw), _f32(pr[1]))
 
 
 pose_on.grounds = {}
