@@ -131,8 +131,11 @@ Theo spec, kết quả là `RELEASE_BLOCKED` kèm số đếm thật ở trên. 
 ## 6. Full suite trên bytes cuối
 
 `m56-full-suite-10b-20261108`: 1237 test, launch tách khỏi Claude Code qua `start-guarded.ps1`, với `--retain failed --floor-gb 7
---cap-gb 9`. Mức sàn dung lượng được hạ vì ổ D chỉ còn 17,5 GB trống; suite 9 có đỉnh namespace 6,4 GB. Bắt đầu 08/11/2026. Kết
-quả: **đang chạy**, sẽ bổ sung vào đây.
+--cap-gb 9`. Mức sàn dung lượng được hạ vì ổ D chỉ còn 17,5 GB trống; suite 9 có đỉnh namespace 6,4 GB.
+
+**Kết quả: PYTEST_PASSED, 1237 passed, 0 failed, `verdict_chain` = `CHAIN_PASSED`**, 7642,75 s (2:07:22); đỉnh namespace 6,42 GB.
+Record: `.superpowers/sdd/2026-10-07-m56-catalog-and-validation/m56-full-suite-10b-20261108.run.json`. Suite chạy trên `m56/`
+và `tests/m56` trùng byte với `feat/m56-v9` `1db746f`.
 
 ## 7. Muốn tới 46 thì cần gì (nhận định của Claude, không phải quyết định)
 
