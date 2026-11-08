@@ -473,3 +473,18 @@ def test_v11_prereg_parameters_need_a_bound_rationale_review(require, parameter_
     assert compare(rv(a), rv(b), c.policies, ()).values == base.values
     stale = replace(rv(a), parameters={k: replace(v, rationale='edited') for k, v in a.parameters.items()})
     assert compare(stale, rv(b), c.policies, ()).status == 'BLOCKED_COMPARABILITY'  # review bound to other parameters
+
+
+def test_v11_category_town_cap_m_is_four(require, catalog_case):
+    """A-SEL2 addendum 7 (Duy 2026-11-08): (M, town) cap 4; every other category keeps 3."""
+    from dataclasses import replace
+    check = require('m56.catalog', 'check_catalog')
+    c = catalog_case()
+    def place(cat, n, town='Town12'):
+        cs = list(c.revision.candidates); idx = [i for i, x in enumerate(cs) if x.category == cat][:n]
+        for i in idx:
+            cs[i] = replace(cs[i], town=town)
+        return replace(c.revision, candidates=tuple(cs))
+    assert 'CATEGORY_TOWN_CAP' not in check(place('M', 4), c.sites, ()).deficits
+    assert 'CATEGORY_TOWN_CAP' in check(place('M', 5), c.sites, ()).deficits
+    assert 'CATEGORY_TOWN_CAP' in check(place('C', 4), c.sites, ()).deficits
