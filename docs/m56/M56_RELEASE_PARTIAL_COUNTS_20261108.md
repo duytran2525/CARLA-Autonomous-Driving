@@ -27,6 +27,29 @@ với v9. Không push. Full suite trên bytes cuối: `m56-full-suite-10b-202611
 
 Theo luật đóng băng gốc chỉ có 3 cặp hợp lệ (C01, L01, C05).
 
+## 1b. Spawn, action outcome theo từng episode (21 A/B × 2 = 42 episode)
+
+Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dùng (`outputs/m56_v6_pair_*/<cảnh>/pair-result.json`).
+
+| Trường | Đếm | Ghi chú |
+|---|---|---|
+| spawn CONFIRMED | 38 / 42 | UNKNOWN: M02 A và B (`INITIALIZATION_INVALID`), I05 A và B |
+| physical COMPLETE | 21 / 42 | 18 episode của 9 cặp PASS, cộng O05 B, O07 B, I01 A |
+| witness VALID | 21 / 42 | cùng tập với COMPLETE |
+
+| Cảnh | A (spawn / physical / witness) | B |
+|---|---|---|
+| C01, C05, L01, L04, O01, O02, O03, I03, I04 | CONFIRMED / COMPLETE / VALID | CONFIRMED / COMPLETE / VALID |
+| C02, L02, M07 | CONFIRMED / UNKNOWN / INVALID | CONFIRMED / UNKNOWN / INVALID |
+| L07 | CONFIRMED / INCOMPLETE / UNCERTAIN | CONFIRMED / FAILED / UNCERTAIN |
+| M02 | UNKNOWN / UNKNOWN / INVALID | UNKNOWN / UNKNOWN / INVALID |
+| M06, I07 | CONFIRMED / FAILED / INVALID | CONFIRMED / FAILED / INVALID |
+| O05 | CONFIRMED / UNKNOWN / UNCERTAIN | CONFIRMED / COMPLETE / VALID |
+| O07 | CONFIRMED / FAILED / UNCERTAIN | CONFIRMED / COMPLETE / VALID |
+| I01 | CONFIRMED / COMPLETE / VALID | CONFIRMED / INCOMPLETE / UNCERTAIN |
+| I02 | CONFIRMED / FAILED / INVALID | CONFIRMED / INCOMPLETE / UNCERTAIN |
+| I05 | UNKNOWN / FAILED / INVALID | UNKNOWN / INCOMPLETE / INVALID |
+
 ## 2. Cặp hợp lệ và điều kiện kèm theo
 
 | Cặp | Hợp lệ theo |
@@ -46,7 +69,7 @@ Theo luật đóng băng gốc chỉ có 3 cặp hợp lệ (C01, L01, C05).
 | C03 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e, phương án i) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | C04 | BLOCKED_FIXTURE | `READINESS_NOT_STEADY` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | C06 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` | như trên |
-| C07, C08 | BLOCKED_FIXTURE | route v1 đóng băng lệch notation (`NO_OUTGOING`); sửa thì phải đổi trường C0 đã đóng băng | `M56_CL_V1_RESULT_20261108.md` §3 |
+| C07, C08 | BLOCKED_FIXTURE | route builder `NO_OUTGOING`. C07: ký hiệu làn catalog −2 so với map −3; C08: chưa xác lập được nguyên nhân (vết giống hệt C07, nhiều khả năng lỗi builder) | `M56_CL_V1_RESULT_20261108.md` §3 |
 | L02 | BLOCKED_WITNESS | GROUND, CONTACT | `M56_V7_RESULT_20261026.md` |
 | L03 | BLOCKED_FIXTURE | C4 `CONFLICT_COMPONENTS_TOO_CLOSE` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | L05 | BLOCKED_FIXTURE | `NPC_TURN_SPEED` (mục e) | `DECISION_M56_ITEMS_D_E_20261107.md` |
@@ -77,6 +100,21 @@ chúng ghi "để trống, không nới thêm".
 - Revision C0 partial cuối (`outputs/m56_c0_partial_io_clv1_20261107T233626Z`): 39 ứng viên, 32 site, 24 junction site.
 - Junction đủ điều kiện, tức có cảnh giao hàng được (Claude đếm, chưa chạy `audit_diversity`): 4, gồm site của C01, C05, L01, L04.
   Spec cần ≥ 23. Các cặp hợp lệ của O và I nằm trên road site, không phải junction.
+
+## 4b. Phép so giữa các cảnh (155 = 5 × C(8,2) + C(6,2))
+
+- **Declared:** spec §6.4 tự ghi thiếu hụt của quy tắc khác biệt (≥ 2 tham số lệch ≥ 20%): 15/28 cặp C, 9/28 cặp L và 1/6 cặp M
+  chưa đạt theo số khai báo. Claude **chưa chạy** `audit_diversity` trên revision cuối, nên không có số declared mới.
+- **Realized:** một phép so chỉ realized được khi cả hai cảnh cùng loại đều có A/B hợp lệ. Hiện có 6 cặp như vậy: C01–C05,
+  L01–L04, O01–O02, O01–O03, O02–O03, I03–I04, tức **6/155**. Chưa phép so nào được audit hay review, vì audit của product đòi đủ
+  46 cảnh.
+
+## 4c. Thay thế
+
+- 26 đề xuất của Astra (đã neo ngày 10/10/2026). 13 chỗ còn lại do thuật toán prereg của Claude lấp qua fill20, fill v2, fill v3
+  (`CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT`).
+- I06, O06 được đề xuất ở fill v3, rồi bị loại vì chỉ có một road.
+- Chưa có lần thay cảnh hỏng nào (quota tối đa 20%), vì việc thay cần người chọn có thẩm quyền.
 
 ## 5. Deficit của release (suy từ `_release_deficits`, `m56/catalog.py:454`)
 

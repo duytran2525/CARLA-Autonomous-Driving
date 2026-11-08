@@ -76,8 +76,9 @@ nhưng sai ý định của luật.
   không. M08 vẫn được chạy theo luật chung, và nhiều khả năng bị chặn.
 - **b:** chỉ kích hoạt khi verdict của probe 1 có `READINESS_NOT_REACHED` và T_end thiếu.
 
-**M01 giữ nguyên BLOCKED.** Kiểm hold ở probe 2 không được nới. Lần hold ở giây 22,3 nằm trong giai đoạn NPC còn đang tiếp cận
-xung đột (EGO tới T_end ở khoảng giây 20), nên đây là lỗi canh pha thật của cảnh trên đoạn tiếp cận dài. M01 không được chuẩn bị
+**M01 giữ nguyên BLOCKED.** Kiểm hold ở probe 2 không được nới. Ước tính của Claude (chưa đo: T_end của probe 2 và station của NPC ở
+tick 446 so với n_entry chưa được tính) là lần hold ở giây 22,3 nằm trong giai đoạn NPC còn đang tiếp cận xung đột, khi EGO tới
+T_end ở khoảng giây 20. Dù ước tính này đúng hay sai, giữ kiểm hold như cũ vẫn là lựa chọn chặt hơn. M01 không được chuẩn bị
 lại.
 
 **Chạy:** chuẩn bị lại M02 (Town04) và M08 (Town07) một lần theo addendum A, rồi chạy A/B cho cảnh nào PREPARED, như §3.
