@@ -241,6 +241,21 @@ def delta(a: Number, b: Number) -> Number | None:
     return abs(Fraction(a)-Fraction(b))/max(abs(a),abs(b))
 
 
+def _parameter_approved(candidate, proposal) -> bool:
+    """APPROVED / APPROVED_PROPOSAL_NOT_READY as before; m56-v11 (A-SEL2 1.3, Claude-signed reviews under Duy's delegation):
+    a PROPOSED_PREREG_NOT_READY parameter of a pre-registered fill counts only when the candidate carries a
+    PARAMETER_RATIONALE review bound to the digest of its parameters."""
+    if proposal.status in ('APPROVED_PROPOSAL_NOT_READY','APPROVED'):
+        return True
+    if proposal.status!='PROPOSED_PREREG_NOT_READY':
+        return False
+    raw=candidate.environment.get('rationale_review') if isinstance(candidate.environment,Mapping) else None
+    if raw is None:
+        return False
+    review=decode_record('ReviewRecord',encode_record(raw))
+    return isinstance(review,ReviewRecord) and _review_binds(review,_digest(candidate.parameters),('PARAMETER_RATIONALE',))
+
+
 def compare_parameters(a: Candidate, b: Candidate, policies: PolicyBundle,
                        reviews: tuple[ReviewRecord,...]) -> ComparisonRecord:
     values=[]; deltas=[]; refs=[]; actions=[]; quantities=[]
@@ -262,8 +277,7 @@ def compare_parameters(a: Candidate, b: Candidate, policies: PolicyBundle,
         if (left is None or right is None or len(left.values)!=1 or len(right.values)!=1
                 or left.units!=right.units or left.units!=descriptor['unit']
                 or not left.source or not right.source or not left.rationale or not right.rationale
-                or left.status not in ('APPROVED_PROPOSAL_NOT_READY','APPROVED')
-                or right.status not in ('APPROVED_PROPOSAL_NOT_READY','APPROVED')):
+                or not _parameter_approved(a,left) or not _parameter_approved(b,right)):
             invalid=True
             continue
         quantity=descriptor['physical_quantity']
