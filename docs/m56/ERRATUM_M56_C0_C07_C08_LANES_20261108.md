@@ -52,3 +52,21 @@ Route v1 của EGO (response A/B) và destination được dựng lại từ not
 
 **Giới hạn phải ghi kèm kết quả:** C07 và C08 sau erratum là cảnh đã được Claude sửa (not independent). Selector gốc chọn
 notation trên làn Shoulder; erratum chỉ dời sang làn xe kề bên, theo một luật máy móc.
+
+## 4. Kết quả (08/11/2026)
+
+Revision erratum `outputs/m56_c0_partial_io_c0e_20261108T012523Z`; chuẩn bị `outputs/m56_v2_prepare_Town06_20261108T012553Z`;
+revision cuối `outputs/m56_c0_partial_io_clv1_20261108T013122Z`; log `outputs/m56_cl_v1_20261108T012552Z`. Product `1db746f`,
+tooling `074fae3`.
+
+| Cảnh | Chuẩn bị | A/B (một lần, P5) | Pair v9 | Pair v6 |
+|---|---|---|---|---|
+| C07 | BLOCKED_FIXTURE `NPC_SIGNAL_HOLD_IN_PROBE2` (route dựng được; NPC dừng đèn trong probe 2, luật v4) | — | — | — |
+| C08 | PREPARED, T_r 7,3 s | `outputs/m56_v2_ab_Town06_20261108T013131Z`, FROZEN, ADMITTED | BLOCKED_WITNESS | BLOCKED_WITNESS |
+
+C08, cả A và B: spawn CONFIRMED, physical UNKNOWN, witness INVALID; lý do `CONTACT_PROOF_INVALID`, `CONTINUOUS_FIT_UNPROVEN`.
+Đây là cùng nhóm lỗi với C02 và M07. Vùng drivable đóng băng không gồm Shoulder và mặt giao lộ (mục b của
+`M56_V5_NIGHT_RESULT_20261026.md`, chưa được duyệt). Pair: `outputs/m56_v6_pair_20261108T014116Z` (v9) và `..._014720Z` (v6).
+
+Erratum làm hai cảnh chạy được tới bước chuẩn bị, nhưng không thêm cặp hợp lệ nào. Tổng vẫn 9 cặp. Theo prereg, không chỉnh thêm
+và không chạy lại.

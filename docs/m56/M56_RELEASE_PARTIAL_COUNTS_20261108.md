@@ -17,30 +17,30 @@ với v9. Không push. Full suite trên bytes cuối: `m56-full-suite-10b-202611
 
 | Loại | Mục tiêu | Đề xuất (C0 partial) | Có A/B dưới version hiện hành | Cặp hợp lệ |
 |---|---|---|---|---|
-| C | 8 | 8 | 3 (C01, C02, C05) | 2: C01, C05 |
+| C | 8 | 8 | 4 (C01, C02, C05, C08) | 2: C01, C05 |
 | L | 8 | 8 | 4 (L01, L02, L04, L07) | 2: L01, L04 |
 | M | 8 | 8 | 3 (M02, M06, M07) | 0 |
 | I | 8 | 6 (I01–I05, I07) | 6 | 2: I03, I04 |
 | O | 8 | 6 (O01–O05, O07) | 5 (O01, O02, O03, O05, O07) | 3: O01, O02, O03 |
 | F | 6 | 3 (F01, F03, F04) | 0 | 0 |
-| **Tổng** | **46** | **39** | **21** | **9** |
+| **Tổng** | **46** | **39** | **22** | **9** |
 
 Theo luật đóng băng gốc chỉ có 3 cặp hợp lệ (C01, L01, C05).
 
-## 1b. Spawn, action outcome theo từng episode (21 A/B × 2 = 42 episode)
+## 1b. Spawn, action outcome theo từng episode (22 A/B × 2 = 44 episode)
 
 Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dùng (`outputs/m56_v6_pair_*/<cảnh>/pair-result.json`).
 
 | Trường | Đếm | Ghi chú |
 |---|---|---|
-| spawn CONFIRMED | 38 / 42 | UNKNOWN: M02 A và B (`INITIALIZATION_INVALID`), I05 A và B |
-| physical COMPLETE | 21 / 42 | 18 episode của 9 cặp PASS, cộng O05 B, O07 B, I01 A |
-| witness VALID | 21 / 42 | cùng tập với COMPLETE |
+| spawn CONFIRMED | 40 / 44 | UNKNOWN: M02 A và B (`INITIALIZATION_INVALID`), I05 A và B |
+| physical COMPLETE | 21 / 44 | 18 episode của 9 cặp PASS, cộng O05 B, O07 B, I01 A |
+| witness VALID | 21 / 44 | cùng tập với COMPLETE |
 
 | Cảnh | A (spawn / physical / witness) | B |
 |---|---|---|
 | C01, C05, L01, L04, O01, O02, O03, I03, I04 | CONFIRMED / COMPLETE / VALID | CONFIRMED / COMPLETE / VALID |
-| C02, L02, M07 | CONFIRMED / UNKNOWN / INVALID | CONFIRMED / UNKNOWN / INVALID |
+| C02, C08, L02, M07 | CONFIRMED / UNKNOWN / INVALID | CONFIRMED / UNKNOWN / INVALID |
 | L07 | CONFIRMED / INCOMPLETE / UNCERTAIN | CONFIRMED / FAILED / UNCERTAIN |
 | M02 | UNKNOWN / UNKNOWN / INVALID | UNKNOWN / UNKNOWN / INVALID |
 | M06, I07 | CONFIRMED / FAILED / INVALID | CONFIRMED / FAILED / INVALID |
@@ -69,7 +69,8 @@ Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dù
 | C03 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e, phương án i) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | C04 | BLOCKED_FIXTURE | `READINESS_NOT_STEADY` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | C06 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` | như trên |
-| C07, C08 | BLOCKED_FIXTURE | route EGO đóng băng ở C0 bị lỗi: C07 chạy trên làn Shoulder 0,5 m (`13/-2`); C08 xuất phát trong junction, không có làn Driving hướng nam trong 3 m | `M56_CL_V1_RESULT_20261108.md` §3 |
+| C07 | BLOCKED_FIXTURE | sau erratum làn C0 (notation trên Shoulder → Driving): `NPC_SIGNAL_HOLD_IN_PROBE2` | `ERRATUM_M56_C0_C07_C08_LANES_20261108.md` §4 |
+| C08 | BLOCKED_WITNESS | sau erratum làn C0: một A/B; CONTACT, FIT (cùng nhóm với C02, M07) | như trên |
 | L02 | BLOCKED_WITNESS | GROUND, CONTACT | `M56_V7_RESULT_20261026.md` |
 | L03 | BLOCKED_FIXTURE | C4 `CONFLICT_COMPONENTS_TOO_CLOSE` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | L05 | BLOCKED_FIXTURE | `NPC_TURN_SPEED` (mục e) | `DECISION_M56_ITEMS_D_E_20261107.md` |
@@ -97,7 +98,7 @@ chúng ghi "để trống, không nới thêm".
 
 ## 4. Site và junction
 
-- Revision C0 partial cuối (`outputs/m56_c0_partial_io_clv1_20261107T233626Z`): 39 ứng viên, 32 site, 24 junction site.
+- Revision C0 partial cuối (`outputs/m56_c0_partial_io_clv1_20261108T013122Z`, có erratum làn C07/C08): 39 ứng viên, 32 site, 24 junction site.
 - Junction đủ điều kiện, tức có cảnh giao hàng được (Claude đếm, chưa chạy `audit_diversity`): 4, gồm site của C01, C05, L01, L04.
   Spec cần ≥ 23. Các cặp hợp lệ của O và I nằm trên road site, không phải junction.
 
@@ -136,8 +137,8 @@ quả: **đang chạy**, sẽ bổ sung vào đây.
 ## 7. Muốn tới 46 thì cần gì (nhận định của Claude, không phải quyết định)
 
 Mỗi hướng dưới đây là một version mới hoặc một lần đổi trường C0 đã đóng băng, nên phải ghi công khai là luật đặt sau khi thấy số:
-- C/L/M: vùng drivable gồm cả Shoulder và mặt giao lộ (CONTACT/FIT); ước lượng ground nhiều tia; đặt lại điểm xuất phát C0 khỏi
-  dốc và khỏi junction (M02, M08); sửa route C0 của C07/C08.
+- C/L/M: vùng drivable gồm cả Shoulder và mặt giao lộ (CONTACT/FIT ở C02, C08, M07); ước lượng ground nhiều tia; đặt lại điểm
+  xuất phát C0 khỏi dốc và khỏi junction (M02, M08).
 - I: lề TRIGGER theo thời gian NPC làm trống làn nguồn ở từng vN; ranh giới theo tâm làn thật (I01, I02, I05, I07).
 - F: recipe NPC của spec §8, và năng lực đo cửa xe cho F04.
 - 7 chỗ chưa được đề xuất cần selector có thẩm quyền chọn (ngoài phạm vi ủy quyền của Claude).
