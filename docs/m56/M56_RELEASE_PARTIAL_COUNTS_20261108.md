@@ -29,6 +29,9 @@ Theo luật đóng băng gốc chỉ có 3 cặp hợp lệ (C01, L01, C05). C08
 
 ## 1b. Spawn, action outcome theo từng episode (22 A/B × 2 = 44 episode)
 
+Mỗi cảnh tính theo A/B của version được báo cáo. C02, M07, C08 còn có thêm một A/B dưới dv1, nên tổng số A/B tính theo version được
+báo cáo là 25; bảng dưới dùng A/B dv1 cho ba cảnh này.
+
 Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dùng (`outputs/m56_v6_pair_*/<cảnh>/pair-result.json`).
 
 | Trường | Đếm | Ghi chú |
@@ -98,17 +101,29 @@ chúng ghi "để trống, không nới thêm".
 
 ## 4. Site và junction
 
-- Revision C0 partial cuối (`outputs/m56_c0_partial_io_clv1_20261108T013122Z`, có erratum làn C07/C08): 39 ứng viên, 32 site, 24 junction site.
-- Junction đủ điều kiện, tức có cảnh giao hàng được (Claude đếm, chưa chạy `audit_diversity`): 5, gồm site của C01, C05, C08, L01, L04.
+- Revision có erratum làn C07/C08 (ví dụ `outputs/m56_c0_partial_io_audit_20261108T032727Z`): 39 ứng viên, 32 site, 24 junction
+  site. **Không có revision đơn lẻ nào chứa trạng thái cuối của mọi cảnh.** Mỗi lượt chạy freeze một revision từ nền
+  `run-io-revision.sh` cộng các lần chuẩn bị của lượt đó. Trạng thái từng cảnh trong báo cáo này được ghép từ tài liệu kết quả của
+  từng lượt, như ghi ở cột Nguồn.
+- **Audit offline của product** (`check_catalog` + `audit_diversity`, chạy trong `native-v5-revision.py` khi đặt `M56_AUDIT=1`;
+  `outputs/m56_c0_partial_io_audit_20261108T032727Z/audit-report.json`): `qualified_junctions` = **0**, `nonjunction_areas` = 0,
+  `distinct_towns` = 4 (Town04 13, Town05 11, Town06 11, Town07 4). Số 0 là vì review site của C0 partial không đạt mức `qualified`
+  mà `_site_review_valid(..., qualified=True)` đòi.
+- Theo cách Claude đếm (không phải quy tắc của product): 5 junction site có cặp giao hàng được, gồm site của C01, C05, C08, L01, L04.
   Spec cần ≥ 23. Các cặp hợp lệ của O và I nằm trên road site, không phải junction.
 
 ## 4b. Phép so giữa các cảnh (155 = 5 × C(8,2) + C(6,2))
 
-- **Declared:** spec §6.4 tự ghi thiếu hụt của quy tắc khác biệt (≥ 2 tham số lệch ≥ 20%): 15/28 cặp C, 9/28 cặp L và 1/6 cặp M
-  chưa đạt theo số khai báo. Claude **chưa chạy** `audit_diversity` trên revision cuối, nên không có số declared mới.
+- **Declared, theo product:** `audit_diversity` sinh **117** phép so (mọi cặp cùng loại trong 39 ứng viên: C 28, L 28, M 28, I 15,
+  O 15, F 3). Cả 117 đều `BLOCKED_COMPARABILITY`, vì PolicyBundle không có `descriptor_specs`: chưa từng có bộ mô tả phép so nào
+  được soạn hay duyệt (tham số, đơn vị, event, cửa sổ, nguồn). Cũng chưa có review `DECLARED_COMPARABILITY_D09` nào. Soạn bộ
+  mô tả là việc của spec/selector, nằm ngoài phạm vi phiên này.
+- **Declared, theo spec §6.4:** spec tự ghi thiếu hụt của quy tắc khác biệt (≥ 2 tham số lệch ≥ 20%): 15/28 cặp C, 9/28 cặp L và
+  1/6 cặp M chưa đạt theo số khai báo.
 - **Realized:** một phép so chỉ realized được khi cả hai cảnh cùng loại đều có A/B hợp lệ. Hiện có 8 cặp như vậy: C01–C05,
   C01–C08, C05–C08, L01–L04, O01–O02, O01–O03, O02–O03, I03–I04, tức **8/155**. Chưa phép so nào được audit hay review, vì audit của product đòi đủ
   46 cảnh.
+- Hai phép so C01–C08 và C05–C08 so một cảnh dưới union dv1 với hai cảnh dưới union v6, tức là so trộn hai luật vùng drivable.
 
 ## 4c. Thay thế
 
@@ -116,13 +131,21 @@ chúng ghi "để trống, không nới thêm".
   (`CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT`).
 - I06, O06 được đề xuất ở fill v3, rồi bị loại vì chỉ có một road.
 - Chưa có lần thay cảnh hỏng nào (quota tối đa 20%), vì việc thay cần người chọn có thẩm quyền.
+- C07, C08 đã được Claude sửa notation làn bằng erratum C0 (not independent;
+  `ERRATUM_M56_C0_C07_C08_LANES_20261108.md`). Đây là sửa một trường đã chọn, không phải thay cảnh.
 
-## 5. Deficit của release (suy từ `_release_deficits`, `m56/catalog.py:454`)
+## 5. Deficit của release
+
+**Theo product** (`summarize`, gọi với evidence rỗng): `RELEASE_BLOCKED`, deficit `CANDIDATE_COUNT`, `JUNCTION_SHORTFALL`,
+`RELEASE_EVIDENCE_REQUIRED`, `COMPARISON_COVERAGE`, `AB_PROOF`. Evidence A/B native chưa từng được gói thành `CatalogEvidence` có review
+cho release, nên `AB_PROOF` ở đây là do không truyền evidence vào. Nếu truyền đủ evidence thì vẫn có 29 trong 39 ứng viên thiếu A/B PASS.
+
+Giải thích từng deficit (Claude):
 
 | Deficit | Vì sao |
 |---|---|
 | `CANDIDATE_COUNT` | 39 ứng viên, không phải 46 |
-| `JUNCTION_SHORTFALL` | 5 junction đủ điều kiện, cần ≥ 23 |
+| `JUNCTION_SHORTFALL` | product: 0 junction qualified; Claude đếm: 5 junction có cặp hợp lệ; cần ≥ 23 |
 | `COMPARISON_COVERAGE` | 155 phép so giữa các cảnh cần mọi cảnh có A/B hợp lệ. Hiện chỉ 9/46 cảnh có, nên chưa có phép so REALIZED nào được audit |
 | `AB_PROOF` | 29 trong 39 ứng viên không có A/B PASS |
 

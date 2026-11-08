@@ -330,6 +330,24 @@ def main(outdir, identity_path, *prep_dirs):
     if unproven:
         print('M_UNPROVEN', unproven)
     frozen = freeze_c0(revision, ledger, review, partial=addendum)
+    if __import__('os').environ.get('M56_AUDIT') == '1':
+        # 2026-11-08 product offline audit (audit_diversity + check_catalog), never a release. No inter-scene descriptor
+        # specs were ever authored or approved, so the PolicyBundle carries none (every comparison is reported as the
+        # product computes it, BLOCKED_COMPARABILITY expected), and no DECLARED_COMPARABILITY_D09 review exists.
+        from collections import Counter
+        from m56.catalog import audit_diversity, check_catalog, summarize
+        from m56.model import PolicyBundle
+        pol = PolicyBundle('m56-audit-no-descriptor-specs', 'f' * 64, {}, {}, {}, (addendum,))
+        comps = audit_diversity(revision, pol, ())
+        aud = check_catalog(revision, ledger, comps)
+        summ = summarize(frozen if not hasattr(frozen, 'reasons') else revision, aud, ())
+        (out / 'audit-report.json').write_text(json.dumps({
+            'note': 'offline product audit; never a release', 'status': aud.status, 'counts': dict(aud.counts),
+            'towns': dict(aud.towns), 'deficits': list(aud.deficits), 'comparisons': len(comps),
+            'comparison_status': dict(Counter(c.status for c in comps)),
+            'comparisons_by_category': dict(Counter(next(x.category for x in done if x.id == c.pair_ids[0]) for c in comps)),
+            'release_summary': summ}, indent=1, default=str, ensure_ascii=False), encoding='utf-8')
+        print('AUDIT', aud.status, dict(aud.counts), list(aud.deficits), dict(Counter(c.status for c in comps)), summ['deficits'])
     summary = {'candidates': len(done), 'sites': len(sites), 'junction_sites': sum(x.kind == 'JUNCTION' for x in sites.values())}
     (out / 'v5-report.json').write_text(json.dumps({'summary': summary, 'rows': report}, indent=1, default=str, ensure_ascii=False),
                                         encoding='utf-8')

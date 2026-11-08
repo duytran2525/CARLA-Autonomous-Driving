@@ -74,3 +74,7 @@ Pair: `outputs/m56_v6_pair_20261108T030910Z` (v9) và `outputs/m56_v6_pair_20261
 - consumer v6+.
 
 Theo luật cũ (union v6), C08 là BLOCKED_WITNESS. C02 và M07 đã dùng hết quota của dv1; không chỉnh thêm, không chạy lại.
+
+**Giới hạn ghi chép:** chuỗi method mà proof ghi lại (`carla-generate-waypoints-0.5m-lane-quads-union` trong `drivable-source`, và
+`carla-generate-waypoints-0.5m` trong SourceRef của union) không mô tả dv1. Thật ra chúng cũng chưa từng mô tả raster mặt đường
+của v6 b. Recipe thật chỉ được ghi trong receipt của A/B (`m56_drivable`) và trong tài liệu này.
