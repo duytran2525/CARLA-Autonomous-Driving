@@ -93,3 +93,22 @@ spec cũ không thể đạt 46/23 (trần thay cảnh 9, Town04–07, nguồn �
    có mục tiêu; full suite để cuối.
 5. Mỗi town lần lượt: chuẩn bị, revision, mỗi cảnh một A/B, rồi pair. Commit tài liệu trước mỗi lượt chạy.
 6. Release: gọi `export_catalog` chỉ khi `_release_deficits` rỗng. Hết trần mà chưa đủ thì báo số thật theo §11.
+
+## 4. Bổ sung 1 (08/11/2026): tham số so thứ ba LrefN cho C và L
+
+**Census offline** (`asel2-census.py`, `outputs/m56_asel2_census_20261108c.json`; `asel2-ladder3.py`):
+- G tính đúng bằng `derive_g` của product, trên mọi site của 11 town.
+- Với cặp tham số (vN, G) của §6.4:
+  - M: có lời giải (G từ 9,5 tới 52,5 m);
+  - C: **không có lời giải** với mọi phương án giữ hay bỏ cảnh. G khả dĩ chỉ trải 10,5 → 41 m (3,9 lần), mà 8 cảnh cần 1,25⁷ ≈ 4,77 lần;
+  - L: **không có lời giải** (khoảng G của từng slot quá hẹp).
+- Thêm LrefN thì C và L đều có lời giải.
+
+**Quyết định:** [chat] Duy, ngày 08/11/2026, chọn "Thêm LrefN cho C/L (Recommended)". Với C và L, bộ mô tả phép so là (vN, G,
+LrefN). Một cặp đạt (về mặt khai báo) khi ≥ 2 trong 3 tham số lệch ≥ 20%, cộng với review D09. M, I, O, F giữ bộ hai tham số
+của loại mình.
+
+**Đặt sau khi thấy số; phải ghi kèm mọi báo cáo:**
+- G = vE²/3 + vE/2 + vE·(LrefN + 5)/(2·vN) + 1/2 là hàm của LrefN và vN, nên LrefN không độc lập với G. Reviewer có thể coi đây
+  là đếm trùng một chiều khác biệt.
+- Mọi phép so C/L phải báo theo cả hai quy tắc: (vN, G) theo §6.4, và (vN, G, LrefN) theo bổ sung này.
