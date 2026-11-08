@@ -213,3 +213,19 @@ Hệ quả phải báo: nếu không cảnh M nào ở Town12/13 hỏng thì lo�
 - C06-S1 và M02-S1 được xếp là hỏng: chúng đã trial ở bước chuẩn bị, và không có luật nào cứu được mà vẫn qua cổng 0,1°.
   Sửa kỹ thuật 2 không áp cho chúng.
 - C04-S1 và M05-S1 vẫn chạy A/B như batch đã định, và kết quả được ghi đúng như đo.
+
+## Addendum E (08/11/2026): chạy đà NPC qua junction phía trên
+
+**Thời điểm:**
+- Sau lần thay cảnh 2b (`outputs/m56_fill_v4_replace2b_20261108.json`): M04, M07 và M08 không còn ứng viên. Lý do loại là cổng B1
+  cộng trần (M, town), vì gần như mọi site M đạt luật §3 "NPC chạy đà 150 m trên một road" đều ở Town11–13.
+- Chưa có A/B nào của các slot này. Luật §3 là luật chọn của Claude, không phải của spec. Đổi luật này là đổi sau khi thấy
+  output chọn, phải công khai, và không đổi ngưỡng đo nào.
+
+**Luật mới (chỉ cho các successor từ nay; các cảnh đã gán giữ nguyên):**
+- Đoạn chạy đà 150 m của NPC được phép nối qua các junction phía trên. Ở mỗi junction phía trên phải có **đúng một** connection
+  đi thẳng (|Δh| ≤ 10°) vào road đang xét, cùng lane.
+- Không có tín hiệu dynamic nào trên bất kỳ road nào của chuỗi, trong phần thuộc đoạn chạy đà. Không có đèn trong 50 m trước
+  mỗi junction phía trên, trên road vào của junction đó (`signal_near_fixed`).
+- Mọi road và connector của chuỗi đều đạt điều kiện dốc (≤ 0,02) và cua (`line`, hoặc `arc` với |κ| ≤ 1/50) như §3.
+- EGO giữ nguyên luật một road.
