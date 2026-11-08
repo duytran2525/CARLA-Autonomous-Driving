@@ -175,66 +175,132 @@ def main(out_path, commit):
     counts = Counter((cat, t) for cat in RETAINED for _, t, _ in RETAINED[cat])
     held = {cat: [d for _, _, d in RETAINED[cat]] for cat in RETAINED}
     used_j = set(); site_uses = Counter(); entries = []
+    LIMIT = 300000  # addendum A: node limit per lookahead search (deterministic; exceeding it counts as infeasible)
+
+    def static(cat, k, pool):
+        """(x, d) in shuffled order passing the static rules (run-in / length / axis), plus skip counts."""
+        out, why = [], Counter()
+        if cat in 'CLM':
+            vN = vNk(k)
+            for x in pool:
+                L = F(x['LrefN']); d = {'vN': vN, 'G': derive_g(VE[cat], vN, L), 'LrefN': L}
+                w = runin(v2.trees[x['town']][1], x['ego'], x['junction'], float(d['G'] + VE[cat] ** 2 / 3 + 20))
+                if w:
+                    why['EGO_' + w] += 1
+                else:
+                    out.append((x, d))
+            return out, why
+        vE = series(F(6), F(5, 4), k); gap = series(F(6), F(13, 10), k); G = series(F(15), F(13, 10), k)
+        a = gen.A; vEf = float(vE)
+        need_i = 7 * vEf + 3.75 + vEf ** 2 / (2 * a) + float(gap) + gen.MARGIN
+        rs = max(3 * vEf, vEf * (float(G) + 9.5) / (vEf - 2.5)) if vEf > 2.5 else math.inf
+        need_o = rs + 3 * vEf + 3.75 + vEf ** 2 / (2 * a) + float(G) + gen.MARGIN
+        need = need_i if cat == 'I' else need_o
+        need_axis = max(3 * vEf, (rs + 3 * vEf) if cat == 'O' else 3 * vEf)
+        d = {'vE': vE, 'gap': gap} if cat == 'I' else {'vE': vE, 'G': G}
+        for x in pool:
+            if x['length'] < need:
+                why['LENGTH_SHORT'] += 1
+            elif x.get('axis_run_m', 0.) < need_axis:
+                why['AXIS_RUN_SHORT'] += 1
+            elif any((x['town'], r) in used_roads for r in x['roads']):
+                why['EXCLUDED_ROAD'] += 1
+            else:
+                out.append((x, d))
+        return out, why
+
+    def site_free(cat, x, uj, uses):
+        if cat in 'CLM':
+            return (x['town'], x['junction']) not in uj
+        return (all(uses[(x['town'], r)] < 2 for r in x['roads'])
+                and not any((x['town'], j) in uj for j in x.get('junctions_crossed', ())))
+
+    def take(cat, x, uj, cnt, uses):
+        uj, cnt, uses = set(uj), Counter(cnt), Counter(uses)
+        cnt[(cat, x['town'])] += 1
+        if cat in 'CLM':
+            uj.add((x['town'], x['junction']))
+        else:
+            for r in x['roads']:
+                uses[(x['town'], r)] += 1
+            uj.update((x['town'], j) for j in x.get('junctions_crossed', ()))
+        return uj, cnt, uses
+
+    def feasible(cat, rest, elig, hl, uj, cnt, uses):
+        """Addendum A: does an assignment of the remaining slots exist (sites, caps, ladder)? Exhaustive over distinct
+        descriptor values, one site per town per value; node limit LIMIT."""
+        groups = {}
+        for s in rest:
+            g = {}
+            for x, d in elig[s]:
+                g.setdefault(tuple(sorted((n, v) for n, v in d.items())), (d, []))[1].append(x)
+            groups[s] = g
+        order = sorted(rest, key=lambda s: len(groups[s])); nodes = [0]
+        def go(i, hl, uj, cnt, uses):
+            nodes[0] += 1
+            if nodes[0] > LIMIT:
+                raise OverflowError
+            if i == len(order):
+                return True
+            for d, xs in groups[order[i]].values():
+                if not all(comparable(cat, d, h) for h in hl):
+                    continue
+                towns = set()
+                for x in xs:
+                    if x['town'] in towns or cnt[(cat, x['town'])] >= 3 or not site_free(cat, x, uj, uses):
+                        continue
+                    towns.add(x['town'])
+                    if go(i + 1, hl + [d], *take(cat, x, uj, cnt, uses)):
+                        return True
+            return False
+        try:
+            return go(0, list(hl), uj, cnt, uses)
+        except OverflowError:
+            return False
+
     for cat in 'CLMIO':
         pool = sorted(pools[cat], key=key); random.Random(SEED + OFFSET[cat]).shuffle(pool)
-        for slot, k in sorted(SLOTS[cat].items()):
-            if cat in 'CLM':
-                vN = vNk(k)
-                def desc(x):
-                    L = F(x['LrefN']); return {'vN': vN, 'G': derive_g(VE[cat], vN, L), 'LrefN': L}
-                def fits(x, d):
-                    why = runin(v2.trees[x['town']][1], x['ego'], x['junction'], float(d['G'] + VE[cat] ** 2 / 3 + 20))
-                    return 'EGO_' + why if why else None
-                free = lambda x: (x['town'], x['junction']) not in used_j
-            else:
-                vE = series(F(6), F(5, 4), k); gap = series(F(6), F(13, 10), k); G = series(F(15), F(13, 10), k)
-                a = gen.A; vEf = float(vE)
-                need_i = 7 * vEf + 3.75 + vEf ** 2 / (2 * a) + float(gap) + gen.MARGIN
-                rs = max(3 * vEf, vEf * (float(G) + 9.5) / (vEf - 2.5)) if vEf > 2.5 else math.inf
-                need_o = rs + 3 * vEf + 3.75 + vEf ** 2 / (2 * a) + float(G) + gen.MARGIN
-                need = need_i if cat == 'I' else need_o
-                need_axis = max(3 * vEf, (rs + 3 * vEf) if cat == 'O' else 3 * vEf)
-                desc = lambda x: {'vE': vE, 'gap': gap} if cat == 'I' else {'vE': vE, 'G': G}
-                def fits(x, d):
-                    if x['length'] < need:
-                        return 'LENGTH_SHORT'
-                    if x.get('axis_run_m', 0.) < need_axis:
-                        return 'AXIS_RUN_SHORT'
-                    return None
-                free = lambda x: (all(site_uses[(x['town'], r)] < 2 and (x['town'], r) not in used_roads for r in x['roads'])
-                                  and not any((x['town'], j) in used_j for j in x.get('junctions_crossed', ())))
-            chosen, queue, why_n = None, [], Counter()
-            for x in pool:
-                if not free(x):
+        slots = sorted(SLOTS[cat])
+        elig, swhy = {}, {}
+        for s in slots:
+            elig[s], swhy[s] = static(cat, SLOTS[cat][s], pool)
+        for i, slot in enumerate(slots):
+            rest = slots[i + 1:]
+            chosen, fallback, queue, why_n = None, None, [], Counter(swhy[slot])
+            for x, d in elig[slot]:
+                if chosen is not None:
+                    if len(queue) >= QUEUE:
+                        break
+                    if site_free(cat, x, used_j, site_uses) and counts[(cat, x['town'])] < 3:
+                        queue.append((x, d))
+                    continue
+                if not site_free(cat, x, used_j, site_uses):
                     why_n['SITE_USED'] += 1; continue
                 if counts[(cat, x['town'])] >= 3:
                     why_n['TOWN_CAP'] += 1; continue
-                d = desc(x); w = fits(x, d)
-                if w:
-                    why_n[w] += 1; continue
-                if chosen is None:
-                    if not all(comparable(cat, d, h) for h in held[cat]):
-                        why_n['LADDER'] += 1; continue
+                if not all(comparable(cat, d, h) for h in held[cat]):
+                    why_n['LADDER'] += 1; continue
+                if fallback is None:
+                    fallback = (x, d)
+                if not rest or feasible(cat, rest, elig, held[cat] + [d], *take(cat, x, used_j, counts, site_uses)):
                     chosen = (x, d)
-                elif len(queue) < QUEUE:
-                    queue.append((x, d))
                 else:
-                    break
-            entry = {'id': f'M56-P-{slot}', 'slot': slot, 'category': cat, 'k': k, 'skipped': dict(why_n)}
+                    why_n['LOOKAHEAD_INFEASIBLE'] += 1
+            rule = 'lookahead'
+            if chosen is None and fallback is not None:
+                chosen, rule = fallback, 'fallback_first_fit'
+            entry = {'id': f'M56-P-{slot}', 'slot': slot, 'category': cat, 'k': SLOTS[cat][slot], 'skipped': dict(why_n)}
             if chosen is None:
                 entry['status'] = 'EMPTY_NO_ELIGIBLE_CANDIDATE'
             else:
                 x, d = chosen
-                entry.update(status='PROPOSED', site=x, descriptors={n: str(v) for n, v in d.items()},
+                entry.update(status='PROPOSED', rule=rule, site=x, descriptors={n: str(v) for n, v in d.items()},
                              queue=[{'site': q, 'descriptors': {n: str(v) for n, v in qd.items()}} for q, qd in queue])
-                counts[(cat, x['town'])] += 1; held[cat].append(d)
-                if cat in 'CLM':
-                    used_j.add((x['town'], x['junction']))
-                else:
-                    for r in x['roads']:
-                        site_uses[(x['town'], r)] += 1
-                    used_j.update((x['town'], j) for j in x.get('junctions_crossed', ()))
+                held[cat].append(d)
+                used_j, counts, site_uses = take(cat, x, used_j, counts, site_uses)
             entries.append(entry)
+            print(json.dumps({'slot': slot, 'status': entry['status'], 'rule': entry.get('rule'),
+                              'town': (entry.get('site') or {}).get('town')}), flush=True)
     for e in entries:
         e.update(selector='CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT',
                  authority='Duy [chat] 2026-11-08 A-SEL2 (self-stated identity); prereg commit ' + commit,
