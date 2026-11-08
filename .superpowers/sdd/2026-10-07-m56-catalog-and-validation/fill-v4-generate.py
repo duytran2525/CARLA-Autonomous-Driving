@@ -55,6 +55,7 @@ RETAINED = {'C': [('C01', 'Town04', {'vN': vNk(1), 'G': F(26), 'LrefN': F('21.96
             'O': [(o, t, {'vE': series(F(6), F(5, 4), k), 'G': series(F(15), F(13, 10), k)})
                   for o, t, k in (('O01', 'Town04', 1), ('O02', 'Town05', 2), ('O03', 'Town06', 3))]}
 OFFSET = {'C': 11, 'L': 12, 'M': 13, 'I': 14, 'O': 15}
+REL = {'C': ('vN', 'G', 'LrefN'), 'L': ('vN', 'G', 'LrefN'), 'M': ('vN', 'G'), 'I': ('vE', 'gap'), 'O': ('vE', 'G')}
 
 
 def comparable(cat, a, b):
@@ -233,7 +234,7 @@ def main(out_path, commit):
         for s in rest:
             g = {}
             for x, d in elig[s]:
-                g.setdefault(tuple(sorted((n, v) for n, v in d.items())), (d, []))[1].append(x)
+                g.setdefault(tuple(d[n] for n in REL[cat]), (d, []))[1].append(x)  # only the compared descriptors matter
             groups[s] = g
         order = sorted(rest, key=lambda s: len(groups[s])); nodes = [0]
         def go(i, hl, uj, cnt, uses):
