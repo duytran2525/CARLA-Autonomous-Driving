@@ -230,6 +230,15 @@ def asel2_additions(done, out, decision_ref, xodr, weather):
     additions). A slot that had a C0 candidate gets the successor id M56-P-<slot>-S1 and its predecessor leaves the run
     revision (recorded REPLACED_BY); an empty slot keeps M56-P-<slot>. I/O/F slots: not built here (report only)."""
     fill = json.loads(Path(ASEL2_FILL).read_text(encoding='utf-8'))
+    # addendum B3: replacement rounds (M56_ASEL2_REPLACE = comma-separated replace outputs, in order); a PROPOSED entry of
+    # round n replaces the slot's site and gets id suffix S<n+1>
+    rounds = {}
+    entries = {e['slot']: e for e in fill['entries']}
+    for n, f in enumerate(filter(None, __import__('os').environ.get('M56_ASEL2_REPLACE', '').split(',')), 1):
+        for e in json.loads(Path(f).read_text(encoding='utf-8'))['entries']:
+            if e['status'] == 'PROPOSED':
+                entries[e['slot']] = e; rounds[e['slot']] = n
+    fill = {**fill, 'entries': [entries[s] for s in sorted(entries)]}
     fill_ref, prereg_ref = cr.st.ref(Path(ASEL2_FILL), 'M56_SELECTION_RECEIPT'), cr.st.ref(ASEL2_PREREG, 'PREREGISTRATION')
     def attest(digest, scope, why):
         return ReviewRecord(digest, scope, (fill_ref, prereg_ref), 'CLAUDE_MECHANICAL_ATTESTATION_UNDER_DUY_DELEGATION',
@@ -243,6 +252,8 @@ def asel2_additions(done, out, decision_ref, xodr, weather):
         s, cat, slot = e['site'], e['category'], e['slot']
         old = by_slot.get(slot)
         cid = f'M56-P-{slot}-S1' if old is not None else f'M56-P-{slot}'
+        if slot in rounds:
+            cid = f'M56-P-{slot}-S{rounds[slot] + 1}'
         if cat in ('I', 'O') and __import__('os').environ.get('M56_ASEL2_IO') != '1':
             report.append({'slot': slot, 'status': 'ASEL2_NOT_BUILT', 'category': cat, 'reason': 'I/O build needs M56_ASEL2_IO=1'}); continue
         if cat in ('I', 'O'):
