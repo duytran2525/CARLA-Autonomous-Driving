@@ -112,3 +112,22 @@ của loại mình.
 - G = vE²/3 + vE/2 + vE·(LrefN + 5)/(2·vN) + 1/2 là hàm của LrefN và vN, nên LrefN không độc lập với G. Reviewer có thể coi đây
   là đếm trùng một chiều khác biệt.
 - Mọi phép so C/L phải báo theo cả hai quy tắc: (vN, G) theo §6.4, và (vN, G, LrefN) theo bổ sung này.
+
+## 5. Bổ sung 2 (08/11/2026): input F theo thang
+
+**Phát hiện (Claude, chỉ đọc spec):**
+- Với input đã duyệt ở §8.1–8.2, 15 phép so giữa các cảnh F không thể đạt:
+  - tốc độ EGO trùng nhau (F01 = F02 = 4 m/s, F04 = F05 = 2 m/s, F03 = F06 = 0);
+  - tốc độ NPC của F04 = 0, mà giá trị 0 không được đếm;
+  - spec §8.3 tự ghi "Inter-F15 numeric pairs remain unproven".
+- §8.2 cũng ghi F06 có Δ khoảng 0,10 < 0,20 ngay trong cảnh.
+- Chưa có cảnh F nào từng được chạy, nên chưa có số đo F nào.
+
+**Quyết định:** [chat] Duy, ngày 08/11/2026, chọn "Claude đổi input F theo thang (Recommended)". Claude soạn prereg F mới, trong đó:
+1. Sáu cơ chế dùng chung hai tham số khai báo, là tốc độ EGO danh nghĩa và khoảng hở ban đầu tới NPC. Giá trị của chúng theo một
+   thang nhân 5/4, để mọi cặp trong 15 cặp có Δ ≥ 0,20 trên cả hai.
+2. Input của F06 được chỉnh để Δ trong cảnh ≥ 0,20, nếu chỉnh được.
+3. F04 (cửa xe) được thay bằng một cơ chế không cần cửa (bổ sung 1 của §1.4).
+
+**Đặt sau khi thấy:** đây là đổi input §8 đã duyệt, sau khi biết rằng input cũ không đạt được cổng so sánh. Nó không đặt sau số
+đo nào của F. Báo cáo F phải ghi điều này, và ghi input §8 gốc bên cạnh input mới.
