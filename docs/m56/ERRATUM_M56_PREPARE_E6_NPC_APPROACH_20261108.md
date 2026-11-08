@@ -34,5 +34,4 @@ mọi cảnh khác.
 
 ## 4. Áp dụng
 
-Bản nháp này **chưa** được áp vào code. Code chỉ được sửa sau khi batch `m56_asel2_cl_20261108T083410Z` kết thúc, và bản này
-phải được commit trước lượt chuẩn bị lại đầu tiên dùng nó.
+**Code** (`native-v2-prepare.py`, cờ `M56_E6=1`, mặc định tắt) được viết sau khi batch `m56_asel2_cl_20261108T083410Z` đã nạp code, nên batch không bị ảnh hưởng. Không phải probe lại: D_N đã được tính từ đường cong tốc độ của probe 1 (phần sau ngoại suy ở tốc độ ổn định). Chỉ có route NPC được dựng dài hơn, rồi n_entry, s0 và trạm dừng của đèn S1 được dịch đúng bằng phần kéo dài. Luật này áp cho lần chuẩn bị lại L08 (và mọi slot ra PHASING_ROOM) sau batch.

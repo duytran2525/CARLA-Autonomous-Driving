@@ -32,6 +32,8 @@ from native_v2_kit import PhaseObserver
 from native_v2_common import lane_width_region
 
 SIG5 = os.environ.get('M56_SIG5', '') == '1'  # signal-phase v1 erratum 5 (2026-11-08)
+E6 = os.environ.get('M56_E6', '') == '1'  # ERRATUM_M56_PREPARE_E6_NPC_APPROACH_20261108 (post-number)
+TF2 = os.environ.get('M56_TF2', '') == '1'  # A-SEL2 technical fix 2: keep the cl-v1 a NPC pitch for the phased pose
 TOWN = sys.argv[1]
 root = WORK / f'outputs/m56_v2_prepare_{TOWN}_{now()}'
 root.mkdir(parents=False, exist_ok=False)
@@ -346,6 +348,19 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
                last_d + vNp * (need - last_t))
     s0 = n_entry - front_off - D_N
     out.update(D_N=D_N, npc_start_station_probe1=s0)
+    if s0 < 0 and E6:  # erratum E6: extend the NPC approach upstream by the missing room (+20 m) and shift the stations
+        extra = -s0 + 20.
+        r_new, ei_new, got_new = route_rows(m, c.town, notation['NPC'], 150. + extra, 15. + 60. * float(vN), None)
+        a_new = arcs(r_new)
+        shift = float(a_new[ei_new]) - float(rows['NPC'][1][exit_idx['NPC']])
+        out['e6'] = {'extra_m': extra, 'approach_got_m': got_new, 'shift_m': shift, 's0_before': s0}
+        log(event='E6_NPC_APPROACH', scene=c.id, **out['e6'])
+        if shift > 0:
+            rows['NPC'] = (r_new, a_new); exit_idx['NPC'] = ei_new
+            n_entry += shift; s0 += shift
+            if sig and sig.get('stop_station') is not None:
+                sig['stop_station'] += shift
+            out.update(npc_start_station_probe1=s0, n_entry_e6=n_entry)
     if s0 < 0:
         out.update(status='BLOCKED_FIXTURE', reason='PHASING_ROOM')
         return finish(c, out)
@@ -365,6 +380,12 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         r_, a_ = rows[role]
         routes[role] = directed(r_, a_, identity.map, c.town, notation[role], cont2, a_[exit_idx[role]] + 5)
     poses['NPC'], grounds['NPC'] = pose_at(routes['NPC'])
+    if TF2 and 'NPC' in cl_v1:  # technical fix 2: the cl-v1 a waypoint pitch also for the phased (probe 2) NPC pose
+        q_ = poses['NPC']; wp_ = m.get_waypoint(carla.Location(q_.x, q_.y, q_.z))
+        pitch_ = (wp_.transform.rotation.pitch + 180.) % 360. - 180.
+        poses['NPC'] = Transform6(q_.x, q_.y, q_.z, _f32(pitch_), q_.yaw, 0.)
+        cl_v1['NPC_phased'] = {'pitch_deg': pitch_, 'waypoint': [wp_.road_id, wp_.lane_id, wp_.is_junction]}
+        log(event='TF2_NPC_PITCH', scene=c.id, **cl_v1['NPC_phased'])
     v6p = None
     if V6:  # prereg v6 a+d on the final (phased, erratum-4 cut) NPC route
         v6p = v6_npc_program(routes['NPC'], vN, region, 2 * bbox['extent'][0], cut=end.get('cut_index') is not None)
