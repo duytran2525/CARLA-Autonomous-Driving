@@ -60,3 +60,9 @@ D(unit, quantity) = {'unit', 'physical_quantity', 'aggregation': 'declared_scala
   - product **tự tính** giá trị trung bình, không nhận giá trị gộp từ bên ngoài;
   - có review `REALIZED_COMPARABILITY_D09` bám đúng cặp.
 - Hàm đó được viết sau bản này nhưng phải theo đúng định nghĩa ở đây.
+
+## 4. Bổ sung (08/11/2026): loại M dùng ba tham số
+
+Theo A-SEL2 §7 (Duy, ngày 08/11/2026, đặt sau khi thấy số), loại M dùng bộ (vN, G, LrefN), cả khai báo lẫn realized, và một cặp đạt
+khi ≥ 2/3 tham số có Δ ≥ 0,20, giống C/L. LrefN_r là đại lượng hình học của fixture, như ở §2. Mọi báo cáo M ghi theo cả bộ cũ
+(vN, G; cả hai phải đạt) lẫn bộ mới.

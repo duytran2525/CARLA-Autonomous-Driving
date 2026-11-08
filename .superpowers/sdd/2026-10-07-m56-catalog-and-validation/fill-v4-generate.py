@@ -40,7 +40,7 @@ series = lambda base, ratio, k: base * ratio ** (k - 1)
 VE = {'C': F(4), 'L': F(2), 'M': F(4)}
 SLOTS = {'C': {'C02': 2, 'C03': 3, 'C04': 4, 'C06': 6, 'C07': 7},
          'L': {'L02': 2, 'L03': 3, 'L05': 5, 'L06': 6, 'L07': 7, 'L08': 8},
-         'M': {'M01': 1, 'M02': 2, 'M03': 3, 'M04': 4, 'M05': 5, 'M06': 0, 'M07': 6, 'M08': -1},
+         'M': {'M01': 1, 'M02': 2, 'M03': 3, 'M04': 4, 'M05': 5, 'M06': 0, 'M07': -2, 'M08': -1},
          'I': {'I01': 1, 'I02': 2, 'I05': 0, 'I06': -2, 'I07': -1, 'I08': 6},
          'O': {'O04': 4, 'O05': 0, 'O06': -2, 'O07': -1, 'O08': 6}}
 # retained valid scenes (spec 6.3 rows / C0 revision; town, k, descriptor values)
@@ -55,13 +55,14 @@ RETAINED = {'C': [('C01', 'Town04', {'vN': vNk(1), 'G': F(26), 'LrefN': F('21.96
             'O': [(o, t, {'vE': series(F(6), F(5, 4), k), 'G': series(F(15), F(13, 10), k)})
                   for o, t, k in (('O01', 'Town04', 1), ('O02', 'Town05', 2), ('O03', 'Town06', 3))]}
 OFFSET = {'C': 11, 'L': 12, 'M': 13, 'I': 14, 'O': 15}
-REL = {'C': ('vN', 'G', 'LrefN'), 'L': ('vN', 'G', 'LrefN'), 'M': ('vN', 'G'), 'I': ('vE', 'gap'), 'O': ('vE', 'G')}
+# A-SEL2 addendum 7 (dbe720a, Duy 2026-11-08, post-number): M compares 2 of (vN, G, LrefN); (M, town) cap 4; M07 k = -2.
+REL = {'C': ('vN', 'G', 'LrefN'), 'L': ('vN', 'G', 'LrefN'), 'M': ('vN', 'G', 'LrefN'), 'I': ('vE', 'gap'), 'O': ('vE', 'G')}
 
 
 def comparable(cat, a, b):
-    if cat in 'CL':
+    if cat in 'CLM':
         return sum(delta(a[n], b[n]) >= F(1, 5) for n in ('vN', 'G', 'LrefN')) >= 2
-    names = {'M': ('vN', 'G'), 'I': ('vE', 'gap'), 'O': ('vE', 'G')}[cat]
+    names = {'M': ('vN', 'G', 'LrefN'), 'I': ('vE', 'gap'), 'O': ('vE', 'G')}[cat]
     return all(delta(a[n], b[n]) >= F(1, 5) for n in names)
 
 
@@ -362,7 +363,7 @@ def main(out_path, commit, state_path=None):
                     continue
                 towns = set()
                 for x in xs:
-                    if x['town'] in towns or cnt[(cat, x['town'])] >= 3 or not site_free(cat, x, uj, uses):
+                    if x['town'] in towns or cnt[(cat, x['town'])] >= (4 if cat == 'M' else 3) or not site_free(cat, x, uj, uses):
                         continue
                     towns.add(x['town'])
                     if go(i + 1, hl + [d], *take(cat, x, uj, cnt, uses)):
@@ -401,12 +402,12 @@ def main(out_path, commit, state_path=None):
                 if chosen is not None:
                     if len(queue) >= QUEUE:
                         break
-                    if site_free(cat, x, used_j, site_uses) and counts[(cat, x['town'])] < 3:
+                    if site_free(cat, x, used_j, site_uses) and counts[(cat, x['town'])] < (4 if cat == 'M' else 3):
                         queue.append((x, d))
                     continue
                 if not site_free(cat, x, used_j, site_uses):
                     why_n['SITE_USED'] += 1; continue
-                if counts[(cat, x['town'])] >= 3:
+                if counts[(cat, x['town'])] >= (4 if cat == 'M' else 3):
                     why_n['TOWN_CAP'] += 1; continue
                 if not all(comparable(cat, d, h) for h in held[cat]):
                     why_n['LADDER'] += 1; continue
