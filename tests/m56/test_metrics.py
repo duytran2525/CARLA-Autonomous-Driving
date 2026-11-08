@@ -107,6 +107,36 @@ def test_first_bracketed_crossings_and_wholebody_confirmation(require,crossing_t
     assert events['CLEAR_N_CONFIRMED'].time==F(2,5)
 
 
+def _offset(frames,y,ego_v=None):
+    out=[]
+    for f in frames:
+        actors=tuple(replace(a,pose=replace(a.pose,y=y),
+                             velocity=ego_v if ego_v is not None and a.role=='EGO' else a.velocity) for a in f.actors)
+        out.append(replace(f,actors=actors))
+    return tuple(out)
+
+
+def test_erratum5_entry_beside_the_face_still_counts(require,crossing_trace,rebind_trace):
+    # Erratum 5 (Duy 2026-10-25): an actor turning into the box meets a face parallel to its heading; spec 7.3 entry is
+    # the front crossing on a valid route. The face y-range is [-1, 1]; bodies at y = 1.2 stick out (0.95..1.45).
+    detect=require('m56.metrics','detect_events');c=crossing_trace
+    events={e.name:e for e in detect(rebind_trace(_offset(c.frames,1.2),c.fixture),c.fixture)}
+    assert events['NPC_ENTRY'].frame==101 and events['E_ENTRY'].frame==104
+    assert 'CLEAR_N_CONFIRMED' not in events  # spec 5.2 keeps "correct corridor" for the whole-body clear
+
+
+def test_erratum5_stop_beside_the_entry_face_is_confirmed(require,crossing_trace,rebind_trace):
+    detect=require('m56.metrics','detect_events');c=crossing_trace
+    first=c.frames[0];raw=first.integrity['frame_refs'][0];frames=[]
+    for i in range(12):  # EGO parked at x = 7 (front 7.5, 2.5 m before entry), NPC parked behind it
+        actors=(replace(first.actors[0],pose=replace(first.actors[0].pose,x=7.)),first.actors[1])
+        frames.append(replace(first,frame=100+i,simtime=F(i,20),actors=actors,
+                              integrity={**first.integrity,'frame_refs':(replace(raw,frame=100+i,time=F(i,20)),)}))
+    frames=_offset(frames,1.2,ego_v=(0.,0.,0.))
+    events={e.name:e for e in detect(rebind_trace(frames,c.fixture),c.fixture)}
+    assert events['STOP_CONFIRMED'].frame==110  # 0.50 s hold = 11 samples from frame 100
+
+
 def test_missing_bracket_no_trigger(require,crossing_trace):
     detect=require('m56.metrics','detect_events')
     c=crossing_trace
@@ -1839,3 +1869,30 @@ def test_naked_or_stale_predicate_is_not_observation(require,clear_frames):
     for packet in (True,{'value':True},clear_frames[0].integrity['predicates']['NPC_WHOLE_BODY_CLEAR']):
         frames=tuple(replace(f,integrity={'predicates':{'NPC_WHOLE_BODY_CLEAR':packet}}) for f in clear_frames)
         assert confirm(frames,'NPC_WHOLE_BODY_CLEAR',F(1,4)) is None
+
+
+def _with_speed_marker(fixture, rows):
+    from m56.model import FrozenResponse
+    program = {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
+               'transitions': ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': F(0), 'requires': ()},
+                               {'cause': 'TURN', 'after_event': 'SPEED_MARKER:NPC:TURN', 'delay_s': F(0), 'requires': ()})}
+    r = FrozenResponse('NPC', 'NPC_COMMON', fixture.routes['NPC'], {'SETTLE': F(0), 'NOMINAL': F(3), 'TURN': F(2)}, {},
+                       {'category': 'C', 'program': program, 'speed_markers': rows}, 'n' * 64)
+    return replace(fixture, responses=(r,))
+
+
+def test_v6_speed_marker_is_the_first_front_crossing(require, crossing_trace, rebind_trace):
+    # v6 d (prereg PREREG_M56_V6_20261026): NPC front (pose x + 0.5) reaches station 11 first at frame 102 (x = 12).
+    detect = require('m56.metrics', 'detect_events'); c = crossing_trace
+    fixture = _with_speed_marker(c.fixture, ({'cause': 'TURN', 'marker_arc_m': F(11)},))
+    events = {e.name: e for e in detect(rebind_trace(c.frames, fixture), fixture)}
+    assert events['SPEED_MARKER:NPC:TURN'].frame == 102
+    assert events['NPC_ENTRY'].frame == 101  # the frozen events are unchanged
+
+
+@pytest.mark.parametrize('rows', [({'cause': 'NOPE', 'marker_arc_m': F(11)},), ({'cause': 'TURN', 'marker_arc_m': F(-1)},),
+                                  ({'cause': 'TURN', 'marker_arc_m': F(11), 'x': 1},)])
+def test_v6_malformed_speed_marker_never_fires(require, crossing_trace, rebind_trace, rows):
+    detect = require('m56.metrics', 'detect_events'); c = crossing_trace
+    fixture = _with_speed_marker(c.fixture, rows)
+    assert not any(e.name.startswith('SPEED_MARKER') for e in detect(rebind_trace(c.frames, fixture), fixture))

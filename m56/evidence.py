@@ -617,7 +617,10 @@ def _target_integrity(evidence,fixture):
                 targets=responses[0].targets
                 if not targets:
                     uncertain.append('TARGET_PROGRAM_MISSING');continue
-                target=targets.get(command.cause)
+                # Erratum 6: the producer's own NPC traffic hold (response.step_response, stock contract
+                # apply_intent) has cause NPC_TRAFFIC_HOLD at 0 km/h; its witness is audited in _phase_integrity.
+                target=(Fraction(0) if command.cause=='NPC_TRAFFIC_HOLD' and actor.role=='NPC'
+                        else targets.get(command.cause))
                 if (isinstance(target,bool) or not isinstance(target,(int,Fraction)) or target<0
                         or isinstance(command.target_kmh,bool) or not isinstance(command.target_kmh,(int,Fraction))
                         or command.target_kmh!=Fraction(18,5)*target):
@@ -781,6 +784,46 @@ def _box_union_covers(envelope,regions,margin,uncertainty):
                for point in product(*(tuple((a+b)/2 for a,b in zip(axis,axis[1:])) for axis in axes)))
 
 
+_DRIVABLE_CACHE={}
+
+
+def _fixture_drivable(evidence,fixture):
+    """v7: the fixture's frozen drivable union (topology.drivable_ref), only if it is an admitted sealed source; else None.
+    Parsed once per source digest. ponytail: bounded cache."""
+    from shapely import wkt
+    from shapely.prepared import prep
+    ref=decode_record('SourceRef',encode_record(fixture.domain.topology.get('drivable_ref')))
+    if not isinstance(ref,SourceRef) or not _admitted_source(evidence,ref):
+        return None
+    hit=_DRIVABLE_CACHE.get(ref.sha256)
+    if hit is None:
+        data=_source_bytes(ref)
+        if data is None:
+            return None
+        try:
+            geom=wkt.loads(data.decode('utf-8'))
+        except (ValueError,UnicodeError):
+            return None
+        if geom.is_empty or not geom.is_valid:
+            return None
+        if len(_DRIVABLE_CACHE)>64:
+            _DRIVABLE_CACHE.clear()
+        hit=_DRIVABLE_CACHE[ref.sha256]=prep(geom)
+    return hit
+
+
+def _oriented_fit(a,b,drivable,margin):
+    """v7: xy convex hull of the body vertices at both frames, grown by margin + 1 mm + 1 % of the largest vertex
+    displacement (the kit's chord-to-arc rotation pad), is covered by the prepared drivable union."""
+    from math import dist
+    from shapely.geometry import MultiPoint
+    from .geometry import world_vertices
+    va,vb=world_vertices(a.body,a.pose),world_vertices(b.body,b.pose)
+    pad=.001+.01*max(dist(tuple(map(float,p)),tuple(map(float,q))) for p,q in zip(va,vb))
+    hull=MultiPoint([(float(v[0]),float(v[1])) for v in (*va,*vb)]).convex_hull
+    return drivable.contains(hull.buffer(float(margin)+pad))
+
+
 def _motion_integrity(evidence,fixture):
     """Admitted continuous enclosures and reference-acceleration bounds for all intervals.
 
@@ -832,6 +875,7 @@ def _motion_integrity(evidence,fixture):
             if response is not None and response.action_id in ('A','B') and isinstance(action_regions,Mapping):
                 key='EGO_TARGET' if (fixture.domain.topology['category'],response.action_id)==('I','B') else 'EGO_INITIAL'
                 intended=action_regions.get(key)
+        drivable=_fixture_drivable(evidence,fixture)
         for row,a,b in zip(rows,evidence.raw,evidence.raw[1:]):
             if (set(row)!={'boot','world','first_frame','last_frame','first_actors_hash','last_actors_hash','actors'}
                     or (row['boot'],row['world'])!=(a.boot,a.world) or (b.boot,b.world)!=(a.boot,a.world)
@@ -857,7 +901,16 @@ def _motion_integrity(evidence,fixture):
                 low=tuple(min(v[k] for v in envelope) for k in range(3));high=tuple(max(v[k] for v in envelope) for k in range(3))
                 if any(not all(low[k]<=v[k]<=high[k] for k in range(3)) for actor in (aa,bb) for v in world_vertices(actor.body,actor.pose)):
                     raise ValueError('enclosure contradicts observation')
-                if not _box_union_covers(envelope,regions[aa.role],Fraction(3,20),proof.uncertainty):
+                # v7 (docs/m56/PREREG_M56_V7_FIT_20261026.md, Duy 2026-10-26): rotation-aware fit. The xy convex hull of
+                # both observed bodies, grown by 0.15 m + uncertainty + the kit's rotation pad, inside the frozen drivable
+                # union. (v6: the axis-aligned envelope inside axis-aligned 0.5 m driving_boxes, which fails in turns.)
+                # A fixture without a drivable_ref (synthetic, pre-native) keeps the v6 rule.
+                if 'drivable_ref' not in fixture.domain.topology:
+                    if not _box_union_covers(envelope,regions[aa.role],Fraction(3,20),proof.uncertainty):
+                        uncertain.append('CONTINUOUS_FIT_UNPROVEN')
+                elif drivable is None:
+                    uncertain.append('MOTION_DRIVABLE_UNPROVEN')
+                elif not _oriented_fit(aa,bb,drivable,Fraction(3,20)+proof.uncertainty):
                     uncertain.append('CONTINUOUS_FIT_UNPROVEN')
                 if (aa.role=='EGO' and end is not None and b.frame>end.frame
                         and (intended is None or not _box_union_covers(envelope,(intended,),Fraction(3,20),proof.uncertainty))):
@@ -1003,7 +1056,18 @@ def _phase_integrity(evidence,fixture):
                 continue
             prior=state
             state=_advance_program(observed,state,response,known)
-            if command.cause!=state.phase:
+            if command.cause=='NPC_TRAFFIC_HOLD' and response.actor_role=='NPC':
+                # Erratum 6: a hold is valid only at 0 km/h on a frame whose sealed npc_controls witness is not CLEAR.
+                try:
+                    npc=next(a for a in observed.actors if a.role=='NPC')
+                    traffic=_reverse_priority(observed,npc,require_clear=False)
+                    held=(traffic['status']!='CLEAR' and command.target_kmh==0
+                          and all(_admitted_source(evidence,r) for r in traffic['witness_refs']))
+                except (ValueError,TypeError,KeyError,AttributeError,StopIteration):
+                    held=False
+                if not held:
+                    invalid.append('PHASE_PROGRAM_MISMATCH')
+            elif command.cause!=state.phase:
                 invalid.append('PHASE_PROGRAM_MISMATCH')
             if (response.actor_role=='EGO' and response.action_id in ('A','B')
                     and fixture.domain.topology.get('mechanism')=='F04'):

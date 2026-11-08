@@ -164,7 +164,17 @@ def apply_intent(driver: StockDriver, intent: CommandRecord) -> CommandRecord:
             raise ValueError('fields')
     except (AttributeError,TypeError,ValueError):
         raise ValueError('STOCK_CONTROL_INVALID') from None
+    if intent.control is None and intent.target_kmh>0 and control.brake>0:
+        # v6 e (prereg PREREG_M56_V6_20261026, probe native-yield-probe.py): below 1.4 m/s any CARLA brake collapses the
+        # speed to ~0 within one tick; with a moving target the stock brake is replaced by coasting there.
+        vehicle=getattr(session.backend,'_vehicle',None)
+        speed=vehicle.get_velocity().length() if vehicle is not None else None
+        if speed is not None and speed<LOW_SPEED_BRAKE_CUTOFF_MPS:
+            control=replace(control,brake=0.)
     return replace(intent,control=control)
+
+
+LOW_SPEED_BRAKE_CUTOFF_MPS=1.4
 
 
 def _program(response):
@@ -211,7 +221,28 @@ def _advance_program(frame, state, response, observations):
     return ScriptState(phase,start,tuple(known.values()))
 
 
+_REFERENCE_CACHE={}
+
+
 def _reference_response(response, cause):
+    """_reference_response_uncached memoized by (response identity, cause): a frozen response gives the same reference
+    or the same ValueError. Perf 2026-10-27 (M56 O03): validating the two CARLA-route switches (_switch_real_v5, O(n*m)
+    projection) took ~1.4 s per call and step_response calls it every tick. ponytail: bounded clear-all cache."""
+    key=(id(response),cause);hit=_REFERENCE_CACHE.get(key)
+    if hit is None or hit[0] is not response:
+        try:
+            hit=(response,_reference_response_uncached(response,cause),None)
+        except ValueError as exc:
+            hit=(response,None,str(exc))
+        if len(_REFERENCE_CACHE)>256:
+            _REFERENCE_CACHE.clear()
+        _REFERENCE_CACHE[key]=hit
+    if hit[2] is not None:
+        raise ValueError(hit[2])
+    return hit[1]
+
+
+def _reference_response_uncached(response, cause):
     """Resolve frozen phase references; only analytically continuous parallel plans.
 
     Curved/banked switches require a separately qualified recipe and are blocked,
@@ -457,7 +488,7 @@ def step_response(frame: FrameRecord, state: ScriptState, response: FrozenRespon
             # A target-plan switch can put the return in a single future segment.
             # Moving toward the initial centre still needs independent return
             # permission; a valid outbound path cannot authorize that motion.
-            separation=Number(reference.route.transforms[0].y)-Number(response.route.transforms[0].y)
+            separation=_lateral_separation(reference.route,response.route)
             returning=(len(segments)>1 and arc>segments[1]['start_arc_m']) or offset*separation<0
             if returning:
                 if not {'TRIGGER','RETURN_MARKER','RETURN_CLEAR_CONFIRMED','RETURN_PATH_CLEAR'}.issubset(events):
@@ -1264,7 +1295,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1288,7 +1319,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1310,7 +1341,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1335,7 +1366,7 @@ def _forward_contract(response,fixture):
         nominal=_nominal_v5(response)
         if nominal is None:
             raise ValueError('NORMATIVE_NOMINAL_UNPROVEN')
-        if nominal not in (Number(6),Number(15,2),Number(75,8)):
+        if not _io_nominal_ok(nominal):  # v9; OLD RULE v8: nominal not in (6, 15/2, 75/8)
             raise ValueError('NORMATIVE_NOMINAL_INVALID')
         initial=response.targets[program['initial']]
         if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
@@ -1379,6 +1410,18 @@ def _nominal_v5(response):
     nominal_old_rule): readiness.targets_mps['EGO'], which E6 sets to the measured stock plateau, so it can never equal
     6 / 7.5 / 75/8 natively."""
     return response.targets.get('NOMINAL')
+
+
+_IO_SERIES=frozenset(6*Number(5,4)**(k-1) for k in range(-4,9))
+
+
+def _io_nominal_ok(nominal, npc=False):
+    """v9 (prereg PREREG_M56_V9_IO_NOMINAL_SERIES_20261107): an I/O EGO nominal is 6*(5/4)^(k-1) for an integer k in
+    [-4, 8], exact (FILL20 dd2954c series); the NPC of an I scene is vE - 1. OLD RULE v8 (report-only): EGO in
+    {6, 15/2, 75/8}, NPC in {5, 13/2, 67/8} = k 1..3 only, so every k outside 1..3 was blocked at admission."""
+    if type(nominal) not in (Number,int):
+        return False
+    return (nominal+1 if npc else nominal) in _IO_SERIES
 
 
 def nominal_old_rule(fixture, role='EGO'):
@@ -1429,7 +1472,7 @@ def _lateral_contract(response, fixture):
     switches=response.phases.get('reference_switches',())
     _reference_response(response,_program(response)['initial'])
     if category in ('I','O'):
-        if nominal not in ((Number(5),Number(13,2),Number(67,8)) if npc else (Number(6),Number(15,2),Number(75,8))):
+        if not _io_nominal_ok(nominal,npc=npc):  # v9; OLD RULE v8: NPC in (5, 13/2, 67/8), EGO in (6, 15/2, 75/8)
             raise ValueError('LATERAL_NOMINAL_INVALID')
         if not separation or moving[0]['start_offset_m']!=0 or moving[0]['end_offset_m']!=separation:
             raise ValueError('LATERAL_SEPARATION_INVALID')
@@ -1486,6 +1529,18 @@ def _lateral_route_v5(response, fixture):
             or any(not isinstance(w,Number) or w<=0 for w in widths.values())):
         raise ValueError('LATERAL_WIDTH_UNPROVEN')
     return geo['separation_m']
+
+
+def _lateral_separation(reference, route):
+    """v8 (docs/m56/PREREG_M56_V8_IO_ONSET_AXIS_20261027.md, Duy 2026-10-27): signed lateral separation of the reference
+    route from the response route along the CARLA right vector (_axis_right, as _lateral_axis_v5). OLD RULE (v7): the y
+    difference only, right only for +x roads (yaw 0): reversed at yaw 180, zero at yaw +-90. Identical on +x routes."""
+    a,b=reference.transforms[0],route.transforms[0]
+    axis=_axis_right(b.yaw)
+    if axis is None:
+        return Number(a.y)-Number(b.y)
+    k,sign=axis
+    return (Number((a.x,a.y)[k])-Number((b.x,b.y)[k]))*sign
 
 
 def _axis_right(yaw):
