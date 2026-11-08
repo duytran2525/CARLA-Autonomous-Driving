@@ -86,6 +86,61 @@ def runin(roads, conn, jid, need):
     return None
 
 
+CHAIN = {'on': False}  # addendum E (replace mode with state['chain'])
+
+
+def stretch_why(r, s0, s1):
+    sigs = r.find('signals')
+    if sigs is not None and any(s.get('dynamic') == 'yes' and s0 - 1e-9 <= float(s.get('s')) <= s1 + 1e-9 for s in sigs.findall('signal')):
+        return 'RUNIN_SIGNAL'
+    slope = gen.slope_profile(r)
+    if any(abs(slope(s0 + i)) > .02 for i in range(int(s1 - s0) + 1)):
+        return 'RUNIN_SLOPE'
+    for g in gen.geometries(r):
+        if g['s'] < s1 and g['s'] + g['length'] > s0 and not (g['kind'] == 'line' or (g['kind'] == 'arc' and abs(g['curv']) <= 1 / 50)):
+            return 'RUNIN_CURVE'
+    return None
+
+
+def runin_chain(town, conn, jid, need):
+    """Addendum E: the NPC run-in may continue upstream through junctions with exactly one straight (|dh| <= 10 deg)
+    connection into the current road/lane, no dynamic signal on the chain stretch, no light within 50 m before each
+    upstream junction, every road/connector of the chain within the slope/curve rule."""
+    root, roads = v2.trees[town]
+    junctions = {int(j.get('id')): j for j in root.findall('junction')}
+    r_id, lane, j, rem = conn['incoming'], conn['from'], jid, float(need)
+    for hop in range(8):
+        r = roads[r_id]; L = float(r.get('length')); at_end = v2.touching_end(r, j)
+        if at_end is None:
+            return 'TOUCH_UNKNOWN'
+        take = min(L, rem)
+        w = stretch_why(r, *((L - take, L) if at_end else (0., take)))
+        if w:
+            return w
+        rem -= take
+        if rem <= 1e-9:
+            return None
+        link = r.find('link'); far = link.find('predecessor' if at_end else 'successor') if link is not None else None
+        if far is None or far.get('elementType') != 'junction' or int(far.get('elementId')) not in junctions:
+            return 'RUNIN_SHORT'
+        jup = int(far.get('elementId'))
+        cs = [c for c in cen.connections(root, roads, junctions[jup])
+              if c['outgoing'] == r_id and abs(c['dh']) <= 10 and out_lane(roads, c) == lane]
+        if len(cs) != 1:
+            return 'RUNIN_CHAIN_AMBIGUOUS'
+        c = cs[0]; con = roads[c['connecting']]
+        w = stretch_why(con, 0., float(con.get('length')))
+        if w:
+            return w
+        if v2.signal_near_fixed(roads[c['incoming']], jup):
+            return 'RUNIN_SIGNAL'
+        rem -= float(con.get('length'))
+        if rem <= 1e-9:
+            return None
+        r_id, lane, j = c['incoming'], c['from'], jup
+    return 'RUNIN_CHAIN_LONG'
+
+
 def out_lane(roads, c):
     croad = roads[c['connecting']]
     lane = next((ln for sec in croad.find('lanes').findall('laneSection')[-1 if c['contact'] == 'start' else 0:][:1]
@@ -118,6 +173,8 @@ def cl_pool(town, excluded, skips):
             if ole is None or oln is None:
                 skips[cat]['OUT_LANE_UNKNOWN'] += 1; continue
             why = runin(roads, n, jid, 150.)
+            if why and CHAIN['on']:
+                why = runin_chain(town, n, jid, 150.)
             if why:
                 skips[cat]['NPC_' + why] += 1; continue
             out[cat].append({'town': town, 'junction': jid, 'LrefN': roads[n['connecting']].get('length'),
@@ -127,6 +184,8 @@ def cl_pool(town, excluded, skips):
     for m in v2.merges_v2(town, True):
         mf, br, jid = m['mainflow'], m['branch'], m['junction']
         why = runin(roads, br, jid, 150.)
+        if why and CHAIN['on']:
+            why = runin_chain(town, br, jid, 150.)
         if why:
             skips['M']['NPC_' + why] += 1; continue
         ol = m['outgoing'][1]
@@ -194,6 +253,7 @@ def main(out_path, commit, state_path=None):
     """state_path (addendum B3, replace mode): JSON {"slots": [...to (re)fill...], "assigned": {slot: site}, "tried":
     [sites ever assigned]}; every other slot keeps its current site (it counts in caps, junctions, roads, ladder)."""
     state = json.loads(Path(state_path).read_text(encoding='utf-8')) if state_path else None
+    CHAIN['on'] = bool(state and state.get('chain'))
     for t in TOWNS:
         assert hashlib.sha256(cen.xodr(t).read_bytes()).hexdigest() == HASHES[t], t
         cen.load(t)
