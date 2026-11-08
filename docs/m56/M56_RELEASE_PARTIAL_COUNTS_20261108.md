@@ -72,15 +72,15 @@ Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dù
 | C02 | BLOCKED_WITNESS | CONTACT, FIT, cả dưới union v6 lẫn dv1 (mép −0,106 m) | `M56_V7_RESULT_20261026.md`, `PREREG_M56_DRIVABLE_DV1_20261108.md` §4 |
 | C03 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e, phương án i) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | C04 | BLOCKED_FIXTURE | `READINESS_NOT_STEADY` | `M56_V5_NIGHT_RESULT_20261026.md` |
-| C06 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` | như trên |
-| C07 | BLOCKED_FIXTURE | sau erratum làn C0 (notation trên Shoulder → Driving): `NPC_SIGNAL_HOLD_IN_PROBE2` | `ERRATUM_M56_C0_C07_C08_LANES_20261108.md` §4 |
+| C06 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2`: đèn ở giao lộ trước lệch cố định 302 tick so với đèn neo. Không có lần neo nào cho NPC qua được khi tuân thủ đèn | `M56_V5_NIGHT_RESULT_20261026.md`; `ERRATUM_M56_SIGNAL_PHASE_V1_E5_20261108.md` §1 |
+| C07 | BLOCKED_FIXTURE | sau erratum làn C0 (notation trên Shoulder → Driving): `NPC_SIGNAL_HOLD_IN_PROBE2`. Cùng nguyên nhân với C06 (đèn 1232 lệch 302 tick), không sửa được | `ERRATUM_M56_C0_C07_C08_LANES_20261108.md` §4; `ERRATUM_M56_SIGNAL_PHASE_V1_E5_20261108.md` §1 |
 | L02 | BLOCKED_WITNESS | GROUND, CONTACT | `M56_V7_RESULT_20261026.md` |
 | L03 | BLOCKED_FIXTURE | C4 `CONFLICT_COMPONENTS_TOO_CLOSE` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | L05 | BLOCKED_FIXTURE | `NPC_TURN_SPEED` (mục e) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | L06 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e) | như trên |
 | L07 | FAILED | thiếu CLEAR_N, E_ENTRY, DESTINATION; B có EARLY_ENTRY | `M56_V7_RESULT_20261026.md` |
 | L08 | BLOCKED_FIXTURE | `PHASING_ROOM` | `M56_V5_NIGHT_RESULT_20261026.md` |
-| M01 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` (cl-v1 b) | `M56_CL_V1_RESULT_20261108.md` |
+| M01 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` (cl-v1 b): đèn S1 nằm sau điểm xuất phát đã phasing. Sau erratum E5: `SIGNAL_E5_NO_LIGHT`, vì vạch dừng của đèn thật nằm sau trạm vào vài cm | `M56_CL_V1_RESULT_20261108.md`, `ERRATUM_M56_SIGNAL_PHASE_V1_E5_20261108.md` |
 | M02 | BLOCKED_WITNESS | `INITIALIZATION_INVALID`: điểm xuất phát trên dốc −1,35°, giới hạn pitch ban đầu 0,1° | như trên |
 | M03, M05 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | M04 | BLOCKED_FIXTURE | `READINESS_NOT_STEADY` | `M56_V5_M_E3_RESULT_20261025.md` |

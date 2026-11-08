@@ -74,6 +74,18 @@ Trường `signal_e5` của `prepare.json` ghi cả đèn cũ lẫn đèn mới.
 **Giới hạn phải ghi kèm kết quả:** M01 dùng dv1, là luật vùng drivable đặt sau khi thấy số (của C02, M07, C08). Nếu M01 PASS thì
 nó hợp lệ kèm các điều kiện: E5, cl-v1 b (probe dài 60 s), dv1, consumer v6+.
 
-## 4. Kết quả
+## 4. Kết quả (08/11/2026)
 
-(điền sau khi chạy)
+Log `outputs/m56_sig5_20261108T051340Z` (stdout `outputs/m56_sig5_20261108.stdout.txt`); revision (không dùng) `outputs/m56_c0_partial_io_sig5_20261108T051607Z`; chuẩn bị `outputs/m56_v2_prepare_Town04_20261108T051341Z`; tooling `d3f1b81`; product
+`1db746f`.
+
+**M01: BLOCKED_FIXTURE `SIGNAL_E5_NO_LIGHT`.** Không có A/B, nên quota P5 không bị dùng.
+- E5 đã kích hoạt đúng: đèn cũ 1619 (trạm dừng 121,96 m) nằm sau điểm xuất phát đã phasing (139,21 m).
+- S1 chạy lại trên route đã phasing nhưng không trả về đèn nào. Trạm vào xung đột trên route đó là 199,578 − 139,210 = 60,368 m.
+  Vạch dừng của 1616 nằm ở khoảng 60,4 m (diag §1, theo điểm route gần nhất), tức **sau** trạm vào vài centimet. Tiêu chí
+  "trạm dừng ≤ trạm vào xung đột" vì vậy loại 1616.
+- **Đính chính §1:** câu "1616 đạt mọi tiêu chí S1" là sai. Diag dùng trạm xuất phát probe 1 (139,12 m) thay vì điểm cắt thật
+  (139,21 m), nên tính ra trạm vào 60,46 m thay vì 60,368 m.
+
+Theo §3, không nới tiêu chí trạm (việc đó sẽ là luật đặt sau khi thấy số) và không chạy lại. Kết quả: không thêm cặp nào; C06,
+C07 và M01 vẫn bị chặn; **tổng vẫn 10 cặp**.
