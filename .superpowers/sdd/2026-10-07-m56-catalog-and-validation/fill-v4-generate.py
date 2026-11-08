@@ -151,7 +151,23 @@ def excluded_sets():
     return jun, roads
 
 
-def main(out_path, commit):
+def kappa_max(town, road):
+    """Addendum B1: max |curvature| over the arc records of a road (connector)."""
+    r = v2.trees[town][1][road]
+    return max([abs(float(g[0].get('curvature'))) for g in r.find('planView').findall('geometry') if g[0].tag == 'arc'] or [0.])
+
+
+def section_length(x):
+    """Addendum B2: length of the laneSection io_recipe builds on (site road, site section)."""
+    roads = v2.trees[x['town']][1]; secs = gen.sections(roads[x['road']])
+    _, s0, s1, _ = secs[x['section']]
+    return s1 - s0
+
+
+def main(out_path, commit, state_path=None):
+    """state_path (addendum B3, replace mode): JSON {"slots": [...to (re)fill...], "assigned": {slot: site}, "tried":
+    [sites ever assigned]}; every other slot keeps its current site (it counts in caps, junctions, roads, ladder)."""
+    state = json.loads(Path(state_path).read_text(encoding='utf-8')) if state_path else None
     for t in TOWNS:
         assert hashlib.sha256(cen.xodr(t).read_bytes()).hexdigest() == HASHES[t], t
         cen.load(t)
@@ -188,6 +204,10 @@ def main(out_path, commit):
                 w = runin(v2.trees[x['town']][1], x['ego'], x['junction'], float(d['G'] + VE[cat] ** 2 / 3 + 20))
                 if w:
                     why['EGO_' + w] += 1
+                elif state and float(vN) ** 2 * kappa_max(x['town'], x['npc']['connecting']) > 2.25:
+                    why['B1_TURN_GATE'] += 1
+                elif state and tried(x):
+                    why['B3_TRIED'] += 1
                 else:
                     out.append((x, d))
             return out, why
@@ -206,6 +226,10 @@ def main(out_path, commit):
                 why['AXIS_RUN_SHORT'] += 1
             elif any((x['town'], r) in used_roads for r in x['roads']):
                 why['EXCLUDED_ROAD'] += 1
+            elif state and section_length(x) < vEf ** 2 / 3 + 20 + ((7 * vEf + 3.75) if cat == 'I' else (rs + 3 * vEf + 3.75)) + 15:
+                why['B2_ONE_ROAD_WINDOW'] += 1
+            elif state and tried(x):
+                why['B3_TRIED'] += 1
             else:
                 out.append((x, d))
         return out, why
@@ -259,9 +283,23 @@ def main(out_path, commit):
         except OverflowError:
             return False
 
+    sk = lambda x: json.dumps({k_: x.get(k_) for k_ in ('town', 'junction', 'road', 'section', 'notation', 'roads', 'lanes')}, sort_keys=True)
+    tried_keys = {sk(x) for x in (state or {}).get('tried', [])}
+    tried = lambda x: sk(x) in tried_keys
+    if state:
+        for slot_, x in sorted(state['assigned'].items()):
+            if slot_ in state['slots']:
+                continue
+            cat_ = slot_[0]; k_ = SLOTS[cat_][slot_]
+            if cat_ in 'CLM':
+                vN_ = vNk(k_); L_ = F(x['LrefN']); held[cat_].append({'vN': vN_, 'G': derive_g(VE[cat_], vN_, L_), 'LrefN': L_})
+            else:
+                vE_ = series(F(6), F(5, 4), k_)
+                held[cat_].append({'vE': vE_, 'gap': series(F(6), F(13, 10), k_)} if cat_ == 'I' else {'vE': vE_, 'G': series(F(15), F(13, 10), k_)})
+            used_j, counts, site_uses = take(cat_, x, used_j, counts, site_uses)
     for cat in 'CLMIO':
         pool = sorted(pools[cat], key=key); random.Random(SEED + OFFSET[cat]).shuffle(pool)
-        slots = sorted(SLOTS[cat])
+        slots = sorted(s_ for s_ in SLOTS[cat] if not state or s_ in state['slots'])
         elig, swhy = {}, {}
         for s in slots:
             elig[s], swhy[s] = static(cat, SLOTS[cat][s], pool)
@@ -321,4 +359,4 @@ def main(out_path, commit):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[4] if len(sys.argv) > 4 and sys.argv[3] == '--replace' else None)
