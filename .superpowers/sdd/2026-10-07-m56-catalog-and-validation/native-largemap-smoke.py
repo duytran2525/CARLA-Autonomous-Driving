@@ -5,7 +5,7 @@ spawn vehicle.audi.a2 at both, apply throttle 0.4 for 300 synchronous ticks (0.0
 max |dz| per tick, distance travelled, ground_projection label under it at the end, and the large-map settings.
 A failure is capability evidence (no harness change here).
 usage: python -I native-largemap-smoke.py Town12,Town13"""
-import json, math, sys
+import json, math, os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from native_v2_common import own_server, NO_RENDER
@@ -33,6 +33,12 @@ with own_server(log) as (client, proc, start):
             for v in vs:
                 if v: v.destroy()
             continue
+        if os.environ.get('M56_SMOKE_SPECTATOR') == '1':  # variant: spectator above the pair midpoint before ticking
+            mid = carla.Location((pair[0].location.x + pair[1].location.x) / 2, (pair[0].location.y + pair[1].location.y) / 2,
+                                 max(pair[0].location.z, pair[1].location.z) + 50.)
+            world.get_spectator().set_transform(carla.Transform(mid, carla.Rotation(pitch=-90.)))
+            for _ in range(20):
+                world.tick(120.)
         world.tick()
         z0 = [v.get_location().z for v in vs]; p0 = [v.get_location() for v in vs]; zprev = list(z0); dzmax = [0., 0.]
         for _ in range(300):
@@ -49,7 +55,7 @@ with own_server(log) as (client, proc, start):
                         'max_dz_per_tick': round(dzmax[i], 4), 'travelled_m': round(loc.distance(p0[i]), 1),
                         'ground': None if g is None else str(g.label)})
             v.destroy()
-        log(event='SMOKE', town=town, tile_stream_distance=getattr(s, 'tile_stream_distance', None),
+        log(event='SMOKE', town=town, spectator=os.environ.get('M56_SMOKE_SPECTATOR') == '1', tile_stream_distance=getattr(s, 'tile_stream_distance', None),
             actor_active_distance=getattr(s, 'actor_active_distance', None), vehicles=out)
         s.synchronous_mode, s.fixed_delta_seconds = False, None; world.apply_settings(s)
 print('SMOKE_END')

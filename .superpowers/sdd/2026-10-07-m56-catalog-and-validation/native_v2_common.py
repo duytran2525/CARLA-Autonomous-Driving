@@ -113,6 +113,22 @@ V6 = os.environ.get('M56_RECIPE', 'v5') == 'v6'
 DV1 = os.environ.get('M56_DRIVABLE', '') == 'dv1'
 
 
+# A-SEL2 large maps (2026-11-08, native-largemap-smoke.py): actors > actor_active_distance (2000 m) from the spectator are
+# dormant and tiles are not streamed. M56_SPECTATOR=1 puts the spectator 50 m above the scene centre (top-down) and streams
+# 20 ticks BEFORE any spawn / ground query of a scene. Unset keeps every byte of the earlier behaviour.
+SPECTATOR = os.environ.get('M56_SPECTATOR', '') == '1'
+
+
+def stream_to(world, x, y, z):
+    if not SPECTATOR:
+        return None
+    import carla
+    world.get_spectator().set_transform(carla.Transform(carla.Location(float(x), float(y), float(z) + 50.), carla.Rotation(pitch=-90.)))
+    for _ in range(20):
+        world.tick(120.) if world.get_settings().synchronous_mode else world.wait_for_tick(120.)
+    return {'spectator': [float(x), float(y), float(z) + 50.], 'stream_ticks': 20}
+
+
 def load(client, town):
     world = client.load_world(town)
     for _ in range(3):

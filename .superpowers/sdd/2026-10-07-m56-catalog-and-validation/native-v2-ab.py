@@ -138,6 +138,10 @@ def run_scene(c, client, proc, start, world, m, identity):
         overlap = selection[0] if selection else overlap
     lo = tuple(min(v[k] for b in overlap for v in b) for k in range(3))
     hi = tuple(max(v[k] for b in overlap for v in b) for k in range(3))
+    from native_v2_common import stream_to
+    streamed = stream_to(world, (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)  # A-SEL2 large maps
+    if streamed:
+        log(event='STREAM_TO', scene=c.id, **streamed)
     region, _, _ = lane_width_region(m, {r_: rows[r_][0] for r_ in rows}, lo, hi)  # V3.2, same rule as preparation
     merge_caps = ()
     if c.category == 'M':  # v4 P3: domain = merge transition box (same rule as preparation)

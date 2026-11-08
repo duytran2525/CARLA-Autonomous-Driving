@@ -98,6 +98,10 @@ def compile_scene(c, world, m, identity, proc, start, sd):
     pts = [(t.x, t.y) for r in routes.values() for t in r.transforms]
     center = ((min(p[0] for p in pts) + max(p[0] for p in pts)) / 2, (min(p[1] for p in pts) + max(p[1] for p in pts)) / 2)
     radius = max(math.dist(p, center) for p in pts) + 20.  # the union covers every route point (O routes are ~200 m)
+    from native_v2_common import stream_to
+    streamed = stream_to(world, center[0], center[1], sum(t.z for r in routes.values() for t in r.transforms) / sum(len(r.transforms) for r in routes.values()))
+    if streamed:  # A-SEL2 large maps: stream before the drivable raster and the spawns
+        log(event='STREAM_TO', scene=c.id, **streamed)
     drivable = drivable_union(m, center, radius, world, froutes)
     dpath = sd / 'drivable-union.wkt'; dpath.write_text(drivable.wkt, encoding='utf-8')
     dref = SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')

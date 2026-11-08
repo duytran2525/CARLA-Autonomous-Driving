@@ -438,6 +438,14 @@ def main():
         for c in scenes:
             try:
                 assert c.category in ('O', 'I'), 'I/O scenes only'
+                from native_v2_common import stream_to, SPECTATOR
+                if SPECTATOR:  # A-SEL2 large maps: stream the site before any spawn / ground query
+                    g_ = geometry(c, m)
+                    w_ = (m.get_waypoint_xodr(int(g_['road']), int(g_['ego_lane']), (float(g_['front_t0_s']) + float(g_['X_s'])) / 2)
+                          or m.get_waypoint_xodr(int(g_['road']), int(g_['ego_lane']), float(g_['front_t0_s'])))
+                    if w_ is not None:
+                        q_ = w_.transform.location
+                        log(event='STREAM_TO', scene=c.id, **stream_to(world, q_.x, q_.y, q_.z))
                 prepare_o(c, client, proc, start, world, m, identity, body, bbox)
             except Exception as e:  # recorded, scene stays blocked; never retried with other values
                 log(event='SCENE_ERROR', scene=c.id, error=repr(e), trace=traceback.format_exc()[-2500:])

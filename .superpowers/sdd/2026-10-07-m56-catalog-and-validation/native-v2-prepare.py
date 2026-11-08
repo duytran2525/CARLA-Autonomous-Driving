@@ -202,6 +202,10 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
         assert not hasattr(s, 'reasons'), f'SECTIONS_BLOCKED:{role}:{s.reasons}'
     e_entry, n_entry = float(sections['EGO'][0].route_station), float(sections['NPC'][0].route_station)
     log(event='DOMAIN', scene=c.id, connected=connected, e_entry=e_entry, n_entry=n_entry, boxes=len(overlap))
+    from native_v2_common import stream_to
+    streamed = stream_to(world, (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)  # A-SEL2 large maps
+    if streamed:
+        log(event='STREAM_TO', scene=c.id, **streamed)
     # start poses: route arc 0, ground + 1 cm, float32 images
     def pose_at(route, along=.02):
         """Spawn 2 cm downstream of the start point (EGO: the frozen v1 arc 0; NPC: its v2 route start) so the
