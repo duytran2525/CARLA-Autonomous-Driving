@@ -5,7 +5,7 @@ frame (= the frozen t0 event of the category's metric window), then
          (product m56.geometry project_route / world_vertices on the frozen EGO route);
   I/O:   vE_r = EGO mean planar speed over [T - 1 s, T].
 Each value is exact (Fraction of the binary64 result) and bound to the sha256 of the observation file of frame T.
-LrefN_r and gap_r: not implemented yet (reported missing; the comparison then stays BLOCKED, never guessed).
+gap_r (I/O): not implemented yet (reported missing; the comparison then stays BLOCKED, never guessed).
 usage: python -I native-realized-descriptors.py OUT.json SCENE_AB_DIR [SCENE_AB_DIR ...]"""
 import glob, hashlib, json, math, sys
 from fractions import Fraction as F
@@ -56,6 +56,15 @@ def scene(d):
             st = [F(x) for x in st if not hasattr(x, 'reasons')]
             if st:
                 out.setdefault('G', {})[act] = (str(e_entry - max(st)), ref, 1)
+    if cat in 'CL':  # LrefN_r: fixture geometry (spec doc 2 note): road/@length of the connector ref of the frozen NPC route
+        import xodr_routes as xr
+        nroute = decode_record('DirectedRoute', fx['routes']['NPC'])
+        con = next((r for r in nroute.refs[1:2]), None)
+        if con is not None:
+            L = xr.roads(con.town)[int(con.road_id)].get('length')
+            fref = {'uri': str((d / 'fixture-frozen.json').resolve()), 'sha256': hashlib.sha256((d / 'fixture-frozen.json').read_bytes()).hexdigest(),
+                    'bytes': (d / 'fixture-frozen.json').stat().st_size, 'version': '1', 'method': 'sha256', 'kind': 'FROZEN_FIXTURE'}
+            out['LrefN'] = {act: (str(F(L)), fref, 1) for act in ('A', 'B') if act in out.get('vN', {})}
     return {'scene': d.name, 'category': cat, 'values': out,
             'missing': [n for n in (('vN', 'G', 'LrefN') if cat in 'CL' else ('vN', 'G') if cat == 'M' else ('vE', 'gap' if cat == 'I' else 'G'))
                         if set(out.get(n, {})) != {'A', 'B'}]}
