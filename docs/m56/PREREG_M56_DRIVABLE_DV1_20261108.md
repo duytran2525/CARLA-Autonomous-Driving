@@ -49,3 +49,28 @@ code.
   consumer v9 và v6.
 - Cảnh vẫn hỏng thì ghi lại; không chỉnh thêm, không chạy lại.
 - Các cặp đã PASS (C01, C05, L01, L04, …) **không** chạy lại; kết quả của chúng vẫn là kết quả dưới union v6.
+
+## 4. Kết quả (08/11/2026)
+
+Log `outputs/m56_dv1_20261108T021201Z`; revision `outputs/m56_c0_partial_io_dv1_20261108T021202Z`; product `1db746f`; tooling
+`aa41707`. Mỗi cảnh một A/B dưới dv1.
+
+| Cảnh | A/B dv1 | Pair v9 | Pair v6 | Mép đường nhỏ nhất (v6 → dv1) | Lý do còn lại |
+|---|---|---|---|---|---|
+| C02 | `m56_v2_ab_Town04_20261108T021209Z` | BLOCKED_WITNESS | BLOCKED_WITNESS | khoảng −0,2 → −0,106 m | CONTACT, FIT: NPC vẫn lấn khoảng 0,1 m ở cùng khúc cua |
+| M07 | `m56_v2_ab_Town05_20261108T022849Z` | BLOCKED_WITNESS | BLOCKED_WITNESS | khoảng −0,3 → −0,048 m | CONTACT, FIT: NPC lấn khoảng 5 cm ở khúc cua sát vỉa hè |
+| **C08** | `m56_v2_ab_Town06_20261108T025717Z` | **PASS** | **PASS** | −47 → **+0,502 m** | — |
+
+**C08:** A và B đều CONFIRMED / COMPLETE / VALID.
+- A (dừng nhường): d_yield 2,0582 m, t_entry 7,5 s.
+- B (giảm tốc nhường): d_yield 6,1162 m, t_entry 5,65 s.
+- Comparisons: 0,6635 và 0,2467.
+
+Pair: `outputs/m56_v6_pair_20261108T030910Z` (v9) và `outputs/m56_v6_pair_20261108T031628Z` (v6).
+
+**C08 là cặp hợp lệ, kèm các điều kiện:**
+- erratum C0 làn (`ERRATUM_M56_C0_C07_C08_LANES_20261108.md`);
+- vùng drivable dv1, là **luật đặt sau khi thấy số**;
+- consumer v6+.
+
+Theo luật cũ (union v6), C08 là BLOCKED_WITNESS. C02 và M07 đã dùng hết quota của dv1; không chỉnh thêm, không chạy lại.

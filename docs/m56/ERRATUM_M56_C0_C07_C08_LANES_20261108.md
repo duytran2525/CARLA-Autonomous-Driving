@@ -65,8 +65,9 @@ tooling `074fae3`.
 | C08 | PREPARED, T_r 7,3 s | `outputs/m56_v2_ab_Town06_20261108T013131Z`, FROZEN, ADMITTED | BLOCKED_WITNESS | BLOCKED_WITNESS |
 
 C08, cả A và B: spawn CONFIRMED, physical UNKNOWN, witness INVALID; lý do `CONTACT_PROOF_INVALID`, `CONTINUOUS_FIT_UNPROVEN`.
-Đây là cùng nhóm lỗi với C02 và M07. Vùng drivable đóng băng không gồm Shoulder và mặt giao lộ (mục b của
-`M56_V5_NIGHT_RESULT_20261026.md`, chưa được duyệt). Pair: `outputs/m56_v6_pair_20261108T014116Z` (v9) và `..._014720Z` (v6).
+Đây là cùng nhóm lỗi với C02 và M07. **Đính chính:** bản đầu của câu này ghi rằng mục b (vùng drivable gồm mặt đường) chưa được
+duyệt. Điều đó sai: v6 b đã được duyệt và đã có trong code. Nguyên nhân thật của C08 là NPC chạy ra khỏi phạm vi dựng union (xem
+`PREREG_M56_DRIVABLE_DV1_20261108.md` §1). Dưới dv1, C08 PASS (§4 của tài liệu đó). Pair: `outputs/m56_v6_pair_20261108T014116Z` (v9) và `..._014720Z` (v6).
 
 Erratum làm hai cảnh chạy được tới bước chuẩn bị, nhưng không thêm cặp hợp lệ nào. Tổng vẫn 9 cặp. Theo prereg, không chỉnh thêm
 và không chạy lại.
