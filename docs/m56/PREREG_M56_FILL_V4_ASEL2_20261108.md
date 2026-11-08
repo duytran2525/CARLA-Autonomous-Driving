@@ -190,3 +190,26 @@ M01, M02, M03 ở Town13). Thay cảnh lần 1 (`outputs/m56_fill_v4_replace1_20
    số đếm, catalog hay release. Trình dựng revision đánh dấu chúng `FAILED_TRIALED` (`M56_ASEL2_FAILED`).
 
 Hệ quả phải báo: nếu không cảnh M nào ở Town12/13 hỏng thì loại M chỉ có 6 cảnh, nên không đạt 46 và tối đa 22 junction.
+
+## Addendum D (08/11/2026): cổng dốc tại điểm xuất phát (B4)
+
+**Thời điểm:** trong batch `m56_asel2_cl_20261108T083410Z`, trước bất kỳ A/B nào của đợt.
+- Kiểm pitch ở frame đầu probe 2 của các cảnh PREPARED: C04-S1 có EGO 0,697°, M05-S1 có EGO −0,971°. Product đòi |pitch| ≤ 0,1°
+  tuyệt đối ở frame quan sát đầu tiên (`m56/evidence.py` `_initial_state_matches`). Hai cảnh này vì vậy sẽ hỏng
+  `INITIALIZATION_INVALID` ở A/B, đúng như M02 gốc.
+- C06-S1 và M02-S1 cần pitch NPC khoảng 1° (cl-v1 a), nên cũng sẽ hỏng như vậy.
+- Nguyên nhân: luật chạy đà ở §3 cho |độ dốc| ≤ 0,02 (khoảng 1,15°), lỏng hơn cổng 0,1° của product. Lỗi nằm ở luật chọn của
+  Claude, không phải ở ngưỡng đo.
+
+**B4 (áp cho mọi successor từ nay):**
+- |độ dốc dọc| ≤ 0,0015 (khoảng 0,086°, dưới 0,1° với biên nhỏ), lấy mẫu mỗi 1 m:
+  - EGO: tại 10 m đầu của đoạn chạy đà (quanh điểm spawn);
+  - NPC: trên **toàn bộ** 150 m chạy đà, vì điểm xuất phát sau phasing có thể nằm ở bất kỳ đâu trong đó.
+- Thêm điều kiện: road không có `superelevation` nào khác 0 trên các đoạn đó, để roll cũng ≤ 0,1°.
+- B4 là luật chọn, đặt sau khi thấy lỗi dự đoán được. Nó không đổi ngưỡng 0,1° của product. Ứng viên bị B4 loại thì chưa admit,
+  nên không tiêu lượt.
+
+**Hệ quả với các cảnh hiện có:**
+- C06-S1 và M02-S1 được xếp là hỏng: chúng đã trial ở bước chuẩn bị, và không có luật nào cứu được mà vẫn qua cổng 0,1°.
+  Sửa kỹ thuật 2 không áp cho chúng.
+- C04-S1 và M05-S1 vẫn chạy A/B như batch đã định, và kết quả được ghi đúng như đo.
