@@ -412,3 +412,45 @@ def test_asel2_descriptor_sets_by_category_and_aliases(require,parameter_case):
     aliased={k:({**d,'aliases':(k+'_m',)} if k==name else d) for k,d in c.policies.descriptor_specs.items()}
     assert compare(renamed(c.a),renamed(c.b),replace(c.policies,descriptor_specs=aliased),()).values==flat.values
     assert compare(renamed(c.a),renamed(c.b),c.policies,()).status=='BLOCKED_COMPARABILITY'
+
+
+def _realized_setup(parameter_case, tmp_path, va, vb):
+    import hashlib
+    from dataclasses import replace
+    from fractions import Fraction as F
+    from m56.model import SourceRef
+    c = parameter_case()
+    raw = tmp_path / 'raw.json'; raw.write_bytes(b'{"frames": 1}')
+    ref = SourceRef(str(raw), hashlib.sha256(raw.read_bytes()).hexdigest(), raw.stat().st_size, '1', 'sha256', 'NATIVE_RAW')
+    d = lambda q: {'unit': 'm', 'source_actions': ('A', 'B'), 'aggregation': 'mean_of_A_and_B', 'event': 't0',
+                   'window': 'at t0', 'reference': 'test', 'physical_quantity': q, 'refs': (ref,)}
+    pol = replace(c.policies, descriptor_specs={'realized_by_category': {c.a.category: {'x': d('qx'), 'y': d('qy')}}})
+    realized = {c.a.id: {'x': {'A': (F(va[0]), ref), 'B': (F(va[1]), ref)}, 'y': {'A': (F(10), ref), 'B': (F(10), ref)}},
+                c.b.id: {'x': {'A': (F(vb[0]), ref), 'B': (F(vb[1]), ref)}, 'y': {'A': (F(20), ref), 'B': (F(20), ref)}}}
+    return c, pol, realized, ref
+
+
+def test_asel2_realized_mean_of_both_actions(require, parameter_case, tmp_path):
+    from fractions import Fraction as F
+    compare = require('m56.catalog', 'compare_realized')
+    # a: A=10, B=14 -> mean 12; b: A=15, B=15 -> 15; Delta = 3/15 = 0.2 exactly (no epsilon); y: 10 vs 20 -> 0.5
+    c, pol, realized, _ = _realized_setup(parameter_case, tmp_path, (10, 14), (15, 15))
+    r = compare(c.a, c.b, realized, pol, ())
+    assert r.declared_or_realized == 'REALIZED' and r.aggregation == 'mean_of_A_and_B'
+    assert r.values[0] == (F(12), F(15)) and r.deltas[0] == F(1, 5)
+    assert r.status == 'REVIEW_REQUIRED'  # both descriptors >= 0.20, but no D09 review
+    # the favourable single action (b.A=15 vs a.B=14 -> 1/15) is never chosen; a smaller mean gap fails
+    c, pol, realized, _ = _realized_setup(parameter_case, tmp_path, (12, 14), (15, 15))
+    assert compare(c.a, c.b, realized, pol, ()).status == 'DIVERSITY_DEFICIT'
+
+
+def test_asel2_realized_blocks_missing_or_unverified(require, parameter_case, tmp_path):
+    from dataclasses import replace
+    compare = require('m56.catalog', 'compare_realized')
+    c, pol, realized, ref = _realized_setup(parameter_case, tmp_path, (10, 14), (15, 15))
+    missing = {**realized, c.b.id: {k: {'A': v['A']} for k, v in realized[c.b.id].items()}}
+    assert compare(c.a, c.b, missing, pol, ()).status == 'BLOCKED_COMPARABILITY'
+    bad = replace(ref, sha256='0' * 64)
+    tampered = {**realized, c.a.id: {k: {a: (v[a][0], bad) for a in 'AB'} for k, v in realized[c.a.id].items()}}
+    assert compare(c.a, c.b, tampered, pol, ()).status == 'BLOCKED_COMPARABILITY'
+    assert compare(c.a, c.b, realized, replace(c.policies, descriptor_specs={}), ()).status == 'BLOCKED_COMPARABILITY'
