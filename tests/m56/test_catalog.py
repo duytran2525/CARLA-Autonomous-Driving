@@ -454,3 +454,22 @@ def test_asel2_realized_blocks_missing_or_unverified(require, parameter_case, tm
     tampered = {**realized, c.a.id: {k: {a: (v[a][0], bad) for a in 'AB'} for k, v in realized[c.a.id].items()}}
     assert compare(c.a, c.b, tampered, pol, ()).status == 'BLOCKED_COMPARABILITY'
     assert compare(c.a, c.b, realized, replace(c.policies, descriptor_specs={}), ()).status == 'BLOCKED_COMPARABILITY'
+
+
+def test_v11_prereg_parameters_need_a_bound_rationale_review(require, parameter_case):
+    from dataclasses import replace
+    from m56.catalog import _digest
+    from m56.model import ReviewRecord, encode_record
+    compare = require('m56.catalog', 'compare_parameters')
+    c = parameter_case()
+    base = compare(c.a, c.b, c.policies, ())
+    pre = lambda x: replace(x, parameters={k: replace(v, status='PROPOSED_PREREG_NOT_READY') for k, v in x.parameters.items()})
+    a, b = pre(c.a), pre(c.b)
+    assert compare(a, b, c.policies, ()).status == 'BLOCKED_COMPARABILITY'   # no rationale review
+    def rv(x):
+        r = ReviewRecord(_digest(x.parameters), 'PARAMETER_RATIONALE', (c.ref,), 'CLAUDE_TEST', '2026-11-08', 'APPROVED',
+                         ('registered series',), c.ref)
+        return replace(x, environment={**x.environment, 'rationale_review': encode_record(r)})
+    assert compare(rv(a), rv(b), c.policies, ()).values == base.values
+    stale = replace(rv(a), parameters={k: replace(v, rationale='edited') for k, v in a.parameters.items()})
+    assert compare(stale, rv(b), c.policies, ()).status == 'BLOCKED_COMPARABILITY'  # review bound to other parameters
