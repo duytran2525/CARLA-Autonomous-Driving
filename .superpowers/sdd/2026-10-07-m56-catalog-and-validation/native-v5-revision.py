@@ -236,8 +236,8 @@ def asel2_additions(done, out, decision_ref, xodr, weather):
     entries = {e['slot']: e for e in fill['entries']}
     for n, f in enumerate(filter(None, __import__('os').environ.get('M56_ASEL2_REPLACE', '').split(',')), 1):
         for e in json.loads(Path(f).read_text(encoding='utf-8'))['entries']:
-            if e['status'] == 'PROPOSED':
-                entries[e['slot']] = e; rounds[e['slot']] = n
+            if e['status'] == 'PROPOSED':  # successor number counts per slot (S2 = first replacement of that slot)
+                entries[e['slot']] = e; rounds[e['slot']] = rounds.get(e['slot'], 0) + 1
     fill = {**fill, 'entries': [entries[s] for s in sorted(entries)]}
     fill_ref, prereg_ref = cr.st.ref(Path(ASEL2_FILL), 'M56_SELECTION_RECEIPT'), cr.st.ref(ASEL2_PREREG, 'PREREGISTRATION')
     def attest(digest, scope, why):

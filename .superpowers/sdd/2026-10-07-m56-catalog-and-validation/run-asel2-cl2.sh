@@ -6,7 +6,7 @@
 #  5. pair under consumer v10 (= v9 consumer) and v6. One own server at a time. No re-run of any scene.
 # usage: bash run-asel2-cl.sh "Town11:M56-P-M04-S1,M56-P-M07-S1 Town12:..."
 cd "$(dirname "$0")"
-export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v10
+export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_SPAWN_TILT=${M56_SPAWN_TILT:-} M56_ASEL2_REPLACE=${M56_ASEL2_REPLACE:-} M56_CODE=${M56_CODE:-D:/AI/CARLA-Funny-Moments.worktrees/m56-v10}
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'; LOG=$A/m56_asel2_cl2_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
@@ -37,6 +37,7 @@ for spec in $1; do
   for s in $(echo $N | tr ',' ' '); do
     [ -d "$D/$s/run" ] || continue
     $PY -I -X utf8 native-v6-pair.py $D/$s >> $LOG/pair-v10.log 2>&1
+    M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v10 $PY -I -X utf8 native-v6-pair.py $D/$s >> $LOG/pair-v10abs.log 2>&1
     M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v6 $PY -I -X utf8 native-v6-pair.py $D/$s >> $LOG/pair-v6.log 2>&1
     echo "$s v10: $(grep -o '"scene": "'$s'", "status": "[A-Z_]*"' $LOG/pair-v10.log | tail -1)  v6: $(grep -o '"scene": "'$s'", "status": "[A-Z_]*"' $LOG/pair-v6.log | tail -1)"
   done

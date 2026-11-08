@@ -5,9 +5,9 @@
 # pointwise) -> pair under consumer v10 and v8. One own server at a time; no scene is ever re-run.
 # usage: bash run-asel2-io.sh "Town12:M56-P-I01-S1,... Town13:..."
 cd "$(dirname "$0")"
-export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v10 \
-       M56_IO_BOX_ANCHOR=midpoint M56_ASEL2_IO=1 \
-       M56_ASEL2_REPLACE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace1_20261108.json
+export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_CODE=${M56_CODE:-D:/AI/CARLA-Funny-Moments.worktrees/m56-v10} \
+       M56_IO_BOX_ANCHOR=midpoint M56_ASEL2_IO=1 M56_SPAWN_TILT=${M56_SPAWN_TILT:-} \
+       M56_ASEL2_REPLACE=${M56_ASEL2_REPLACE:-D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace1_20261108.json}
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'; LOG=$A/m56_asel2_io_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
@@ -43,7 +43,7 @@ for spec in $1; do
       timeout 3000 $PY -I -X utf8 native-io-ab.py $REVF $t $s --ab > $LOG/ab-$s.log 2>&1
     D=$(done_path $LOG/ab-$s.log)
     [ -d "$D/$s/run" ] || { echo "$s: no run directory"; grep -a '"event"' $LOG/ab-$s.log | tail -2 | cut -c1-300; continue; }
-    for code in $M56_CODE D:/AI/CARLA-Funny-Moments.worktrees/m56-v8; do
+    for code in $M56_CODE D:/AI/CARLA-Funny-Moments.worktrees/m56-v10; do
       M56_CODE=$code $PY -I -X utf8 native-v6-pair.py $D/$s > $LOG/pair-${s}-$(basename $code).log 2>&1
       echo "$s pair $(basename $code): $(grep '"status"' $LOG/pair-${s}-$(basename $code).log | tail -1 | cut -c1-200)"
     done
