@@ -635,7 +635,20 @@ def _initial_state_matches(actor,pose):
     CARLA vehicle is only observable after one physics step, by which time it has settled 1-2 mm with a few mm/s
     (native g4 probe 2026-10-23), so the old rule can never hold natively. NEW RULE: x/y/yaw equal the float32
     image of the frozen pose within 1e-4; 0 <= z_frozen - z_observed <= 0.02 m (measured spawn clearance);
-    |pitch|,|roll| <= 0.1 deg; speed <= 0.10 m/s (the spec's settle/stop threshold)."""
+    |pitch - pitch_frozen|,|roll - roll_frozen| <= 0.1 deg (m56-v11, A-SEL2 6; v10 compared with 0, kept as
+    initial_tilt_absolute_rule); speed <= 0.10 m/s (the spec's settle/stop threshold)."""
+    from .response import _f32
+    from .metrics import _speed
+    a=actor.pose;yaw=(a.yaw-_f32(pose.yaw)+180)%360-180;speed=_speed(actor.velocity)
+    return (abs(a.x-_f32(pose.x))<=1e-4 and abs(a.y-_f32(pose.y))<=1e-4 and abs(yaw)<=1e-4
+            and 0<=pose.z-a.z<=.02 and abs(a.pitch-_f32(pose.pitch))<=.1 and abs(a.roll-_f32(pose.roll))<=.1
+            and speed is not None and speed<=Fraction(1,10))
+
+
+def initial_tilt_absolute_rule(actor,pose):
+    """Report-only (m56-v11, spec addendum A-SEL2 6, Duy 2026-11-08, POST-NUMBER): the m56-v10 rule kept verbatim,
+    |pitch|,|roll| <= 0.1 deg ABSOLUTE. v11 compares them with the frozen spawn pose instead (a vehicle at rest on a
+    1 deg grade has 1 deg pitch; the old rule only held on near-flat starts). Every result reports both."""
     from .response import _f32
     from .metrics import _speed
     a=actor.pose;yaw=(a.yaw-_f32(pose.yaw)+180)%360-180;speed=_speed(actor.velocity)
