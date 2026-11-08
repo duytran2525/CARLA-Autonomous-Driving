@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 export M56_NO_RENDER=1 M56_RECIPE=v6 M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v9
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'; LOG=$A/m56_cl_v1_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
-REV_M=$(ls -d $A/m56_c0_partial_v5g_2*/c0-partial-v5-frozen-revision.json | tail -1)
+REV_M=${CLV1_PREP_REV:-$(ls -d $A/m56_c0_partial_v5g_2*/c0-partial-v5-frozen-revision.json | tail -1)}
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
 echo "product $(git -C $M56_CODE log -1 --format=%h) tooling $(git -C ../../.. log -1 --format=%h)" | tee $LOG/head.txt
 SPECS=${CLV1_SPECS:-"Town04:M56-P-M01,M56-P-M02 Town07:M56-P-M08"}

@@ -164,6 +164,31 @@ def f25_index_k(done):
     return out
 
 
+# C0 erratum lanes (docs/m56/ERRATUM_M56_C0_C07_C08_LANES_20261108.md): in C07/C08 the catalog notation names OpenDRIVE
+# Shoulder lanes (0.5 m wide), so no native route exists (NO_OUTGOING). Each Shoulder lane is replaced by the first
+# Driving lane on the same side moving away from the reference line (same roads, connectors, junctions); the frozen v1
+# EGO route is rebuilt from the corrected notation by the catalog's own junction_recipe. No other candidate changes.
+C0_LANE_ERRATUM = {'M56-P-C07': {'EGO': '13/-3→453/-3→14/-3'},
+                   'M56-P-C08': {'EGO': '55/+4→652/+4→54/+4', 'NPC': '50/-3→680/-3→51/-3'}}
+
+
+def c0_erratum_lanes(done, xodr):
+    out = []
+    for c in done:
+        fix = C0_LANE_ERRATUM.get(c.id)
+        if fix:
+            actors = tuple(replace(a, route_recipe={**a.route_recipe, 'route': fix[a.role],
+                                                    'c0_erratum': f"{a.route_recipe['route']} (Shoulder lanes) -> {fix[a.role]}"})
+                           if a.role in fix else a for a in c.actors)
+            c = replace(c, actors=actors)
+            dest, responses, flags, _ = cr.junction_recipe(c, xodr[c.town])
+            c = replace(c, actors=tuple(replace(a, destination=dest.get(a.role)) for a in c.actors), responses=responses,
+                        environment={**c.environment, 'recipe_flags': tuple(flags),
+                                     'c0_erratum_lanes': 'ERRATUM_M56_C0_C07_C08_LANES_20261108 (Shoulder -> Driving)'})
+        out.append(c)
+    return out
+
+
 def main(outdir, identity_path, *prep_dirs):
     out = Path(outdir); out.mkdir(parents=False, exist_ok=False)
     guard = {n: (rev2.V1.parent / n).read_bytes() for n in ('duy-decision-receipt.json', 'm01-r2-evidence.json')}
@@ -183,6 +208,7 @@ def main(outdir, identity_path, *prep_dirs):
     for f in sorted(glob.glob(str(WORK / 'outputs/m56_native_weather_*/weather-light.json'))):
         weather.update(json.loads(Path(f).read_text(encoding='utf-8')))
     xodr = {t: v['opendrive_sha256'] for t, v in weather.items()}
+    done = c0_erratum_lanes(done, xodr)
     identity = json.loads(Path(identity_path).read_text(encoding='utf-8'))
     decision = out / 'duy-v5-receipt.json'
     decision.write_text(json.dumps({
