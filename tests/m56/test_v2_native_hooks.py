@@ -115,3 +115,16 @@ def test_incremental_event_detection_equals_whole_trace(require):
     for k in range(1, len(frames) + 1):
         stepped = metrics.detect_events(frames[:k], fx)
     assert stepped == whole
+
+
+def test_v11_initial_tilt_against_frozen_pose():
+    """m56-v11 (A-SEL2 6): pitch/roll compared with the frozen spawn pose; the v10 absolute rule stays report-only."""
+    from dataclasses import replace
+    from m56.evidence import _initial_state_matches, initial_tilt_absolute_rule
+    good = Transform6(264.6748046875, -310.8308410644531, .0125, 0., -179.4102020263672, 0.)
+    tilted = replace(FROZEN, pitch=1.)
+    on_grade = actor(replace(good, pitch=1.04))
+    assert _initial_state_matches(on_grade, tilted)
+    assert not initial_tilt_absolute_rule(on_grade, tilted)
+    assert not _initial_state_matches(actor(replace(good, pitch=0.)), tilted)
+    assert not _initial_state_matches(actor(replace(good, roll=.3)), FROZEN)
