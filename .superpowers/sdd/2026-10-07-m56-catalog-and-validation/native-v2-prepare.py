@@ -12,7 +12,7 @@ Writes outputs/m56_v2_prepare_<town>_<stamp>/<scene>.json (create-exclusive). Ru
 """
 from dataclasses import replace
 from fractions import Fraction as F
-import json, math, sys, traceback
+import json, math, os, sys, traceback
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -31,6 +31,7 @@ from m56.response import _f32
 from native_v2_kit import PhaseObserver
 from native_v2_common import lane_width_region
 
+SIG5 = os.environ.get('M56_SIG5', '') == '1'  # signal-phase v1 erratum 5 (2026-11-08)
 TOWN = sys.argv[1]
 root = WORK / f'outputs/m56_v2_prepare_{TOWN}_{now()}'
 root.mkdir(parents=False, exist_ok=False)
@@ -366,6 +367,28 @@ def prepare_scene(c, client, proc, start, world, m, identity, body, bbox):
             return finish(c, out)
     responses = (responses[0], npc_response(c.category, vN, routes['NPC'], v6p))
     pred2 = None
+    if SIG5 and sig and sig.get('stop_station') is not None and sig['stop_station'] < float(arc_n[k]):
+        # signal-phase v1 erratum 5 (docs/m56/ERRATUM_M56_SIGNAL_PHASE_V1_E5_20261108.md): S1 ran on the long probe-1
+        # route and chose a light whose stop line lies BEHIND the phased NPC start, so it can never gate the NPC.
+        # Re-run S1 with the same criteria on the phased route; stations go back to probe-1 coordinates for S4.
+        new = find_light(world, m, rows['NPC'], exit_idx['NPC'], routes['NPC'], n_entry - float(arc_n[k]))
+        out['signal_e5'] = {'old': {a_: b_ for a_, b_ in sig.items() if a_ != 'actor'}, 'phased_start_m': float(arc_n[k]),
+                            'new': new and {a_: b_ for a_, b_ in new.items() if a_ != 'actor'}}
+        log(event='SIGNAL_E5', scene=c.id, **out['signal_e5'])
+        if new is None:
+            out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_E5_NO_LIGHT')
+            return finish(c, out)
+        new['stop_station'] += float(arc_n[k])
+        cycle = observe_cycle(world, new['actor'])
+        if cycle.get('reason'):
+            out.update(status='BLOCKED_FIXTURE', reason=cycle['reason'])
+            return finish(c, out)
+        sig = new
+        out['signal'] = {**signal, 'NPC': {a_: b_ for a_, b_ in new.items() if a_ != 'actor'}}
+        out['cycle'] = {a_: b_ for a_, b_ in cycle.items() if a_ != 'sequence'}
+        wait_s = max(60., cycle['cycle_ticks'] / 20 + 2.)
+        runtime.PHASE_LIMIT_S = wait_s
+        out['phase_wait_limit_s'] = wait_s
     if sig and sig.get('stop_station') is None:
         out.update(status='BLOCKED_FIXTURE', reason='SIGNAL_STOP_UNMAPPED')
         return finish(c, out)
