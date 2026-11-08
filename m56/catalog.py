@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from fractions import Fraction
@@ -83,6 +84,13 @@ def _town(town: str) -> str:
     return town.removesuffix('_Opt')
 
 
+# m56-v10 = spec addendum A-SEL2 (Duy 2026-11-08, POST-NUMBER): every installed town except Town03.
+ASEL2_TOWNS = frozenset({'Town01', 'Town02', 'Town04', 'Town05', 'Town06', 'Town07', 'Town10HD', 'Town11', 'Town12', 'Town13',
+                         'Town15'})
+# A-SEL2 §1.2: shared pre/post-delivery successor budget 150 (spec original: exactly 9).
+REPLACEMENT_LIMIT = 150
+
+
 def _construction_deficits(revision: CandidateRevision, sites: SiteLedger) -> tuple[str,...]:
     candidates=revision.candidates
     deficits=[]
@@ -92,7 +100,7 @@ def _construction_deficits(revision: CandidateRevision, sites: SiteLedger) -> tu
     if len({c.id for c in candidates})!=len(candidates) or len({c.slot for c in candidates})!=len(candidates):
         deficits.append('DUPLICATE_CANDIDATE')
     towns={_town(c.town) for c in candidates}
-    if not towns<={'Town04','Town05','Town06','Town07'}:
+    if not towns<=ASEL2_TOWNS:
         deficits.append('TOWN_NOT_ALLOWED')
     if len(towns)<3:
         deficits.append('TOWN_SHORTFALL')
@@ -238,13 +246,19 @@ def compare_parameters(a: Candidate, b: Candidate, policies: PolicyBundle,
     values=[]; deltas=[]; refs=[]; actions=[]; quantities=[]
     invalid=a.category!=b.category or a.id==b.id or not policies.receipt_refs
     keys={'unit','source_actions','aggregation','event','window','reference','physical_quantity','refs'}
-    for name,descriptor in policies.descriptor_specs.items():
-        if (set(descriptor)!=keys or not all(descriptor.get(k) for k in keys)
+    specs=policies.descriptor_specs
+    if set(specs)=={'by_category'}:  # A-SEL2: one descriptor set per category (C/L: vN, G, LrefN; M: vN, G; ...)
+        specs=specs['by_category'].get(a.category,{}) if isinstance(specs['by_category'],Mapping) else {}
+        invalid=invalid or not specs
+    for name,descriptor in specs.items():
+        if (not keys<=set(descriptor) or set(descriptor)-keys-{'aliases'} or not all(descriptor.get(k) for k in keys)
                 or descriptor['aggregation']!='declared_scalar'
                 or descriptor['unit'] not in ('m','m/s','s','m/s^2')):
             invalid=True
             continue
-        left=a.parameters.get(name);right=b.parameters.get(name)
+        names=(name,*tuple(descriptor.get('aliases',())))  # A-SEL2: e.g. gap / gap_m, G / G_m (fill outputs)
+        left=next((a.parameters[n] for n in names if n in a.parameters),None)
+        right=next((b.parameters[n] for n in names if n in b.parameters),None)
         if (left is None or right is None or len(left.values)!=1 or len(right.values)!=1
                 or left.units!=right.units or left.units!=descriptor['unit']
                 or not left.source or not right.source or not left.rationale or not right.rationale
@@ -341,8 +355,8 @@ def admit_successor(ledger: ReplacementLedger, transaction: ReplacementTransacti
             return ReplacementResult('INVALID_LEDGER',ledger,('HISTORY_MISMATCH',))
         seen.add(previous.id); latest[previous.slot]=previous.new_hash
         history=replace(history,used=history.used+1,transactions=history.transactions+(previous,))
-    if ledger.used>=9:
-        return ReplacementResult('REPLACEMENT_LIMIT',ledger,('EXACT_NINE_LIMIT',))
+    if ledger.used>=REPLACEMENT_LIMIT:
+        return ReplacementResult('REPLACEMENT_LIMIT',ledger,('ASEL2_150_LIMIT',))
     if (transaction.id in {t.id for t in ledger.transactions}
             or transaction.counters!=(ledger.used,ledger.used+1)
             or transaction.old_hash==transaction.new_hash

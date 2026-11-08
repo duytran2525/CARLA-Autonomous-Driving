@@ -305,13 +305,22 @@ def test_review_is_bound_to_values_and_policy(require,parameter_case):
     assert compare(c.a,modified,c.policies,(review,)).status=='REVIEW_REQUIRED'
 
 
-def test_tenth_successor_never_admitted(require,replacement_case):
+def test_tenth_successor_admitted_under_asel2(require,replacement_case):
+    # m56-v10 = spec addendum A-SEL2 (Duy 2026-11-08): shared successor budget 150 (spec original: exactly 9).
     admit=require('m56.catalog','admit_successor')
     c=replacement_case(9)
     out=admit(c.ledger,c.transaction,c.review)
+    assert out.status=='ADMITTED'
+    assert out.ledger.used==10
+
+
+def test_151st_successor_never_admitted(require,replacement_case):
+    admit=require('m56.catalog','admit_successor')
+    c=replacement_case(150)
+    out=admit(c.ledger,c.transaction,c.review)
     assert out.status=='REPLACEMENT_LIMIT'
-    assert out.ledger.used==9
-    assert len(out.ledger.transactions)==9
+    assert out.ledger.used==150
+    assert len(out.ledger.transactions)==150
 
 
 def test_pre_post_share_one_counter(require,replacement_case):
@@ -339,10 +348,10 @@ def test_failed_successor_still_consumes(require,replacement_case):
 def test_restart_cannot_reset_ledger(require,replacement_case):
     admit=require('m56.catalog','admit_successor')
     from m56.model import encode_record,decode_record
-    c=replacement_case(9)
+    c=replacement_case(150)
     restored=decode_record('ReplacementLedger',encode_record(c.ledger))
     out=admit(restored,c.transaction,c.review)
-    assert out.ledger.used==9
+    assert out.ledger.used==150
     assert out.status=='REPLACEMENT_LIMIT'
 
 
@@ -376,3 +385,30 @@ def test_tampered_history_cannot_be_admitted(require,replacement_case):
     out=admit(changed,c.transaction,c.review_for(changed,c.transaction))
     assert out.status=='INVALID_LEDGER'
     assert out.ledger==changed
+
+
+def test_asel2_towns_allowed_town03_still_not(require,catalog_case):
+    from dataclasses import replace
+    check=require('m56.catalog','check_catalog')
+    c=catalog_case()
+    big=replace(c.revision,candidates=(replace(c.revision.candidates[0],town='Town12'),)+c.revision.candidates[1:])
+    assert 'TOWN_NOT_ALLOWED' not in check(big,c.sites,()).deficits
+    bad=replace(c.revision,candidates=(replace(c.revision.candidates[0],town='Town03'),)+c.revision.candidates[1:])
+    assert 'TOWN_NOT_ALLOWED' in check(bad,c.sites,()).deficits
+
+
+def test_asel2_descriptor_sets_by_category_and_aliases(require,parameter_case):
+    # A-SEL2 4: one descriptor set per category; a descriptor may name parameter aliases (gap / gap_m).
+    from dataclasses import replace
+    compare=require('m56.catalog','compare_parameters')
+    c=parameter_case()
+    flat=compare(c.a,c.b,c.policies,())
+    by_cat=replace(c.policies,descriptor_specs={'by_category':{c.a.category:dict(c.policies.descriptor_specs)}})
+    assert compare(c.a,c.b,by_cat,()).status==flat.status
+    other=replace(c.policies,descriptor_specs={'by_category':{'Z':dict(c.policies.descriptor_specs)}})
+    assert compare(c.a,c.b,other,()).status=='BLOCKED_COMPARABILITY'
+    name=next(iter(c.policies.descriptor_specs))
+    renamed=lambda x:replace(x,parameters={(name+'_m' if k==name else k):v for k,v in x.parameters.items()})
+    aliased={k:({**d,'aliases':(k+'_m',)} if k==name else d) for k,d in c.policies.descriptor_specs.items()}
+    assert compare(renamed(c.a),renamed(c.b),replace(c.policies,descriptor_specs=aliased),()).values==flat.values
+    assert compare(renamed(c.a),renamed(c.b),c.policies,()).status=='BLOCKED_COMPARABILITY'
