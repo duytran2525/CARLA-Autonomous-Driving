@@ -148,3 +148,27 @@ Commit tooling ghi ở output của bộ sinh; product `m56-v9` `1db746f`, rồi
 - Hàng thay thế (§5.4) dùng cùng luật này với tập cảnh đang giữ lúc thay.
 
 Mọi điều khác của prereg giữ nguyên.
+
+## Addendum B (08/11/2026): thủ tục thay cảnh và hai cổng tĩnh
+
+**Thời điểm:** sau lượt thí điểm Town11 (`M56_ASEL2_BATCH_LOG_20261108.md`). M04-S1 và M07-S1 bị chặn ở bước chuẩn bị với
+`NPC_TURN_BEFORE_EXIT`, đây là luật v6 d đã đóng băng. Cũng lúc đó, trình dựng revision loại I02-S1 và O08 với
+`WINDOW_TOO_SHORT`: `io_recipe` chỉ dựng trên một road. Chưa có A/B nào. Không chỉnh tham số nào của cảnh nào.
+
+**B1, cổng cua của NPC (tính offline, cùng ngưỡng với v6 d):**
+- Một ứng viên C/L/M bị bỏ qua khi `vN² · κmax` của connector NPC lớn hơn 2,25 m/s². κmax là |curvature| lớn nhất trong các bản
+  ghi `arc` của connector đó.
+- Áp cho 19 pick C/L/M hiện có, cổng này đúng bằng kết quả: chỉ M04 (4,09) và M07 (10,11) vượt.
+- B1 chỉ là áp sớm luật v6 d để không tiêu lượt thay cho cảnh chắc chắn hỏng. v6 d ở bước chuẩn bị vẫn giữ nguyên.
+
+**B2, trình dựng recipe:**
+- Một ứng viên I/O bị bỏ qua khi cửa sổ cần (`vE²/3 + 20 + x_rel + 15` m, theo đúng `io_recipe`) dài hơn laneSection của road
+  site.
+- Ứng viên bị B1 hoặc B2 bỏ qua chưa được admit, nên không tiêu lượt (spec §4: proposal chưa admit thì chỉ ghi lại, không trial).
+
+**B3, thay cảnh:**
+- Slot có cảnh hỏng (đã trial) lấy successor kế tiếp: duyệt theo đúng thứ tự xáo của pool, với luật nhìn trước của addendum A,
+  với tập cảnh đang giữ lúc đó, và loại trừ mọi site đã từng gán.
+- Successor thứ n của một slot có id `M56-P-<slot>-S<n+1>`.
+- Mỗi successor được admit tiêu 1 lượt của trần 150. Ghi vào `outputs/m56_asel2_replacements.jsonl`, chỉ nối thêm.
+- Slot mà ứng viên ban đầu bị B2 loại thì lấy ứng viên kế tiếp theo cùng luật, không tiêu lượt.
