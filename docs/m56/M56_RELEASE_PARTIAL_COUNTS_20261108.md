@@ -69,7 +69,7 @@ Mỗi cảnh lấy kết quả pair dưới consumer mà báo cáo của nó dù
 | C03 | BLOCKED_FIXTURE | `NPC_TURN_BEFORE_EXIT` (mục e, phương án i) | `DECISION_M56_ITEMS_D_E_20261107.md` |
 | C04 | BLOCKED_FIXTURE | `READINESS_NOT_STEADY` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | C06 | BLOCKED_FIXTURE | `NPC_SIGNAL_HOLD_IN_PROBE2` | như trên |
-| C07, C08 | BLOCKED_FIXTURE | route builder `NO_OUTGOING`. C07: ký hiệu làn catalog −2 so với map −3; C08: chưa xác lập được nguyên nhân (vết giống hệt C07, nhiều khả năng lỗi builder) | `M56_CL_V1_RESULT_20261108.md` §3 |
+| C07, C08 | BLOCKED_FIXTURE | route EGO đóng băng ở C0 bị lỗi: C07 chạy trên làn Shoulder 0,5 m (`13/-2`); C08 xuất phát trong junction, không có làn Driving hướng nam trong 3 m | `M56_CL_V1_RESULT_20261108.md` §3 |
 | L02 | BLOCKED_WITNESS | GROUND, CONTACT | `M56_V7_RESULT_20261026.md` |
 | L03 | BLOCKED_FIXTURE | C4 `CONFLICT_COMPONENTS_TOO_CLOSE` | `M56_V5_NIGHT_RESULT_20261026.md` |
 | L05 | BLOCKED_FIXTURE | `NPC_TURN_SPEED` (mục e) | `DECISION_M56_ITEMS_D_E_20261107.md` |
