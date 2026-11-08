@@ -157,3 +157,26 @@ pose". So với 0 chỉ đúng khi tư thế spawn có pitch 0, tức chỉ đú
   cảnh nào, nên nó chỉ được giữ làm hồ sơ.
 - Các cảnh trên dốc được chuẩn bị lại dưới `M56_SPAWN_TILT` và chạy A/B dưới v11. Theo P5, đó là version mới, nên mỗi cảnh được
   một A/B.
+
+## 7. Bổ sung 4 (08/11/2026): loại M
+
+**Phát hiện (census, chế độ thay cảnh, giữ nguyên các cảnh đã trial; `asel2-census-m-var*.py`):**
+- Dưới mọi luật hiện hành, M chỉ đạt tối đa 5–6/8:
+  - M04 (k = 4) và M07 (k = 6) bị cổng cua v6 d loại khoảng 750 site, vì connector nhánh quá cong so với vN;
+  - M08 bị loại vì thang G và trần (M, town) = 3.
+- Kết quả từng phương án:
+
+  | Phương án | Lấp thêm |
+  |---|---|
+  | (a) LrefN làm tham số so thứ 3 cho M | 0 |
+  | (b) trần (M, town) = 4 | 1 (M08) |
+  | (a) + (b) | 2 (M04, M08) |
+  | (a) + (b) + M07 ở k = −2 (hoặc −3) | 3, tức M đủ 8/8 |
+
+**Quyết định:** [chat] Duy, ngày 08/11/2026, chọn "(a)+(b)+hạ k M07 (Recommended)":
+1. Với loại M, một cặp đạt (khai báo và realized) khi ≥ 2 trong 3 tham số (vN, G, LrefN) có Δ ≥ 0,20, như C/L ở §4.
+2. Trần (M, town) = 4. Các loại khác vẫn 3; spec gốc là 3.
+3. Slot M07 dùng k = −2 (vN = 3·(5/4)^(−3) = 1,536 m/s) thay cho k = 6. Mọi slot khác giữ k đã đăng ký.
+
+**Đặt sau khi thấy số:** quyết định được đưa ra sau các lỗi M ở Town11/12 và sau census. Mọi báo cáo M phải ghi theo cả luật cũ
+lẫn luật mới.
