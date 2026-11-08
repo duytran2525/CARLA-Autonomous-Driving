@@ -78,7 +78,8 @@ def newest_output_age():
                 except OSError:
                     pass
     for f in glob.glob(str(OUT / 'm56_asel2_*.stdout.txt')):
-        best = max(best, os.path.getmtime(f))
+        if 'watchdog' not in f:  # never count the watchdog's own files as job progress
+            best = max(best, os.path.getmtime(f))
     return time.time() - best if best else None
 
 
