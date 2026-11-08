@@ -172,3 +172,21 @@ Mọi điều khác của prereg giữ nguyên.
 - Successor thứ n của một slot có id `M56-P-<slot>-S<n+1>`.
 - Mỗi successor được admit tiêu 1 lượt của trần 150. Ghi vào `outputs/m56_asel2_replacements.jsonl`, chỉ nối thêm.
 - Slot mà ứng viên ban đầu bị B2 loại thì lấy ứng viên kế tiếp theo cùng luật, không tiêu lượt.
+
+## Addendum C (08/11/2026): M04 và M07
+
+**Thời điểm:** commit trước khi có bất kỳ kết quả chuẩn bị hay A/B nào của các cảnh M ở Town12/13 (M05, M06, M08 ở Town12;
+M01, M02, M03 ở Town13). Thay cảnh lần 1 (`outputs/m56_fill_v4_replace1_20261108.json`) cho thấy M04 và M07 không còn ứng viên:
+- cổng cua B1 loại khoảng 490/586 site M;
+- các site còn lại đều ở Town12/13, nơi trần (M, town) đã đủ 3.
+
+**Luật:**
+1. Không bao giờ dời một cảnh **đã trial** (đã chuẩn bị hay đã A/B) sang site khác để nhường trần cho slot khác. Tập cảnh đang
+   giữ chỉ đổi khi có cảnh hỏng, theo B3.
+2. M04 và M07 được ghi là `EMPTY_CAP_AND_B1`. Mỗi khi một cảnh M ở một town hỏng (theo B3) làm trống một suất (M, town), thì
+   **trước khi** thay chính slot đó, bộ sinh chạy B3 cho M04 rồi M07, theo thứ tự đó, với tập cảnh đang giữ lúc ấy. Slot hỏng
+   lấy successor sau cùng, nếu còn.
+3. M04-S1 và M07-S1 (Town11, `BLOCKED_FIXTURE NPC_TURN_BEFORE_EXIT`) là cảnh đã trial và hỏng. Chúng không bao giờ được tính vào
+   số đếm, catalog hay release. Trình dựng revision đánh dấu chúng `FAILED_TRIALED` (`M56_ASEL2_FAILED`).
+
+Hệ quả phải báo: nếu không cảnh M nào ở Town12/13 hỏng thì loại M chỉ có 6 cảnh, nên không đạt 46 và tối đa 22 junction.
