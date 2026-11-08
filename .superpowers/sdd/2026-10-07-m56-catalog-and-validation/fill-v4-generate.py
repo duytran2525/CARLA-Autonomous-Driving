@@ -157,6 +157,32 @@ def kappa_max(town, road):
     return max([abs(float(g[0].get('curvature'))) for g in r.find('planView').findall('geometry') if g[0].tag == 'arc'] or [0.])
 
 
+def flat(road, s0, s1, lim=.0015):
+    """Addendum D (B4): |grade| <= lim every 1 m on [s0, s1] and no non-zero superelevation record overlapping it."""
+    sl = gen.slope_profile(road)
+    if any(abs(sl(s0 + i)) > lim for i in range(int(max(s1 - s0, 0)) + 1)):
+        return False
+    lp = road.find('lateralProfile')
+    sups = sorted((float(e.get('s')), float(e.get('a'))) for e in (lp.findall('superelevation') if lp is not None else []))
+    for i, (s, a) in enumerate(sups):
+        nxt = sups[i + 1][0] if i + 1 < len(sups) else float(road.get('length'))
+        if a != 0 and s < s1 and nxt > s0:
+            return False
+    return True
+
+
+def b4_clm(x, need_ego):
+    """B4 for C/L/M: EGO spawn region = first 10 m of its run-in; NPC = its whole 150 m run-in (incoming roads)."""
+    for role, need, span in (('ego', need_ego, 10.), ('npc', 150., 150.)):
+        c = x[role]; r = v2.trees[x['town']][1][c['incoming']]; L = float(r.get('length'))
+        at_end = v2.touching_end(r, x['junction'])
+        s_far = L - need if at_end else need          # run-in start (farthest from J)
+        a, b = (s_far, min(s_far + span, L)) if at_end else (max(s_far - span, 0.), s_far)
+        if not flat(r, a, b):
+            return False
+    return True
+
+
 def section_length(x):
     """Addendum B2: length of the laneSection io_recipe builds on (site road, site section)."""
     roads = v2.trees[x['town']][1]; secs = gen.sections(roads[x['road']])
@@ -206,6 +232,8 @@ def main(out_path, commit, state_path=None):
                     why['EGO_' + w] += 1
                 elif state and float(vN) ** 2 * kappa_max(x['town'], x['npc']['connecting']) > 2.25:
                     why['B1_TURN_GATE'] += 1
+                elif state and state.get('b4') and not b4_clm(x, float(d['G'] + VE[cat] ** 2 / 3 + 20)):
+                    why['B4_START_SLOPE'] += 1
                 elif state and tried(x):
                     why['B3_TRIED'] += 1
                 else:
@@ -228,6 +256,8 @@ def main(out_path, commit, state_path=None):
                 why['EXCLUDED_ROAD'] += 1
             elif state and section_length(x) < vEf ** 2 / 3 + 20 + ((7 * vEf + 3.75) if cat == 'I' else (rs + 3 * vEf + 3.75)) + 15:
                 why['B2_ONE_ROAD_WINDOW'] += 1
+            elif state and state.get('b4') and not flat(v2.trees[x['town']][1][x['road']], *gen.sections(v2.trees[x['town']][1][x['road']])[x['section']][1:3]):
+                why['B4_START_SLOPE'] += 1
             elif state and tried(x):
                 why['B3_TRIED'] += 1
             else:
@@ -299,7 +329,8 @@ def main(out_path, commit, state_path=None):
             used_j, counts, site_uses = take(cat_, x, used_j, counts, site_uses)
     for cat in 'CLMIO':
         pool = sorted(pools[cat], key=key); random.Random(SEED + OFFSET[cat]).shuffle(pool)
-        slots = sorted(s_ for s_ in SLOTS[cat] if not state or s_ in state['slots'])
+        slots = (sorted(s_ for s_ in SLOTS[cat] if not state or s_ in state['slots']) if not (state and state.get('order'))
+                 else [s_ for s_ in state['order'] if s_[0] == cat])  # addendum C: explicit order (M04, M07 first)
         elig, swhy = {}, {}
         for s in slots:
             elig[s], swhy[s] = static(cat, SLOTS[cat][s], pool)
