@@ -104,7 +104,7 @@ def _construction_deficits(revision: CandidateRevision, sites: SiteLedger) -> tu
         deficits.append('TOWN_NOT_ALLOWED')
     if len(towns)<3:
         deficits.append('TOWN_SHORTFALL')
-    if any(n>3 for n in Counter((c.category,_town(c.town)) for c in candidates).values()):
+    if any(n>(4 if cat=='M' else 3) for (cat,_),n in Counter((c.category,_town(c.town)) for c in candidates).items()):  # A-SEL2 7: M 4
         deficits.append('CATEGORY_TOWN_CAP')
     if sites.freeze_ref is None:
         deficits.append('IDENTITY_METHOD_NOT_FROZEN')
