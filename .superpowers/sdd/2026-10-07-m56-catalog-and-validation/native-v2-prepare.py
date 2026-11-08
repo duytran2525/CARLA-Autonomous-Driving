@@ -130,7 +130,10 @@ def main():
         settings = world.get_settings(); settings.synchronous_mode, settings.fixed_delta_seconds = True, .05
         world.apply_settings(settings)
         bp = world.get_blueprint_library().find('vehicle.audi.a2')
+        from native_v2_common import stream_to  # A-SEL2 large maps: a dormant actor reports a zero bounding box
+        _sp0 = m.get_spawn_points()[0].location; stream_to(world, _sp0.x, _sp0.y, _sp0.z)
         car = world.spawn_actor(bp, m.get_spawn_points()[0]); world.tick()
+        assert min(car.bounding_box.extent.x, car.bounding_box.extent.y, car.bounding_box.extent.z) > 0, 'BODY_BBOX_ZERO (dormant actor)'
         b = car.bounding_box
         bbox = {'location': [b.location.x, b.location.y, b.location.z], 'extent': [b.extent.x, b.extent.y, b.extent.z],
                 'rotation': [b.rotation.pitch, b.rotation.yaw, b.rotation.roll]}
