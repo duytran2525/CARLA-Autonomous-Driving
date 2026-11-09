@@ -163,3 +163,9 @@ xong, rồi:
   - F01 cho cùng section và domain như trước khi sửa, nên chuỗi F01 không đổi hành vi.
   - F02 compile được, `F02_END − nominal_front_t0 = 60` đúng tuyệt đối, cặp metric khớp, ba contract OK.
 - Chuỗi `run-f02-after-f01.sh` chờ `F01_END`.
+
+**Thời gian raster ở hàng đợi 3b (09/11, 16:56 UTC):**
+- A/B C02-S1 (Town12) vẫn ở raster dv1 sau khoảng 2 giờ. Đọc biến local qua py-spy được i = 270/436 (lưới 436 × 1249), tức khoảng
+  62%. Ước tính raster mất 3,2 giờ cho một cảnh, nghĩa là khoảng 70 ms cho mỗi `cast_ray` trên Town12.
+- Với khoảng 30 cảnh, hàng đợi 3b có thể chạy vài ngày. Tooling không được đổi giữa batch. Chưa có cách tăng tốc nào cho ra
+  đúng y hệt các ô.
