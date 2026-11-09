@@ -5,7 +5,7 @@
 #  3. native-f-ab --ab: compile + admission + response contracts, and only if FROZEN + ADMITTED + all contracts OK exactly
 #  ONE A/B (P5), outer 1500 s, dv1; 4. pair under consumer v13. No re-run of any step with other values. Prints F01_END.
 cd "$(dirname "$0")"
-until grep -q F03_ALL_DONE ../../../outputs/m56_f03_probe2.stdout.txt 2>/dev/null; do sleep 120; done
+until grep -q F03_ALL_DONE ../../../outputs/${M56_WAIT_F03:-m56_f03_probe2}.stdout.txt 2>/dev/null; do sleep 120; done
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'; LOG=$A/m56_f01_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 PY=../../../.venv-m56-native-v1/Scripts/python.exe; V13=D:/AI/CARLA-Funny-Moments.worktrees/m56-v13
 export M56_ASEL2_IO=1 M56_ASEL2_F=1 M56_ASEL2_FSITES=$A/m56_f_sites_20261109.json \
