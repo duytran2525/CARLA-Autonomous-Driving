@@ -4,7 +4,7 @@
 #  0. F capability smoke;
 #  1. the PREPARED batch-1 scenes without an A/B (P5: one each) on revision asel2prep, dv1, spectator:
 #     Town12 L05-S1, M06-S1; Town13 C07-S1, L03-S1, L06-S1, M01-S1, M03-S1 (M05-S1 is re-prepared in step 3);
-#  2. I/O batch (v12 + tilt); 3. C/L/M batch 2 (v12 + tilt + E6 + TF2).
+#  2. I/O batch (v12 + tilt); 3. C/L/M batch 2 (v12 + tilt + E6 + TF2), incl. C03-S2/C04-S2 (replacement 4, B5).
 cd "$(dirname "$0")"
 O=../../../outputs; V12=D:/AI/CARLA-Funny-Moments.worktrees/m56-v12
 REV1=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_c0_partial_io_asel2prep_20261108T114946Z/c0-partial-v5-frozen-revision.json
@@ -19,6 +19,6 @@ while tasklist | grep -qi CarlaUE4; do sleep 15; done
 M56_CODE=$V12 M56_SPAWN_TILT=1 bash run-asel2-io.sh "Town12:M56-P-I01-S1,M56-P-I05-S1,M56-P-I06,M56-P-O05-S1,M56-P-O06,M56-P-O07-S1 Town13:M56-P-I07-S1,M56-P-I08,M56-P-O04-S1,M56-P-I02-S2,M56-P-O08-S2"
 echo "Q3 C/L/M batch 2 $(date -u +%FT%TZ)"
 while tasklist | grep -qi CarlaUE4; do sleep 15; done
-M56_CODE=$V12 M56_SPAWN_TILT=1 M56_ASEL2_REPLACE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace1_20261108.json,D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace2b_20261108.json,D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace3_20261108.json \
-  bash run-asel2-cl2.sh "Town12:M56-P-C04-S1,M56-P-M05-S1,M56-P-L08-S1,M56-P-M07-S2,M56-P-M08-S2 Town13:M56-P-C06-S1,M56-P-M02-S1,M56-P-L07-S2,M56-P-M04-S2"
+M56_CODE=$V12 M56_SPAWN_TILT=1 M56_ASEL2_REPLACE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace1_20261108.json,D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace2b_20261108.json,D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace3_20261108.json,D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_fill_v4_replace4_20261109.json \
+  bash run-asel2-cl2.sh "Town12:M56-P-C04-S2,M56-P-M05-S1,M56-P-L08-S1,M56-P-M07-S2,M56-P-M08-S2 Town13:M56-P-C03-S2,M56-P-C06-S1,M56-P-M02-S1,M56-P-L07-S2,M56-P-M04-S2"
 echo "QUEUE2_DONE $(date -u +%FT%TZ)"
