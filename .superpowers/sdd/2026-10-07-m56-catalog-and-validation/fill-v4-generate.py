@@ -243,6 +243,19 @@ def b4_clm(x, need_ego):
     return True
 
 
+def axis_ok(x, tol=1.):
+    """Addendum F (B5): both incoming travel headings at the conflict junction within tol deg of a world axis."""
+    roads = v2.trees[x['town']][1]
+    dev = lambda h: min(abs(((h - a + 180) % 360) - 180) for a in (0, 90, 180, 270))
+    for role in ('ego', 'npc'):
+        h = x[role].get('h_in')
+        if h is None:
+            h = cen.h_in(roads, x[role], x['junction'])
+        if h is None or dev(h) > tol:
+            return False
+    return True
+
+
 def section_length(x):
     """Addendum B2: length of the laneSection io_recipe builds on (site road, site section)."""
     roads = v2.trees[x['town']][1]; secs = gen.sections(roads[x['road']])
@@ -295,6 +308,8 @@ def main(out_path, commit, state_path=None):
                     why['B1_TURN_GATE'] += 1
                 elif state and state.get('b4') and not b4_clm(x, float(d['G'] + VE[cat] ** 2 / 3 + 20)):
                     why['B4_START_SLOPE'] += 1
+                elif state and state.get('axis') and not axis_ok(x):
+                    why['B5_AXIS'] += 1
                 elif state and tried(x):
                     why['B3_TRIED'] += 1
                 else:
