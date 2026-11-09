@@ -121,7 +121,7 @@ lần chạy duy nhất. Kết quả: `outputs/m56_f_sites_20261109.json`, sha25
 
 **Realized F01/F02:** `F_REALIZED_DESCRIPTORS_20261109.md`, commit trước mọi A/B F.
 
-**Chuỗi F01** `run-f01-after-f03.sh` (commit 52b8f68; chạy tách rời với nhãn `m56_f01_chain`). Chuỗi chờ hàng đợi 3b và probe F03
+**Chuỗi F01** `run-f01-after-f03.sh` (commit 52b8f68; chạy tách rời với nhãn `m56_f01_chain2`; lần khởi động `m56_f01_chain` gọi nhầm bash của WSL và thoát ngay mà không làm gì). Chuỗi chờ hàng đợi 3b và probe F03
 xong, rồi:
 1. prepare;
 2. dựng revision;
