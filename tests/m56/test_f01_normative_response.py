@@ -84,3 +84,20 @@ def test_f01_actual_stop_and_restart_are_both_needed_by_pure_ego_producer():
     first=step_response(c.frame,c.state,r)
     out=step_response(replace(c.frame,frame=101,simtime=F(21,20),events=()),first.state,r)
     assert out.state.phase=='YIELD' and out.command.target_kmh==0
+
+
+@pytest.mark.parametrize('nominal,ok', [(F(3), True), (F(17, 5), True), (F(7, 2), False)])
+def test_v13_f01_npc_nominal_two_approved_values(nominal, ok):
+    """m56-v13 (A-SEL2 F prereg part 1): F01 NPC nominal 3 (spec 8.1) or 17/5 (A-SEL2 ladder); anything else is invalid."""
+    from dataclasses import replace
+    from m56.catalog import _digest
+    from m56.response import _f_script_contract
+    r, _ = f01_response('NPC_COMMON', 'NPC', settle=True)
+    targets = {**r.targets, 'NOMINAL': nominal, 'NPC_RESTART': nominal}
+    r = replace(r, targets=targets)
+    r = replace(r, hash=_digest({k: getattr(r, k) for k in ('actor_role', 'action_id', 'route', 'targets', 'profile', 'phases')}))
+    if ok:
+        _f_script_contract(r)
+    else:
+        with pytest.raises(ValueError):
+            _f_script_contract(r)
