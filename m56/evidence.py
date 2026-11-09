@@ -634,9 +634,21 @@ def _initial_state_matches(actor,pose):
     OLD RULE (kept verbatim in initial_state_old_rule): actor.velocity==(0,0,0) and actor.pose==pose exactly. A spawned
     CARLA vehicle is only observable after one physics step, by which time it has settled 1-2 mm with a few mm/s
     (native g4 probe 2026-10-23), so the old rule can never hold natively. NEW RULE: x/y/yaw equal the float32
-    image of the frozen pose within 1e-4; 0 <= z_frozen - z_observed <= 0.02 m (measured spawn clearance);
+    image of the frozen pose within 1e-3 for x/y (m56-v12, A-SEL2 8; 1e-4 kept as initial_xy_old_rule) and 1e-4 for yaw; 0 <= z_frozen - z_observed <= 0.02 m (measured spawn clearance);
     |pitch - pitch_frozen|,|roll - roll_frozen| <= 0.1 deg (m56-v11, A-SEL2 6; v10 compared with 0, kept as
     initial_tilt_absolute_rule); speed <= 0.10 m/s (the spec's settle/stop threshold)."""
+    from .response import _f32
+    from .metrics import _speed
+    a=actor.pose;yaw=(a.yaw-_f32(pose.yaw)+180)%360-180;speed=_speed(actor.velocity)
+    return (abs(a.x-_f32(pose.x))<=1e-3 and abs(a.y-_f32(pose.y))<=1e-3 and abs(yaw)<=1e-4
+            and 0<=pose.z-a.z<=.02 and abs(a.pitch-_f32(pose.pitch))<=.1 and abs(a.roll-_f32(pose.roll))<=.1
+            and speed is not None and speed<=Fraction(1,10))
+
+
+def initial_xy_old_rule(actor,pose):
+    """Report-only (m56-v12, spec addendum A-SEL2 8, Duy 2026-11-09, POST-NUMBER): the m56-v11 x/y tolerance 1e-4 m,
+    kept verbatim. v12 allows 1e-3 m: on the large maps (|coordinate| ~5 km) float32 resolves only 0.24-0.49 mm, so a
+    settled spawn is quantised by more than 1e-4 m (Town12 batch 1, 2026-11-08). Every result reports both."""
     from .response import _f32
     from .metrics import _speed
     a=actor.pose;yaw=(a.yaw-_f32(pose.yaw)+180)%360-180;speed=_speed(actor.velocity)

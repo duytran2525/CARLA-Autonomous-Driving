@@ -128,3 +128,14 @@ def test_v11_initial_tilt_against_frozen_pose():
     assert not initial_tilt_absolute_rule(on_grade, tilted)
     assert not _initial_state_matches(actor(replace(good, pitch=0.)), tilted)
     assert not _initial_state_matches(actor(replace(good, roll=.3)), FROZEN)
+
+
+def test_v12_initial_xy_tolerance_one_millimetre():
+    """m56-v12 (A-SEL2 8): x/y within 1 mm of the float32 spawn image; the v11 1e-4 rule stays report-only."""
+    from dataclasses import replace
+    from m56.evidence import _initial_state_matches, initial_xy_old_rule
+    good = Transform6(264.6748046875, -310.8308410644531, .0125, 0., -179.4102020263672, 0.)
+    quantised = replace(good, y=good.y - 0.00048828125)  # one float32 step at |y| ~ 5 km
+    assert _initial_state_matches(actor(quantised), FROZEN)
+    assert not initial_xy_old_rule(actor(quantised), FROZEN)
+    assert not _initial_state_matches(actor(replace(good, x=good.x + .0011)), FROZEN)   # > 1 mm
