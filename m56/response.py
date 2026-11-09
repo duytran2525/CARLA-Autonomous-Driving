@@ -341,7 +341,13 @@ def _f_script_contract(response):
                     or rows!=({'cause':'NPC_QUEUE_FORWARD','after_event':'TRIGGER','delay_s':Number(3),'requires':()},)):
                 raise ValueError('F_SCRIPT_POLICY_INVALID')
         else:
-            nominal=Number(3 if script['mechanism']=='F01' else 5)
+            # m56-v13 (A-SEL2 F prereg part 1, 3fb9865): the F01 NPC nominal is one of the two approved inputs, 3 m/s
+            # (spec 8.1) or 17/5 m/s (A-SEL2 ladder); F02 keeps 5. The same value must hold for NOMINAL and NPC_RESTART.
+            allowed=(Number(3),Number(17,5)) if script['mechanism']=='F01' else (Number(5),)
+            nominal=(response.targets[rows[0]['cause']] if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START'
+                     else initial)
+            if nominal not in allowed:
+                raise ValueError('F_SCRIPT_POLICY_INVALID')
             if initial==0 and rows and rows[0]['after_event']=='CAPTURE_START':
                 if response.targets[rows[0]['cause']]!=nominal or rows[0]['requires']:
                     raise ValueError('F_SCRIPT_POLICY_INVALID')
