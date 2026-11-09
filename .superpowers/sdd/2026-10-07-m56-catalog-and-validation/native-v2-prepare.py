@@ -91,7 +91,7 @@ def probe(client, proc, start, world, identity, scene, routes, rows, poses, resp
     admission = runtime.admit(fixture, approvals, identity, own)
     assert admission.status == 'ADMITTED', admission
     ctx = RuntimeContext(None, identity, own, approvals, admission, store,
-                         {'tick_s': F(10), 'cleanup_s': F(15), 'outer_s': F(600), 'rpc_s': F(60)}, 'SINGLE_EPISODE', 'RUNNING')
+                         {'tick_s': F(10), 'cleanup_s': F(15), 'outer_s': F(1500), 'rpc_s': F(60)}, 'SINGLE_EPISODE', 'RUNNING')
     backend = runtime.bind_owned(ctx)
     source = write_ref(root / scene / f'{label}-plan-source.json', {'rows': {k: len(v[0]) for k, v in rows.items()},
                                                                     'rule': 'route lane waypoints every 2 m'}, 'G4_STOCK_SOURCE')

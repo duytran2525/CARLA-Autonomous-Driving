@@ -199,3 +199,22 @@ lẫn luật mới.
 - 4 A/B đã seal được **đánh giá lại** dưới v12. Không chạy A/B mới.
 
 **Đặt sau khi thấy số.**
+
+## 9. Bổ sung 6 (09/11/2026): giới hạn thời gian thực của episode là 1500 s
+
+**Phát hiện (Claude, chẩn đoán chỉ đọc cộng probe capability):**
+- 4 A/B của batch 1 trên Town12 đều dừng với `OUTER_TIMEOUT`, theo spec §7.1 "episode outer ≤ 300 wall seconds".
+- Phân bổ thời gian: chờ pha đèn trước spawn khoảng 226 s, rồi khoảng 0,2–0,3 s thực mỗi tick (Town06 chỉ 0,06 s).
+- Probe `native-tick-cost-probe.py`: các RPC của CARLA nhanh (tick 3 ms, 16 lần ground projection 4 ms). py-spy cho thấy chi phí
+  nằm trong harness, chia đều cho tick, duyệt hàng nghìn actor của map và ghi raw.
+- Một episode đầy đủ (khoảng 1500–2800 tick, gồm cả chờ pha) cần 300–840 s trên laptop này. Không có giới hạn **mô phỏng** nào
+  bị vượt.
+
+**Quyết định:** [chat] Duy, ngày 09/11/2026, chọn "Nâng outer lên 1500 s (Recommended)".
+- `outer_s` = 1500 s cho mọi episode A/B, cả C/L/M lẫn I/O. Probe chuẩn bị cũng là 1500 s (trước là 600 s).
+- Giữ nguyên mọi giới hạn mô phỏng của §7.1: settle 1 s, readiness ≤ 15 s, validation ≤ 60 s, tổng ≤ 76,5 s, chờ pha ≤ 60 s
+  mô phỏng, mỗi tick ≤ 5 s thực.
+- Consumer không kiểm `outer_s`. Giá trị này chỉ là tham số của runner, được ghi trong context của từng lượt chạy.
+
+**Đặt sau khi thấy số.** 4 A/B của batch 1 giữ nguyên kết quả `OUTER_TIMEOUT`. Quota P5 của chúng đã dùng dưới version tooling
+cũ. Version tooling mới (`outer_s` 1500) được tính là version mới theo P5.

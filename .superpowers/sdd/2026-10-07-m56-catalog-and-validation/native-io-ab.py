@@ -202,7 +202,7 @@ def run_scene(c, client, proc, start, world, m, identity):
         return
     store = open_run(sd / 'run', c.id, own.writer)
     ctx = RuntimeContext(None, identity, own, approvals, admission, store,
-                         {'tick_s': F(5), 'cleanup_s': F(15), 'outer_s': F(300), 'rpc_s': F(60)}, 'AB_PAIR', 'RUNNING')
+                         {'tick_s': F(5), 'cleanup_s': F(15), 'outer_s': F(1500), 'rpc_s': F(60)}, 'AB_PAIR', 'RUNNING')
     backend = runtime.bind_owned(ctx)
     qual_path = WORK / 'outputs/m56_native_g4_probe_20261023T135210Z/g4-probe.json'
     qual = SourceRef(str(qual_path), sha(qual_path), qual_path.stat().st_size, '1', 'native', 'NATIVE_QUALIFICATION')
