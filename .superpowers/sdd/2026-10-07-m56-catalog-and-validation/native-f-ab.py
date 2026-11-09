@@ -26,33 +26,37 @@ from m56.model import (ApprovalBundle, CapabilityProof, CompiledFixture, PolicyB
                        decode_record, encode_record, load_json)
 from m56.response import _forward_contract
 
-REVISION, TOWN, SCENES = Path(sys.argv[1]), sys.argv[2], sys.argv[3].split(',')
-AB = '--ab' in sys.argv[4:]
-PREREG = os.environ.get('M56_F_PREREG', '')
-AB_AUTHORITY = os.environ.get('M56_AB_AUTHORITY', '')
-if AB and not (PREREG and AB_AUTHORITY):
-    sys.exit('REFUSED: --ab needs M56_F_PREREG=<F prereg commit> and M56_AB_AUTHORITY=<who authorised this A/B, quoted source>')
-root = WORK / f"outputs/m56_f_{'ab' if AB else 'compile'}_{TOWN}_{now()}"
-root.mkdir(parents=False, exist_ok=False)
 log_rows = []
+REVISION = TOWN = SCENES = AB = root = authority = review = approvals = None
+OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
 
 
 def log(**kw):
     log_rows.append(kw); print(json.dumps(kw, default=str), flush=True)
 
 
-charter_path = WS / 'native-probe-charter-20261021.md'
-charter = SourceRef(str(charter_path), sha(charter_path), charter_path.stat().st_size, '1', 'operator', 'PROBE_CHARTER')
-authority = write_ref(root / 'duy-delegation-receipt.json', {
-    'source': '[chat] 2026-11-08 Duy (self-stated): "Claude soạn recipe F", "Claude đổi input F theo thang"',
-    'plan': 'docs/m56/PLAN_M56_F_NATIVE_TOOLING_20261109.md', 'revision': {'path': str(REVISION), 'sha256': sha(REVISION)},
-    'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent); independent review waived by Duy 2026-10-24',
-    'stage': 'F A/B' if AB else 'F fixture compile + admission only (no episode)', 'f_prereg': PREREG or None,
-    'carla_no_rendering_mode': NO_RENDER, 'ab_authority': AB_AUTHORITY or None,
-    'm56_code': os.environ.get('M56_CODE', str(WORK))}, 'OPERATOR_RECEIPT')
-review = reviewer(authority)
-OPS = runtime.READ_OPS + ('SETTINGS', 'LOAD_MAP', 'SPAWN', 'TICK', 'APPLY', 'DESTROY', 'VALIDATE_AB', 'tick', 'observe')
-approvals = ApprovalBundle((authority, charter), {}, OPS)
+def init(argv, out_root=None):
+    """argv = [REVISION, TOWN, SCENES, (--ab)]; creates the output root and the receipt (never at import)."""
+    global REVISION, TOWN, SCENES, AB, root, authority, review, approvals
+    REVISION, TOWN, SCENES = Path(argv[0]), argv[1], argv[2].split(',')
+    AB = '--ab' in argv[3:]
+    PREREG = os.environ.get('M56_F_PREREG', '')
+    AB_AUTHORITY = os.environ.get('M56_AB_AUTHORITY', '')
+    if AB and not (PREREG and AB_AUTHORITY):
+        sys.exit('REFUSED: --ab needs M56_F_PREREG=<F prereg commit> and M56_AB_AUTHORITY=<who authorised this A/B, quoted source>')
+    root = out_root or WORK / f"outputs/m56_f_{'ab' if AB else 'compile'}_{TOWN}_{now()}"
+    root.mkdir(parents=False, exist_ok=False)
+    charter_path = WS / 'native-probe-charter-20261021.md'
+    charter = SourceRef(str(charter_path), sha(charter_path), charter_path.stat().st_size, '1', 'operator', 'PROBE_CHARTER')
+    authority = write_ref(root / 'duy-delegation-receipt.json', {
+        'source': '[chat] 2026-11-08 Duy (self-stated): "Claude soạn recipe F", "Claude đổi input F theo thang"',
+        'plan': 'docs/m56/PLAN_M56_F_NATIVE_TOOLING_20261109.md', 'revision': {'path': str(REVISION), 'sha256': sha(REVISION)},
+        'reviewer': 'CLAUDE_REVIEW_UNDER_DUY_DELEGATION (not independent); independent review waived by Duy 2026-10-24',
+        'stage': 'F A/B' if AB else 'F fixture compile + admission only (no episode)', 'f_prereg': PREREG or None,
+        'carla_no_rendering_mode': NO_RENDER, 'ab_authority': AB_AUTHORITY or None,
+        'm56_code': os.environ.get('M56_CODE', str(WORK))}, 'OPERATOR_RECEIPT')
+    review = reviewer(authority)
+    approvals = ApprovalBundle((authority, charter), {}, OPS)
 
 
 def cap(kind, limits, raw, binding, why, method='native-g4-measure-v1'):
@@ -73,20 +77,14 @@ def plain(x):
     return x
 
 
-def compile_scene(c, world, m, identity, proc, start, sd):
+def scene_routes(c):
     rr = c.environment['runtime_recipe_v2']
     raw_prep = json.loads(Path(rr['prepare_json']).read_text(encoding='utf-8'))
     prep = {k: (v if k == 'poses' else plain(v)) for k, v in raw_prep.items()}
-    assert prep['map_hash'] == identity.map, 'MAP_HASH_CHANGED'
-    prep_ref = SourceRef(rr['prepare_json'], sha(rr['prepare_json']), Path(rr['prepare_json']).stat().st_size, '1',
-                         'claude-g4', 'G4_PREPARATION')
-    routes, rows, cont = f_routes(prep, plain, c.town)
-    assert all(_digest(r.route) == _digest(routes['EGO']) for r in c.responses), 'F_RESPONSE_ROUTE_MISMATCH'
-    geo = f_geometry(prep, routes, plain)
-    assert not geo.get('reason'), geo
-    body = body_record(prep['bbox'], write_ref(sd / 'a2-bbox.json', prep['bbox'], 'NATIVE_BODY'))
-    poses = {k: decode_record('Transform6', v) for k, v in prep['poses'].items()}
-    certs = {role: certificates(routes[role], body, review, cont) for role in routes}
+    return prep, raw_prep, f_routes(prep, plain, c.town)
+
+
+def native_drivable(world, m, c, routes, sd):
     pts = [(t.x, t.y) for r in routes.values() for t in r.transforms]
     center = ((min(p[0] for p in pts) + max(p[0] for p in pts)) / 2, (min(p[1] for p in pts) + max(p[1] for p in pts)) / 2)
     radius = max(math.dist(p, center) for p in pts) + 20.
@@ -96,14 +94,29 @@ def compile_scene(c, world, m, identity, proc, start, sd):
         log(event='STREAM_TO', scene=c.id, **streamed)
     drivable = drivable_union(m, center, radius, world, routes)
     dpath = sd / 'drivable-union.wkt'; dpath.write_text(drivable.wkt, encoding='utf-8')
-    dref = SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')
+    return drivable, SourceRef(str(dpath), sha(dpath), dpath.stat().st_size, '1', 'carla-generate-waypoints-0.5m', 'NATIVE_DRIVABLE')
+
+
+def compile_scene(c, identity, boot, wid, sd, drivable_pair, scene=None):
+    """CARLA-free given the drivable union (geometry, SourceRef); scene = scene_routes(c)."""
+    rr = c.environment['runtime_recipe_v2']
+    prep, raw_prep, (routes, rows, cont) = scene or scene_routes(c)
+    assert prep['map_hash'] == identity.map, 'MAP_HASH_CHANGED'
+    prep_ref = SourceRef(rr['prepare_json'], sha(rr['prepare_json']), Path(rr['prepare_json']).stat().st_size, '1',
+                         'claude-g4', 'G4_PREPARATION')
+    assert all(_digest(r.route) == _digest(routes['EGO']) for r in c.responses), 'F_RESPONSE_ROUTE_MISMATCH'
+    geo = f_geometry(prep, routes, plain)
+    assert not geo.get('reason'), geo
+    body = body_record(prep['bbox'], write_ref(sd / 'a2-bbox.json', prep['bbox'], 'NATIVE_BODY'))
+    poses = {k: decode_record('Transform6', v) for k, v in prep['poses'].items()}
+    certs = {role: certificates(routes[role], body, review, cont) for role in routes}
+    drivable, dref = drivable_pair
     z_lo, z_hi = geo['z']
     driving = {role: driving_boxes(drivable, routes[role], z_lo, z_hi) for role in routes}
     policies = PolicyBundle('m56-f-fixture', 'f' * 64, {}, {}, {}, (prep_ref,))
     mech = c.environment['mechanism']
     npc = f_npc(mech, c.parameters['vN_char'].values[0], routes['NPC'], _digest(policies))
     mp = {'town': c.town, 'opendrive_sha256': identity.map}
-    boot, wid = f'pid{proc.pid}@{start}', str(world.id)
     binding = _digest({'candidate': c, 'policy': policies, 'routes': routes, 'bodies': {'EGO': body, 'NPC': body},
                        'poses': poses, 'map': mp, 'boot': boot, 'world': wid})
     from shapely.geometry import MultiPoint
@@ -145,7 +158,9 @@ def compile_scene(c, world, m, identity, proc, start, sd):
 
 def run_scene(c, client, proc, start, world, m, identity):
     sd = root / c.id; sd.mkdir()
-    fixture, drivable, rows, raw_prep = compile_scene(c, world, m, identity, proc, start, sd)
+    scene = scene_routes(c)
+    dp = native_drivable(world, m, c, scene[2][0], sd)
+    fixture, drivable, rows, raw_prep = compile_scene(c, identity, f'pid{proc.pid}@{start}', str(world.id), sd, dp, scene)
     if not isinstance(fixture, CompiledFixture):
         log(event='FIXTURE', scene=c.id, status='BLOCKED_FIXTURE', reasons=list(fixture.reasons)); return
     fref = write_ref(sd / 'fixture-frozen.json', fixture, 'FROZEN_FIXTURE')
@@ -180,6 +195,7 @@ def run_scene(c, client, proc, start, world, m, identity):
 
 
 def main():
+    init(sys.argv[1:])
     data = load_json(REVISION)
     scenes = [decode_record('Candidate', c) for c in data['candidates'] if c['town'] == TOWN and c['id'] in SCENES
               and (c['environment'].get('runtime_recipe_v2') or {}).get('recipe') == 'f-v1'

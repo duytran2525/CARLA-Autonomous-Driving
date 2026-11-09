@@ -128,3 +128,14 @@ xong, rồi:
 3. compile, admission và contract;
 4. **một** A/B (P5), chỉ khi FROZEN, ADMITTED và mọi contract OK;
 5. ghép cặp dưới v13.
+
+**Sửa trước khi chạy (09/11, chưa có số F nào):**
+- Chuỗi `m56_f01_chain2` vẫn đang chờ, chưa chạy bước nào. Đã dừng đúng tiến trình bash của nó.
+- Script đã sửa:
+  - bỏ bước compile riêng, vì `--ab` tự compile, admit và kiểm contract trước episode;
+  - bỏ mọi `timeout`, vì timeout giết giữa episode sẽ tiêu quota P5 và bỏ lại server mồ côi. Watchdog lo trường hợp treo.
+- `native-f-ab.py` không còn tác dụng phụ khi import. Có thêm test compile offline `native-f-offline-check.py`: prepare giả trên
+  trục x, drivable là một hộp. Kết quả: fixture compile được, cặp metric đúng `_F_CONTRACTS['F01']`, ba response qua
+  `_forward_contract`, section brake ở trạm EGO 77,05 m (= 32,05 + 45).
+- Kiểm XODR cả bốn site: section dài hơn mức cần, lệch trục tối đa 0,59° trên toàn cửa sổ, dốc tối đa 1,7%.
+- Ghi F01-S1 vào `m56_asel2_replacements.jsonl`: 37/150.
