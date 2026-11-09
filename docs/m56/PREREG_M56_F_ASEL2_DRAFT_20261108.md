@@ -55,3 +55,10 @@ cạnh trong mọi báo cáo.
 - **Tooling native F** (compile fixture, prepare, A/B) theo mẫu `native-io-*`: site lấy từ pool R1/R3 của fill v4 trên 11 town,
   dùng spawn nghiêng và spectator.
 - **Chọn site F:** fill v4 §5 cùng các addendum B–E, áp cho F với pool R1 (F01, F02, F04', F05, F06) và R3 (F03).
+
+## 4. Smoke test capability, lần 1 (09/11/2026; `native-f-capability-smoke.py`, Town04)
+
+- **F06:** `reverse=True` cho readback gear −1, và xe lùi được 0,455 m/s sau 3 s ở throttle 0,3. **Đèn lùi không tự bật**
+  (`light_state` NONE). Tooling F06 phải đặt `VehicleLightState.Reverse` cho cue số lùi kèm đèn, và witness phải đọc lại đèn.
+- **F03: chưa kết luận.** Probe chọn điểm "dốc nhất" của road 40 nhưng thật ra chỉ dốc 0,0027. Lỗi nằm ở cách probe dò dốc, nên
+  xe không trôi. Phải test lại trên một site R3 có độ dốc ≥ 0,05 (`native-f03-grade-probe.py`).
