@@ -180,3 +180,22 @@ pose". So với 0 chỉ đúng khi tư thế spawn có pitch 0, tức chỉ đú
 
 **Đặt sau khi thấy số:** quyết định được đưa ra sau các lỗi M ở Town11/12 và sau census. Mọi báo cáo M phải ghi theo cả luật cũ
 lẫn luật mới.
+
+## 8. Bổ sung 5 (09/11/2026): dung sai vị trí ban đầu x/y là 1 mm (consumer v12)
+
+**Phát hiện (Claude, chẩn đoán chỉ đọc; `asel2-init-clause.py`):**
+- Cả 4 A/B của batch 1 trên Town12 (C02, C03, C04, L02-S1) hỏng ở mệnh đề `actual initial state` của
+  `_initialization_integrity`. Ở frame biên, x/y lệch 0,06–0,49 mm so với ảnh float32 của tư thế spawn, trong khi luật đòi
+  ≤ 1e-4 m.
+- Nhiều giá trị lệch đúng bằng một bước lượng tử float32 tại tọa độ đó: 2⁻¹¹ m ở |y| khoảng 5000 m, 2⁻¹² m ở |x| khoảng 3500 m.
+- So sánh: C08 trên Town06, gần gốc tọa độ, chỉ lệch 4,8e-7 m.
+- Kết luận: ngưỡng 1e-4 m nhỏ hơn độ phân giải số của simulator trên map lớn. Đây là lập luận "sai khách quan", cùng loại với
+  E3/E5 ngày 23/10.
+
+**Quyết định:** [chat] Duy, ngày 09/11/2026, chọn "Dung sai x/y 1 mm (Recommended)".
+- Luật mới: |x − x_f32|, |y − y_f32| ≤ 1e-3 m.
+- Yaw (1e-4), z, pitch/roll (bổ sung 3) và speed giữ nguyên.
+- Luật cũ được giữ nguyên văn là `initial_xy_old_rule`, và báo song song trong mọi kết quả.
+- 4 A/B đã seal được **đánh giá lại** dưới v12. Không chạy A/B mới.
+
+**Đặt sau khi thấy số.**
