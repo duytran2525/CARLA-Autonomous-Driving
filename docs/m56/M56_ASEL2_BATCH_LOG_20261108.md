@@ -139,3 +139,27 @@ xong, rồi:
   `_forward_contract`, section brake ở trạm EGO 77,05 m (= 32,05 + 45).
 - Kiểm XODR cả bốn site: section dài hơn mức cần, lệch trục tối đa 0,59° trên toàn cửa sổ, dốc tối đa 1,7%.
 - Ghi F01-S1 vào `m56_asel2_replacements.jsonl`: 37/150.
+
+**F05 và F06 bị chặn ở product, chưa phải ở recipe (09/11):**
+- Guard creep F05 B (`_creep_stop_proof`, `_creep_guard`) và guard lùi F06 (`REVERSE_ALIGNMENT_UNSUPPORTED`) cùng đòi hai điều
+  ở mọi khung hình:
+  - route chỉ 2 điểm theo +x;
+  - pose của actor có pitch/yaw/roll đúng bằng 0 và y bằng y của route.
+- Hai guard này còn đòi một proof `CREEP_STOP_BOUND`/`REVERSE_STOP_BOUND` hiệu chỉnh sẵn. Docstring tự ghi rằng native
+  qualification "cannot be obtained by this pure arithmetic producer".
+- Native không bao giờ thỏa được các điều kiện này. Muốn có F05/F06 thì cần một version product mở rộng (consumer v14, công
+  khai). Việc đó chưa làm.
+
+**F02** (`F02_RECIPE_NOTES_20261109.md`, trước mọi số đo F02):
+- `M56-P-F02` (Town12 R451) lấp slot trống. Trần thay cảnh: 38/150.
+- Revision `outputs/m56_c0_partial_io_asel2fbase2_20261109T160045Z`, 44 candidate.
+- Tooling đã tổng quát hóa:
+  - prepare: lead/follower;
+  - section theo trạm EGO;
+  - box bắt đầu sau route khởi đầu muộn hơn;
+  - script NPC F02;
+  - builder EGO F02 lấy từ composition `f02_cases` của product.
+- Test offline `native-f-offline-check.py`:
+  - F01 cho cùng section và domain như trước khi sửa, nên chuỗi F01 không đổi hành vi.
+  - F02 compile được, `F02_END − nominal_front_t0 = 60` đúng tuyệt đối, cặp metric khớp, ba contract OK.
+- Chuỗi `run-f02-after-f01.sh` chờ `F01_END`.

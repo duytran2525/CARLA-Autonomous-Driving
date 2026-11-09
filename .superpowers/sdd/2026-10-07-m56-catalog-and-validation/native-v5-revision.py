@@ -225,8 +225,29 @@ def asel2_io(e, cid, old, fill_ref, prereg_ref, attest, xodr, weather):
     return replace(c, actors=actors, responses=responses, environment=env), None
 
 
-F_BUILT = ('F01',)  # PLAN_M56_F_NATIVE_TOOLING: F01 first; F02/F05/F06 builders follow
+F_BUILT = ('F01', 'F02')  # PLAN_M56_F_NATIVE_TOOLING; F05/F06 need product creep/reverse support (batch log 09/11)
 F_PREREG = WORK / 'docs/m56/PREREG_M56_F_ASEL2_20261109.md'
+
+
+def f02_recipe(c, xodr_hash):
+    """Catalog-form F02 (like catalog-recipes f_recipe for F01): the approved F02 EGO programs of the product's F02
+    composition (tests/m56/f02_cases.py, settle variant) on the site lane over the whole section; the native
+    preparation replaces route and destination (f-v1)."""
+    import tempfile
+    from tests.m56.source_cases import Sources
+    from tests.m56.f02_cases import f02_fixture
+    r = c.actors[0].route_recipe; road, lane = r['road'], r['lanes'][0]
+    secs = cr.xr.roads(c.town)[road].find('lanes').findall('laneSection')
+    lo = float(secs[r['section']].get('s'))
+    hi = float(secs[r['section'] + 1].get('s')) if r['section'] + 1 < len(secs) else cr.xr.length(c.town, road)
+    entry, exit_ = (lo, hi) if lane < 0 else (hi, lo)
+    route, _ = cr.lane_route(c.town, road, lane, entry, exit_, xodr_hash, F(0))
+    dest = F(str(round(abs(hi - lo) - 5, 3))); route = replace(route, destination=dest)
+    with tempfile.TemporaryDirectory() as tmp:
+        fx = f02_fixture(Sources(Path(tmp) / 'f')).fixture
+        egos = sorted((x for x in fx.responses if x.actor_role == 'EGO'), key=lambda x: x.action_id)
+        responses = tuple(cr.hashed(replace(x, route=route)) for x in egos)
+    return {'EGO': dest, 'NPC': dest}, responses, [], {'EGO': route}
 
 
 def asel2_f(done, decision_ref, xodr, weather):
@@ -258,7 +279,7 @@ def asel2_f(done, decision_ref, xodr, weather):
         why = f'PREREG F part 1 section 1 ({slot}); site by f-site-generate (F_SITE_NOTES_20261109)'
         units = {'vN_char': 'm/s', 'd0': 'm'}
         params = {n: ParameterProposal(n, (v,), units[n], why, (pref, fref), 'PROPOSED_PREREG_NOT_READY') for n, v in d.items()}
-        params['vE'] = ParameterProposal('vE', (F(4),), 'm/s', 'spec 8.1 F01 EGO nominal', (pref,), 'PROPOSED_PREREG_NOT_READY')
+        params['vE'] = ParameterProposal('vE', (F(4),), 'm/s', f'spec 8.1 {slot} EGO nominal', (pref,), 'PROPOSED_PREREG_NOT_READY')
         # no 'mechanism' ParameterProposal: units '' fail the strict Candidate decoder (C0 F01/F04 carry one and do not
         # decode); the mechanism is environment['mechanism']
         site_id = f"{s['town']}-R{s['road']}-S{s['section']}"
@@ -277,7 +298,7 @@ def asel2_f(done, decision_ref, xodr, weather):
             'attestation, not an independent selector review'))}
         c = Candidate(*fields, env, bare.refs)
         try:
-            dest, responses, flags, _ = cr.f_recipe(c, xodr[c.town])
+            dest, responses, flags, _ = (cr.f_recipe if slot == 'F01' else f02_recipe)(c, xodr[c.town])
         except Exception as ex:  # recorded, never guessed
             report.append({'id': cid, 'status': 'RECIPE_ERROR', 'error': repr(ex)[:500]}); continue
         w = weather[c.town]

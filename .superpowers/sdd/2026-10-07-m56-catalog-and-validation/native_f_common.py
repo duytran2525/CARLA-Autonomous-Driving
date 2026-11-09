@@ -48,8 +48,14 @@ def f_responses(c, routes):
 def f_npc(mech, vN, route, policy_hash):
     """F01 NPC_COMMON (response.py _f_script_contract): SETTLE 0 -> NOMINAL vN after CAPTURE_START + release ->
     F01_BRAKE 0 at F01_BRAKE_MARKER -> NPC_RESTART vN at NPC_F01_STOP_HOLD_CONFIRMED."""
-    assert mech == 'F01', mech
-    rows = ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()},
+    assert mech in ('F01', 'F02'), mech
+    nominal = {'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()}
+    if mech == 'F02':  # constant NPC from behind: SETTLE 0 -> NOMINAL vN, nothing else
+        phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
+                                               'transitions': (nominal,)},
+                  'f_script': {'mechanism': 'F02', 'policy_hash': policy_hash}}
+        return hashed(FrozenResponse('NPC', 'NPC_COMMON', route, {'SETTLE': F(0), 'NOMINAL': vN}, ZERO, phases, ''))
+    rows = (nominal,
             {'cause': 'F01_BRAKE', 'after_event': 'F01_BRAKE_MARKER', 'delay_s': F(0), 'requires': ()},
             {'cause': 'NPC_RESTART', 'after_event': 'NPC_F01_STOP_HOLD_CONFIRMED', 'delay_s': F(0), 'requires': ()})
     phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'SETTLE', 'transitions': rows},
@@ -79,27 +85,42 @@ def f_geometry(prep, routes, plain):
     zs = [t.z for r in (ego, npc) for t in r.transforms]
     z_lo, z_hi = min(zs) - 1., max(zs) + 3.
     sm = {k: (v['route'], plain(v['station'])) for k, v in prep['sections_m'].items()}
+    extra = {}
+    if 'F02_END' in sm:  # metrics _detect_f02: F02_END.route_station - nominal_front_t0_m == 60 exactly
+        front = q6(plain(prep['nominal_front_t0_m']))
+        sm['F02_END'] = ('EGO', front + 60)
+        extra['nominal_front_t0_m'] = front
 
-    def section(role, station):
-        p = _point(routes[role], q6(station))
+    def section(key, role, station):
+        """Plane across the lane at a route station. Every route_station is in the EGO station frame: an EGO-route
+        section keeps its exact station (DESTINATION = the EGO route destination); an NPC-route one is projected."""
+        st = ego.destination if key == 'DESTINATION' else q6(station)
+        p = _point(routes[role], st)
         verts = []
         for lv, zv in product((l_lo, l_hi), (z_lo, z_hi)):
             v = [0., 0., zv]; v[trv] = p[trv]; v[lat] = lv; verts.append(tuple(v))
         n = [0., 0., 0.]; n[trv] = float(tsg)
-        st = ego.destination if role == 'EGO' else q6(project_route(p, ego))  # every section in the EGO station frame
+        if role == 'NPC':
+            st = q6(project_route(p, ego))
         return Section(tuple(verts), tuple(n), st, {})
-    sections = {k: section(*sm[k]) for k in ('F01_BRAKE_START', 'F01_END', 'DESTINATION')}
-    # domain box: along travel from 1 m past the NPC route start to 1 m before the shorter route end; across both lanes
+    sections = {k: section(k, *v) for k, v in sm.items()}
+    # domain box: along travel from 1 m past the later route start to 1 m before the shorter route end; across both lanes
     ends = [(r.transforms[k].x, r.transforms[k].y)[trv] for r in (ego, npc) for k in (0, -1)]
-    a = (npc.transforms[0].x, npc.transforms[0].y)[trv] + tsg * 1.
+    s_e, s_n = (ego.transforms[0].x, ego.transforms[0].y)[trv], (npc.transforms[0].x, npc.transforms[0].y)[trv]
+    a = (max(s_e, s_n) if tsg > 0 else min(s_e, s_n)) + tsg * 1.
     e_end, n_end = (ego.transforms[-1].x, ego.transforms[-1].y)[trv], (npc.transforms[-1].x, npc.transforms[-1].y)[trv]
     b = (min(e_end, n_end) if tsg > 0 else max(e_end, n_end)) - tsg * 1.
     region = []
     for tv, lv, zv in product(sorted((a, b)), (l_lo, l_hi), (z_lo, z_hi)):
         v = [0., 0., zv]; v[trv] = tv; v[lat] = lv; region.append(tuple(v))
-    spec = (('a_peak_025', 'g_front_min_m'), ('m/s^2', 'm'), ('peak_decel_025', 'min_front_gap'),
-            (('TRIGGER', 'F01_N_CLEAR'),) * 2, 'route:' + _digest(ego))
+    spec = (*PAIRS[prep['mechanism']], 'route:' + _digest(ego))
     pair = FrozenMetricPair(*spec, _digest(spec), 'APPROVED_PROPOSAL_NOT_READY')
     region = tuple(region)
     return {'region': region, 'sections': sections, 'pair': pair, 'z': (z_lo, z_hi), 'axis': (trv, tsg), 'ends': ends,
-            'driving_regions': {'EGO': (region,), 'NPC': (region,)}}
+            'topology_extra': extra}
+
+
+# metrics.py _F_CONTRACTS (names, units, estimators, windows), copied; the offline check asserts equality
+PAIRS = {'F01': (('a_peak_025', 'g_front_min_m'), ('m/s^2', 'm'), ('peak_decel_025', 'min_front_gap'), (('TRIGGER', 'F01_N_CLEAR'),) * 2),
+         'F02': (('v_mean_E', 'g_rear_min_m'), ('m/s', 'm'), ('mean_speed', 'min_rear_gap'), (('TRIGGER', 'F02_END'),) * 2)}
+END_SECTION = {'F01': 'F01_END', 'F02': 'F02_END'}

@@ -71,7 +71,8 @@ class IO:
         s = [project_route(p, route) for p in world_vertices(actor.body, actor.pose)]
         s = [float(x) for x in s if not hasattr(x, 'reasons')]
         return min(s) if s else None
-INPUTS = {'F01': {'vE': F(4), 'vN_char': F(17, 5), 'd0': F(57, 5)}}   # PREREG F part 1 section 1
+INPUTS = {'F01': {'vE': F(4), 'vN_char': F(17, 5), 'd0': F(57, 5)},   # PREREG F part 1 section 1
+          'F02': {'vE': F(4), 'vN_char': F(5), 'd0': F(20)}}         # + F02_RECIPE_NOTES_20261109
 G0, TAIL_M = 40., 30.
 ZERO = {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': F(0), 'length_m': F(1), 'start_offset_m': F(0), 'end_offset_m': F(0)},)}
 
@@ -115,16 +116,27 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     arc = {k: arcs(v) for k, v in rows.items()}
     cont = write_ref(P.root / c.id / 'routes-f-probe1.json', rows, 'NATIVE_ROUTE')
     note = f'{road}/{lane}'
+    # F01: the NPC leads (its route is cut at its start). F02 (F02 recipe notes 1): the EGO leads; both share the whole
+    # lane route (the rear-gap metric projects the NPC onto the EGO route) and the EGO spawns at its start station.
+    lead, follow = ('NPC', 'EGO') if mech == 'F01' else ('EGO', 'NPC')
 
-    def routes_for(npc_station):
-        k = next(i for i, a in enumerate(arc['NPC']) if float(a) >= npc_station)
-        nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
+    def routes_for(lead_station):
+        k = next(i for i, a in enumerate(arc[lead]) if float(a) >= lead_station)
+        if mech == 'F01':
+            nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
+        else:
+            nr, na = rows['NPC'], arc['NPC']
         r = {'EGO': directed(rows['EGO'], arc['EGO'], identity.map, c.town, note, cont, arc['EGO'][-1] - 5),
              'NPC': directed(nr, na, identity.map, c.town, note, cont, na[-1] - 5)}
         return r, {'EGO': (rows['EGO'], arc['EGO']), 'NPC': (nr, na)}, k
-    first = float(G0 + L)  # NPC origin station on the EGO route (front gap G0)
+
+    def poses_for(prow, k):
+        if mech == 'F01':
+            return {'EGO': IO.pose_on(world, rows['EGO'], 0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+        return {'EGO': IO.pose_on(world, rows['EGO'], k), 'NPC': IO.pose_on(world, rows['NPC'], 0)}
+    first = float(G0 + L)  # lead origin station on the follower route (front gap G0)
     routes, prow, k1 = routes_for(first)
-    poses = {'EGO': IO.pose_on(world, rows['EGO'], 0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+    poses = poses_for(prow, k1)
     mid = rows['EGO'][len(rows['EGO']) // 2]
     stream_to(world, mid['x'], mid['y'], mid['z'])
 
@@ -140,12 +152,14 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NOT_STEADY'); return P.finish(c, out)
     T = max(tE, tN)
     fr = next(f for f in p1 if f.simtime >= T)
-    ego = next(a for a in fr.actors if a.role == 'EGO'); npc = next(a for a in fr.actors if a.role == 'NPC')
-    gap = IO.rear_station(npc, routes['EGO']) - P.front_station(ego, routes['EGO'])
-    shift = float(inp['d0']) - gap
-    out.update(probe1_gap_at_ready_m=gap, npc_shift_m=shift)
+    act = {a.role: a for a in fr.actors}
+    gap = IO.rear_station(act[lead], routes[follow]) - P.front_station(act[follow], routes[follow])
+    # F02 recipe notes 2: gap at readiness d0 + (vN - vE) * 1 s, so TRIGGER (gap 20 m) comes 1 s after readiness
+    target = float(inp['d0']) + (float(inp['vN_char'] - inp['vE']) if mech == 'F02' else 0.)
+    shift = target - gap
+    out.update(probe1_gap_at_ready_m=gap, lead_shift_m=shift, target_gap_at_ready_m=target, lead=lead)
     routes2, prow2, k2 = routes_for(first + shift)
-    poses2 = {'EGO': poses['EGO'], 'NPC': IO.pose_on(world, prow2['NPC'][0], 0)}
+    poses2 = poses_for(prow2, k2)
     p2 = run('probe2', routes2, prow2, poses2)
     if not p2:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE2_NO_FRAMES:' + ','.join(P.LAST_REASONS)); return P.finish(c, out)
@@ -154,20 +168,34 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     if ready is None:
         out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_REACHED_IN_PROBE2'); return P.finish(c, out)
     frr, markers = ready
-    ego = next(a for a in frr.actors if a.role == 'EGO'); npc = next(a for a in frr.actors if a.role == 'NPC')
-    d0r = IO.rear_station(npc, routes2['EGO']) - P.front_station(ego, routes2['EGO'])
-    npc_front = P.front_station(npc, routes2['NPC'])
-    brake = npc_front + 3 * float(inp['vN_char']); end = brake + 20.
-    ego_end = P.front_station(ego, routes2['EGO']) + (end - npc_front) + d0r + L + 10.
-    if end + TAIL_M > float(routes2['NPC'].arc[-1]) or ego_end + 15. > float(routes2['EGO'].arc[-1]):
+    act = {a.role: a for a in frr.actors}; ego, npc = act['EGO'], act['NPC']
+    d0r = IO.rear_station(act[lead], routes2[follow]) - P.front_station(act[follow], routes2[follow])
+    ego_front = P.front_station(ego, routes2['EGO'])
+    extra = {}
+    if mech == 'F01':
+        npc_front = P.front_station(npc, routes2['NPC'])
+        brake = npc_front + 3 * float(inp['vN_char']); end = brake + 20.
+        ego_end = ego_front + (end - npc_front) + d0r + L + 10.
+        sections = {'F01_BRAKE_START': {'route': 'NPC', 'station': brake}, 'F01_END': {'route': 'NPC', 'station': end},
+                    'DESTINATION': {'route': 'EGO', 'station': ego_end}}
+        npc_need = end + TAIL_M
+    else:  # F02 recipe notes 3: nominal EGO front at TRIGGER; F02_END = front + 60 (metrics.py); DESTINATION = F02_END + 5
+        t_trig = (d0r - 20.) / float(inp['vN_char'] - inp['vE'])
+        front_t0 = ego_front + float(inp['vE']) * max(t_trig, 0.)
+        end = front_t0 + 60.; ego_end = end + 5.
+        sections = {'F02_END': {'route': 'EGO', 'station': end}, 'DESTINATION': {'route': 'EGO', 'station': ego_end}}
+        extra = {'nominal_front_t0_m': front_t0, 'nominal_trigger_after_ready_s': t_trig}
+        npc_need = 0.
+    if npc_need > float(routes2['NPC'].arc[-1]) or ego_end + 15. > float(routes2['EGO'].arc[-1]):
         out.update(status='BLOCKED_FIXTURE', reason='F_WINDOW_TOO_SHORT', need_ego_m=ego_end + 15., have_ego_m=float(routes2['EGO'].arc[-1]))
         return P.finish(c, out)
-    cont2 = write_ref(P.root / c.id / 'routes-f.json', {'EGO': rows['EGO'], 'NPC': prow2['NPC'][0]}, 'NATIVE_ROUTE')
+    npc_rows = prow2['NPC'][0]
+    cont2 = write_ref(P.root / c.id / 'routes-f.json', {'EGO': rows['EGO'], 'NPC': npc_rows}, 'NATIVE_ROUTE')
     out.update(status='PREPARED', reason=None, targets=targets, markers=markers, T_r=float(frr.simtime) - float(p2[0].simtime),
-               d0_realised_m=d0r, npc_route_start_index=k2, routes_f=str(cont2.uri), routes_f_sha256=cont2.sha256,
-               poses={k: encode_record(v) for k, v in poses2.items()}, grounds={'EGO': IO.grounds.get(id(rows['EGO'])), 'NPC': IO.grounds.get(id(prow2['NPC'][0]))},
-               sections_m={'F01_BRAKE_START': {'route': 'NPC', 'station': brake}, 'F01_END': {'route': 'NPC', 'station': end},
-                           'DESTINATION': {'route': 'EGO', 'station': ego_end}})
+               d0_realised_m=d0r, lead_route_start_index=k2, routes_f=str(cont2.uri), routes_f_sha256=cont2.sha256,
+               poses={k: encode_record(v) for k, v in poses2.items()},
+               grounds={'EGO': IO.grounds.get(id(rows['EGO'])), 'NPC': IO.grounds.get(id(npc_rows))},
+               sections_m=sections, **extra)
     return P.finish(c, out)
 
 

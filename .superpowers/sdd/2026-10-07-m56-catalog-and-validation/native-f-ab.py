@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from native_v2_common import (NO_RENDER, WORK, WS, body_record, certificates, drivable_union, driving_boxes, load, now,
                               own_server, ownership, policy_maker, reviewer, sha, stream_to, up, write_ref)
-from native_f_common import f_geometry, f_npc, f_routes
+from native_f_common import END_SECTION, f_geometry, f_npc, f_routes
+KIND = {'F01': 'same-lane-lead-brake', 'F02': 'same-lane-rear-closing'}
 from native_v2_kit import Kit, q
 from m56 import runtime
 from m56.catalog import _digest
@@ -132,20 +133,23 @@ def compile_scene(c, identity, boot, wid, sd, drivable_pair, scene=None):
                                                'contact_method': 'world.ground_projection at route start + 1 cm'},
                             (prep_ref,), binding, 'native ground_projection at the spawn point')
     ego, sec = routes['EGO'], geo['sections']
-    brake = sec['F01_BRAKE_START'].route_station
+    # run-in reference (EGO station frame): F01 the brake-start section; F02 the nominal EGO front at TRIGGER
+    mark, mark_name = ((sec['F01_BRAKE_START'].route_station, 'F01_BRAKE_START') if mech == 'F01'
+                       else (geo['topology_extra']['nominal_front_t0_m'], 'nominal EGO front at TRIGGER'))
     need = F(math.ceil((float(prep['markers']['EGO']) - ego_front) * 10000), 10000)  # readiness distance, rounded up
-    room = q(float(brake) - ego_front)
+    room = q(float(mark) - ego_front)
+    end_name = END_SECTION[mech]
     caps = (cap('BODY_FIT', {'minimum_road_edge_m': q(edge), 'minimum_body_separation_m': q(fp['EGO'].distance(fp['NPC']))},
                 (prep_ref, dref), binding, 'start footprints vs CARLA driving-lane union'),
-            # F has no G: run-in = readiness before the brake-start section (EGO station frame). required = the probe-2
-            # readiness distance of the EGO front; available = spawn front -> F01_BRAKE_START.
+            # F has no G: run-in = readiness before the mechanism reference (EGO station frame). required = the probe-2
+            # readiness distance of the EGO front; available = spawn front -> reference.
             cap('RUNIN_ROOM', {'required_m': need, 'available_m': room, 'initial_front_m': room, 'G_m': need},
-                (prep_ref,), binding, 'EGO front at spawn vs F01_BRAKE_START; readiness distance measured in probe 2'),
-            cap('DESTINATION_ROOM', {'exit_to_destination_m': q(float(ego.destination - sec['F01_END'].route_station)),
+                (prep_ref,), binding, f'EGO front at spawn vs {mark_name}; readiness distance measured in probe 2'),
+            cap('DESTINATION_ROOM', {'exit_to_destination_m': q(float(ego.destination - sec[end_name].route_station)),
                                      'destination_to_plan_end_m': q(float(ego.arc[-1] - ego.destination))},
-                (prep_ref,), binding, 'destination = F01_END + body + 10 m (EGO frame); plan extends >= 15 m further'))
-    topology = {'category': 'F', 'mechanism': mech, 'kind': 'same-lane-lead-brake', 'driving_regions': driving,
-                'drivable_ref': dref}
+                (prep_ref,), binding, f'destination after {end_name} (EGO frame); plan extends >= 15 m further'))
+    topology = {'category': 'F', 'mechanism': mech, 'kind': KIND[mech], 'driving_regions': driving,
+                'drivable_ref': dref, **geo['topology_extra']}
     packet = {'region': geo['region'], 'topology': topology, 'proof': (prep_ref, cont, dref), 'G': None,
               'sections': sec, 'responses': (*c.responses, npc), 'pair': geo['pair']}
     queries = QueryBundle(boot, wid, mp, routes, {'EGO': body, 'NPC': body}, poses, grounds,
