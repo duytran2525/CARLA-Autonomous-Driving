@@ -497,11 +497,19 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
         return None
     pc = prep(corridor); cells = []
     x0, y0, x1, y1 = corridor.bounds
-    for i in range(int((x1 - x0) / cell) + 1):
-        for j in range(int((y1 - y0) / cell) + 1):
-            x, y = x0 + cell * i, y0 + cell * j
-            if not pc.contains(Point(x, y)):
+    # A-SEL2 technical fix 4 (performance only): the corridor test is shapely.contains_xy over the whole grid at once,
+    # the same float64 grid points (x0 + cell*i, y0 + cell*j) and the same i-outer / j-inner order as the per-point
+    # prepared contains it replaces (identical booleans, verified on 200k points), so `cells` is unchanged.
+    import numpy as np, shapely
+    ni, nj = int((x1 - x0) / cell) + 1, int((y1 - y0) / cell) + 1
+    gx = x0 + cell * np.arange(ni, dtype=np.int64).astype(np.float64)
+    gy = y0 + cell * np.arange(nj, dtype=np.int64).astype(np.float64)
+    inside = shapely.contains_xy(corridor, np.repeat(gx, nj), np.tile(gy, ni)).reshape(ni, nj)
+    for i in range(ni):
+        for j in range(nj):
+            if not inside[i, j]:
                 continue
+            x, y = x0 + cell * i, y0 + cell * j
             z = local_z(x, y)
             if z is None:
                 continue
