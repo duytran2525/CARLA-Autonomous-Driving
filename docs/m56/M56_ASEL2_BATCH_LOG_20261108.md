@@ -98,3 +98,33 @@ chờ, chưa chạy bước nào), watchdog, batch 1 và server CarlaUE4 riêng 
 - 09/11 khoảng 14:55 UTC: dừng có chủ đích lượt A/B Town12 của hàng đợi 3 (`outputs/m56_v2_ab_Town12_20261109T132009Z`). Lúc dừng
   nó vẫn ở raster dv1 của C02-S1 sau 95 phút: chưa có FIXTURE, chưa có episode, nên **quota P5 chưa dùng**. Khởi động lại thành
   hàng đợi 3b để dùng sửa kỹ thuật 4. Smoke F đã chạy xong, nên được bỏ khỏi 3b.
+
+## F phần 1 (09/11/2026): chọn site, revision, tooling F01
+
+**Chọn site.** Bộ sinh `f-site-generate.py` cùng ghi chú cài đặt `F_SITE_NOTES_20261109.md` được commit ở 9677a51 **trước**
+lần chạy duy nhất. Kết quả: `outputs/m56_f_sites_20261109.json`, sha256 `1fba8d39…`, pool 107. Không slot nào trống.
+
+| Slot | Site | Rule | Bị bỏ qua |
+|---|---|---|---|
+| F01 | Town13 R1165 S0, làn −2 | F3-1 | B5 2 |
+| F02 | Town12 R451 S0, làn −1 | F2-3 | B5 12, section ngắn 17, site đã dùng 1 |
+| F05 | Town12 R164 S0, làn −2 | R1 | B5 17, section ngắn 25, site đã dùng 2 |
+| F06 | Town12 R896 S0, làn −2 | F3-1 | B5 24, section ngắn 35, site đã dùng 3 |
+
+**Revision base F.** `outputs/m56_c0_partial_io_asel2fbase_20261109T153007Z`, chưa có preparation F:
+- `M56-P-F01-S1` thay `M56-P-F01` (C0, Town06 R49). Thao tác này tiêu 1 lần trong trần 150.
+- Đã kiểm offline: candidate decode được; EGO A/B qua `_forward_contract` (v13); script NPC F01 17/5 qua `_f_script_contract`;
+  với nominal 4, contract trả `F_SCRIPT_POLICY_INVALID` như mong đợi.
+- Bản dựng trước đó, `…asel2fbase_20261109T152720Z`, có tham số `mechanism` với units rỗng. Decoder strict từ chối tham số này
+  (`UNSUPPORTED_UNIT`). Bản đó bị bỏ, vẫn được giữ lại.
+- **Phát hiện kèm theo:** candidate C0 `M56-P-F01` và `M56-P-F04` cũng mang tham số đó, nên cũng không decode được.
+
+**Realized F01/F02:** `F_REALIZED_DESCRIPTORS_20261109.md`, commit trước mọi A/B F.
+
+**Chuỗi F01** `run-f01-after-f03.sh` (commit 52b8f68; chạy tách rời với nhãn `m56_f01_chain`). Chuỗi chờ hàng đợi 3b và probe F03
+xong, rồi:
+1. prepare;
+2. dựng revision;
+3. compile, admission và contract;
+4. **một** A/B (P5), chỉ khi FROZEN, ADMITTED và mọi contract OK;
+5. ghép cặp dưới v13.
