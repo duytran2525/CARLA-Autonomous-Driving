@@ -229,3 +229,19 @@ Hệ quả phải báo: nếu không cảnh M nào ở Town12/13 hỏng thì lo�
   mỗi junction phía trên, trên road vào của junction đó (`signal_near_fixed`).
 - Mọi road và connector của chuỗi đều đạt điều kiện dốc (≤ 0,02) và cua (`line`, hoặc `arc` với |κ| ≤ 1/50) như §3.
 - EGO giữ nguyên luật một road.
+
+## Addendum F (09/11/2026): cổng trục cho C/L/M (B5)
+
+**Thời điểm:** sau batch 1 trên Town12 (`M56_ASEL2_BATCH_LOG_20261108.md`). C03-S1 có NPC đi chéo 23°: `CLEAR_N_CONFIRMED` không
+bao giờ kích hoạt, vì vùng xung đột và các mặt cắt do tooling dựng là hộp thẳng trục (`lane_width_region`). NPC đi chéo ra khỏi
+bề rộng mặt cắt `n_exit` trước khi vượt mặt phẳng 0,5 m (chẩn đoán `asel2-clear-diag.py`). Đây là luật chọn đặt sau khi thấy
+lỗi; nó không đổi ngưỡng nào.
+
+**B5:**
+- Chỉ áp cho mọi successor C/L/M từ nay.
+- Hướng đi vào junction xung đột của cả EGO và NPC (`h_in`) phải lệch trục thế giới gần nhất ≤ 1°.
+- Census (`asel2-axis-census.py`): pool còn C 1722, L 1072, M 475 site, chủ yếu ở Town12/13.
+
+**Các cảnh đã chuẩn bị nhưng chưa A/B** vẫn chạy đúng một A/B như đã đóng băng, không bị loại trước:
+- L05-S1, M06-S1, C07-S1, L03-S1, L06-S1, M03-S1 có route lệch trục 5–43°.
+- L02-S1 (NPC lệch 31°) vẫn đạt được CLEAR, nên đi chéo không chắc chắn là hỏng.
