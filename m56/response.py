@@ -593,6 +593,53 @@ REVERSE_LAWS={'bounded-reverse-stop-v1':{'target_mps':Number(1,2),'gain':Number(
                                           'throttle_cap':Number(2,5),'brake_cap':Number(3,10),'terminal_brake':Number(3,10)}}
 
 
+def _v13_exact_x_alignment(route,pose):
+    """OLD RULE (v13, reported in parallel): 2-point +x route, constant y/z, zero rotation of route and pose."""
+    return not (route is None or len(route.transforms)!=2 or route.transforms[0].x>=route.transforms[1].x
+                or route.transforms[0].y!=route.transforms[1].y or route.transforms[0].z!=route.transforms[1].z
+                or any((t.pitch,t.yaw,t.roll)!=(0.,0.,0.) for t in route.transforms)
+                or (pose.pitch,pose.yaw,pose.roll)!=(0.,0.,0.))
+
+
+V14_YAW_DEG,V14_TILT_DEG,V14_LATERAL_M=1.,.5,Number(3,20)
+
+
+def _v14_axis_route(route):
+    """v14 (docs/m56/PLAN_M56_F_REVERSE_CREEP_V14_20261109.md 2.1): a straight world-axis route: >= 2 points, every
+    yaw within 1 deg of the same axis direction (_axis_right), strictly monotone along that axis."""
+    if route is None or len(route.transforms)<2:
+        return None
+    axes={_axis_right(t.yaw) for t in route.transforms}
+    if len(axes)!=1 or None in axes:
+        return None
+    lat,_=next(iter(axes));trv=1-lat
+    steps=[(b.x,b.y)[trv]-(a.x,a.y)[trv] for a,b in zip(route.transforms,route.transforms[1:])]
+    if not (all(s>0 for s in steps) or all(s<0 for s in steps)):
+        return None
+    return lat,trv
+
+
+def _v14_aligned(route,pose,spawn):
+    """v14 2.1-2.3: pose yaw on the route's axis direction (1 deg), pitch/roll within 0.5 deg of the frozen spawn pose,
+    lateral distance to the route polyline <= 0.15 m. v13 exact-zero poses satisfy it on a v13 route."""
+    from math import hypot
+    from .metrics import _metric_station
+    axis=_v14_axis_route(route)
+    if axis is None or spawn is None or _axis_right(pose.yaw)!=_axis_right(route.transforms[0].yaw):
+        return False
+    wrap=lambda a,b:abs(((a-b+180.)%360.)-180.)
+    if wrap(pose.pitch,spawn.pitch)>V14_TILT_DEG or wrap(pose.roll,spawn.roll)>V14_TILT_DEG:
+        return False
+    station=_metric_station((pose.x,pose.y,pose.z),route)
+    if station is None:
+        return False
+    for i,(a,b) in enumerate(zip(route.arc,route.arc[1:])):
+        if a<=station<=b:
+            s,e=route.transforms[i],route.transforms[i+1];u=float((station-a)/(b-a)) if b>a else 0.
+            return hypot(pose.x-(s.x+u*(e.x-s.x)),pose.y-(s.y+u*(e.y-s.y)))<=float(V14_LATERAL_M)
+    return False
+
+
 def _reverse_capability(proof,kind,method):
     from .model import CapabilityProof
     from .catalog import _digest,_review_binds
@@ -658,10 +705,8 @@ def _reverse_inputs(frame,response,fixture,forward=False):
     if len(actors)!=1 or actors[0].route_valid is not True:
         raise ValueError('REVERSE_ACTOR_UNKNOWN')
     actor=actors[0];route=response.route;recipe=_reverse_recipe_hash(fixture)
-    if (route is None or len(route.transforms)!=2 or route.transforms[0].x>=route.transforms[1].x
-            or route.transforms[0].y!=route.transforms[1].y or route.transforms[0].z!=route.transforms[1].z
-            or any((t.pitch,t.yaw,t.roll)!=(0.,0.,0.) for t in route.transforms)
-            or (actor.pose.pitch,actor.pose.yaw,actor.pose.roll)!=(0.,0.,0.)):
+    spawn=fixture.poses.get(role) if isinstance(fixture.poses,Mapping) else None
+    if not _v14_aligned(route,actor.pose,spawn):  # v14; OLD RULE _v13_exact_x_alignment
         raise ValueError('REVERSE_ALIGNMENT_UNSUPPORTED')
     proofs=tuple(p for p in fixture.proofs if p.kind=='REVERSE_STOP_BOUND' and p.limits.get('actor_role')==role)
     if (len(proofs)!=1 or proofs[0].method not in REVERSE_LAWS
@@ -693,7 +738,7 @@ def _reverse_inputs(frame,response,fixture,forward=False):
                           'simtime':observed.simtime,'actors':observed.actors})
         if (len(own)!=1 or own[0].id!=actor.id or own[0].route_valid is not True
                 or _reverse_body_hash(own[0].body)!=_reverse_body_hash(actor.body)
-                or (own[0].pose.pitch,own[0].pose.yaw,own[0].pose.roll)!=(0.,0.,0.)
+                or not _v14_aligned(route,own[0].pose,spawn)
                 or not refs or not any(_source_bytes(r)==payload for r in refs)):
             raise ValueError('REVERSE_HISTORY_OBSERVATION_UNBOUND')
     if forward:
@@ -739,10 +784,8 @@ def _creep_stop_proof(fixture,response,actor):
         raise ValueError('CREEP_POLICY_UNBOUND')
     _forward_contract(response,fixture)
     route=response.route
-    if (route is None or len(route.transforms)!=2 or route.transforms[0].x>=route.transforms[1].x
-            or route.transforms[0].y!=route.transforms[1].y or route.transforms[0].z!=route.transforms[1].z
-            or any((t.pitch,t.yaw,t.roll)!=(0.,0.,0.) for t in route.transforms)
-            or (actor.pose.pitch,actor.pose.yaw,actor.pose.roll)!=(0.,0.,0.) or actor.route_valid is not True):
+    spawn=fixture.poses.get('EGO') if isinstance(fixture.poses,Mapping) else None
+    if not _v14_aligned(route,actor.pose,spawn) or actor.route_valid is not True:  # v14; OLD RULE _v13_exact_x_alignment
         raise ValueError('CREEP_ALIGNMENT_UNSUPPORTED')
     proofs=tuple(decode_record('CapabilityProof',encode_record(p)) for p in fixture.proofs
                  if p.kind=='CREEP_STOP_BOUND' and p.limits.get('actor_role')=='EGO')
@@ -838,7 +881,7 @@ def _creep_guard(frame,state,response,target):
     progress=Number(0);previous=None
     for f in selected:
         a=next(a for a in f.actors if a.role=='EGO');station=_metric_station((a.pose.x,a.pose.y,a.pose.z),response.route)
-        if station is None or (a.pose.pitch,a.pose.yaw,a.pose.roll)!=(0.,0.,0.) or a.pose.y!=response.route.transforms[0].y:
+        if station is None or not _v14_aligned(response.route,a.pose,fixture.poses.get('EGO')):  # v14
             raise ValueError('CREEP_ALIGNMENT_UNSUPPORTED')
         speed=sqrt(sum(v*v for v in a.velocity))
         if not isfinite(speed) or speed>proof.limits['maximum_forward_speed_mps']:
