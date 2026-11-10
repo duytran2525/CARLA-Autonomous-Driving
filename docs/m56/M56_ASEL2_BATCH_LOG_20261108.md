@@ -281,3 +281,7 @@ UTC.
   `_source_bytes` giống hệt nhau trên v1, v12, v13 và v14.
 - Ghi chú vận hành: scratchpad của phiên trước bị dọn giữa chừng lúc khoảng 15:56 UTC. Các log và chẩn đoán từ giờ đặt trong
   `outputs/`.
+
+**Regression v14** (0e2d233, `outputs/m56_v14_flake_diag/v14_regression.txt`): `tests/m56/test_f0[356]*.py` và `test_v14_*.py`
+cho **189 passed** sau 1:03:07. v14 phần 1 đã sẵn sàng để merge cho F03, nhưng chỉ merge sau khi grade probe và prereg F phần 2 của
+F03 xong. Claude quyết dưới ủy quyền.
