@@ -269,3 +269,15 @@ UTC.
   (`tmpyuq43w6i`) qua nhiều hash seed.
 - Không thêm retry vào `_source_bytes`: nguyên nhân chưa quan sát được, và đây là đường fail-closed dùng chung cho mọi category.
 - Quy tắc vận hành được mở rộng: không chạy job offline nào trong lúc có bất kỳ episode native nào, không riêng F.
+
+**Phép thử phân biệt lỗi v14** (`outputs/m56_v14_flake_diag/`, gồm `fixed_root.py` và `seed0..7.log`):
+- Cách chạy: arm B chạy trên đúng thư mục gốc tạm của lần hỏng (`%TEMP%\tmpyuq43w6i`), với PYTHONHASHSEED 0–7.
+- Kết quả: **8/8 OK**. `observed-149.json` hash `98dc07a4…` ở cả 8 lần, trùng với traceback của lần hỏng, nên byte input được tái hiện
+  y hệt.
+- NPC đọc `frozen-stop-NPC.json` lần đầu ở frame 149 và đọc lại mỗi frame sau đó, nên frame 209 không phải ranh giới đường code.
+- Kết luận: loại trừ được logic phụ thuộc dữ liệu hoặc thứ tự hash. Cách đọc "lỗi môi trường, tức một lần đọc nguồn thất bại tạm
+  thời" vẫn đứng vững, nhưng **vẫn chỉ là suy luận**, vì nguyên nhân trực tiếp chưa quan sát được.
+- v14 không còn bị giữ vì lỗi này, chỉ chờ regression. Quy tắc vận hành giữ nguyên: không chạy job offline trong episode native.
+  `_source_bytes` giống hệt nhau trên v1, v12, v13 và v14.
+- Ghi chú vận hành: scratchpad của phiên trước bị dọn giữa chừng lúc khoảng 15:56 UTC. Các log và chẩn đoán từ giờ đặt trong
+  `outputs/`.
