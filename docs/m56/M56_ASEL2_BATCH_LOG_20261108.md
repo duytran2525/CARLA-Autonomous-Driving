@@ -285,3 +285,21 @@ UTC.
 **Regression v14** (0e2d233, `outputs/m56_v14_flake_diag/v14_regression.txt`): `tests/m56/test_f0[356]*.py` và `test_v14_*.py`
 cho **189 passed** sau 1:03:07. v14 phần 1 đã sẵn sàng để merge cho F03, nhưng chỉ merge sau khi grade probe và prereg F phần 2 của
 F03 xong. Claude quyết dưới ủy quyền.
+
+**File STOP cho hàng đợi và dừng an toàn sáng 11/11** (Duy yêu cầu: "thêm file stop cho hàng đợi, tôi cần dừng an toàn vào lúc 8h
+sáng mai để tắt máy"):
+- **Công cụ mới:** `asel2-stopper.py`, kèm `asel2-stopper-check.py` (ALL_OK). Script chạy song song với hàng đợi chứ không sửa script
+  bash đang chạy, vì bash đọc script dần trong lúc chạy.
+- **Cách kích hoạt:** tạo file `outputs/m56_asel2_STOP` (dừng êm), hoặc để tới giờ `--at`. Nội dung file là `now` thì dừng ngay, kể
+  cả giữa episode: cảnh đó thành INFRA_INTERRUPTED và mất quota.
+- **Khi nào không an toàn:** cảnh mới nhất của một job A/B native đã có `fixture-frozen.json` nhưng chưa có `ab-result.json`; hoặc có
+  `native-v6-pair` / `native-v5-revision` đang chạy. Với io và f, toàn bộ đoạn từ fixture tới cảnh kế tiếp được coi là không an toàn,
+  cho chắc.
+- **Cách dừng:** chỉ kill tiến trình của mình, theo thứ tự bash chuỗi, rồi python, rồi CarlaUE4 trên 2610. Sau đó ghi
+  `outputs/m56_asel2_stop_<utc>.json` (trạng thái từng cảnh) và `outputs/M56_SAFE_TO_SHUTDOWN.txt`.
+- **Đã khởi động:** nhãn `m56_asel2_stopper_r2`, `--at 2026-11-10T23:45:00Z` (06:45 giờ máy). Trường hợp xấu nhất là một episode
+  window khoảng 55 phút, nên dừng xong trước 08:00. Claude quyết dưới ủy quyền.
+- **Khi chạy tiếp sau lần dừng này,** hàng đợi 3b **không** được chạy lại từ đầu, vì các A/B đã chạy thì đã tốn quota P5. Cần một
+  resume bỏ qua những cảnh DONE, dựa trên bản ghi dừng.
+- Lưu ý: checkpoint của watchdog đánh dấu AB_STARTED cho mọi cảnh có mặt trong sự kiện SCENES, nên không được dùng nó một mình để
+  chạy tiếp.
