@@ -258,3 +258,14 @@ UTC.
   sát được, chỉ suy ra. Đây không phải hồi quy logic của v14, nên v14 không còn bị giữ vì lỗi này; còn chờ kết quả regression.
 - Rủi ro native: một lỗi đọc tạm thời trong episode sẽ thành `BLOCKED_CONTROLLER` và tốn quota P5. Đường lùi đọc lại nguồn frozen ở
   mỗi tick nên phơi nhiều hơn. Biện pháp vận hành: không chạy job offline nặng song song với episode F native.
+
+**Đính chính mục trên** (sau khi hỏi advisor):
+- Sai về thời điểm. r1 khởi động CARLA lúc 02:49:15 và có STREAM_TO lúc khoảng 02:51; lần hỏng bắt đầu lúc 02:53:42, tức 4,5 phút sau
+  khởi động. Lúc đó Town12 đã nạp xong và đang raster, giống hệt điều kiện của các lần chạy sạch sau này. Lập luận "đỉnh tải lúc nạp
+  map" bị rút lại.
+- Phép tiêm chỉ chứng minh một lỗi đọc là **đủ** để gây lỗi. `start=109/20` chỉ là simtime của frame 209, nên mọi ngoại lệ bị bắt
+  trong lời gọi NPC frame 209 đều cho cùng bộ giá trị đó.
+- Trạng thái v14: **chưa kết luận**, vẫn bị giữ. Phép thử phân biệt là chạy lại B trên đúng thư mục gốc tạm của lần hỏng
+  (`tmpyuq43w6i`) qua nhiều hash seed.
+- Không thêm retry vào `_source_bytes`: nguyên nhân chưa quan sát được, và đây là đường fail-closed dùng chung cho mọi category.
+- Quy tắc vận hành được mở rộng: không chạy job offline nào trong lúc có bất kỳ episode native nào, không riêng F.
