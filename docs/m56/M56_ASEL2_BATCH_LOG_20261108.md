@@ -224,3 +224,22 @@ F02 vN_char 5, d0 20,95). Được commit trước mọi A/B F.
 **Máy tắt 10/11 khoảng 03:46 UTC** (mọi tiến trình con chết với 0xC000026B, máy khởi động lại lúc 14:10 UTC). C02-S1 mới ở raster dv1,
 chỉ có `a2-bbox.json`, chưa có FIXTURE hay episode, nên không dùng quota P5 nào. **Chạy tiếp 14:5x UTC:**
 `bash run-asel2-resume-20261110.sh r2` (các nhãn `*_r2`). Hàng đợi 3b chạy lại Q1 từ đầu. Claude quyết dưới ủy quyền.
+
+**Nguyên nhân máy tắt 10/11:** sự kiện Kernel-Power 105 lúc 03:14 UTC báo mất nguồn AC (AcOnline=false, pin 40146/43715 mWh).
+Máy chạy pin dưới tải CARLA cho tới khi bị cắt cứng khoảng 03:39 UTC (Kernel-Power 41, bugcheck 0, không phải do nút nguồn hay
+Windows Update). Khi chạy pin, máy còn ngủ sau 180 s rảnh; khi cắm AC thì không bao giờ ngủ. Nguyên nhân là nguồn điện, không phải
+tải, nên các job offline vẫn chạy song song được. Đã gửi một thông báo nhờ giữ sạc cắm liên tục.
+
+**F04': chưa dựng** (Claude quyết dưới ủy quyền, sau khi hỏi advisor). Đây là quyết định ưu tiên, giống F05, không phải
+`BLOCKED_CAPABILITY` hay `DIVERSITY_DEFICIT`.
+- F04 của product không phải khung dùng lại được. Nhánh NPC (`response.py` v13 khoảng dòng 528–545) bắt NPC đỗ yên: steer 0 và tốc
+  độ ≤ 0,1. Nhánh này cấm thay cửa bằng PID stock. Vật cản lấy từ capability `door_geometry` (`calibrated-door-envelope-v1`), chạy
+  xuyên evidence, metrics và response: khoảng 88 chỗ tham chiếu và 7 file test. Vì vậy F04' là một cơ chế mới, không phải biến thể.
+- Bước "NPC lùi về" của A là lùi có đánh lái, nằm ngoài luật căn trục thẳng của v14 phần 1. Bản thân v14 cũng đang bị giữ.
+- Trần lợi ích: +1 cảnh và tối đa +3 phép so (với F01, F02, F03), mỗi phép so chỉ có nếu cảnh kia cho cặp hợp lệ. Điều khiển ngang
+  tốc độ thấp của stock đã từng hỏng ở O07, I05 và I07.
+- Hệ quả: prereg F phần 2 chỉ còn F03, không cần 5 lập luận cặp F04'. Không chỉnh lại bản nháp cho vừa product.
+
+**Thứ tự việc offline:** F03 B dùng lùi (`_reverse_inputs`), nên cần v14 khi chạy native. Vì vậy việc giải thích lỗi
+`BLOCKED_CONTROLLER` lúc có lúc không của v14 nằm trên đường găng của F03 và được làm trước. Regression v14 đang chạy lại lúc 15:0x
+UTC.
