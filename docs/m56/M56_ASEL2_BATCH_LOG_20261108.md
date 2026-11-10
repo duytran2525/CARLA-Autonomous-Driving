@@ -216,3 +216,11 @@ Q1 từ đầu. Test regression v14 cũng được chạy lại.
 
 **v14:** dừng ở phần 1 (luật căn trục, 0e2d233). Không merge cho tới khi giải thích được lỗi `BLOCKED_CONTROLLER` lúc có lúc không
 trong composition F06. Lỗi xuất hiện một lần, lúc CARLA đang chạy, rồi không lặp lại.
+
+**Bộ sinh realized F01/F02** (b6dfaa4): `native_f_realized.py` chỉ dùng hàm của product (`detect_events`, `runtime._ready`,
+`_metric_station`, `world_vertices`), kèm `native-f-realized-check.py` (ALL_OK trên composition: F01 vN_char A/B 20/7 và 5, d0 15,95;
+F02 vN_char 5, d0 20,95). Được commit trước mọi A/B F.
+
+**Máy tắt 10/11 khoảng 03:46 UTC** (mọi tiến trình con chết với 0xC000026B, máy khởi động lại lúc 14:10 UTC). C02-S1 mới ở raster dv1,
+chỉ có `a2-bbox.json`, chưa có FIXTURE hay episode, nên không dùng quota P5 nào. **Chạy tiếp 14:5x UTC:**
+`bash run-asel2-resume-20261110.sh r2` (các nhãn `*_r2`). Hàng đợi 3b chạy lại Q1 từ đầu. Claude quyết dưới ủy quyền.
