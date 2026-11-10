@@ -196,3 +196,23 @@ Sau khi dừng, cổng 2610 trống.
 **Chạy tiếp 10/11, 02:49 UTC:** `bash run-asel2-resume-20261110.sh r1`. Các nhãn mới gồm `m56_asel2_watchdog_r1`,
 `m56_asel2_queue_r1`, `m56_f03_probe_r1`, `m56_f01_chain_r1` và `m56_f02_chain_r1`, tất cả chạy bằng Git bash. Hàng đợi 3b chạy lại
 Q1 từ đầu. Test regression v14 cũng được chạy lại.
+
+## Quyết định F ngày 10/11 (Claude quyết dưới ủy quyền: "làm theo những gì bạn recommended")
+
+**F06: `DIVERSITY_DEFICIT`** (`F06_IDEAL_SKETCH_20261110.md`, 2b6a987, trước mọi A/B).
+- Phác thảo lý tưởng cho `g_front_min_m` là 4,8 so với 5,8 m, Δ = 0,172 < 0,20. Kết quả ghi đúng như prereg F §2 yêu cầu, không
+  chỉnh gì.
+- **Hệ quả cho release:** thiếu F06 thì chỉ còn tối đa 10 trên 15 phép so F, nên 46 cảnh và 155 phép so §11 **không còn đạt được**
+  dù các cảnh khác ra sao. Từ đây mục tiêu là release partial trung thực, xếp việc theo số đếm mỗi việc thêm được.
+
+**F05: chưa dựng.** Đây là quyết định ưu tiên, không phải `DIVERSITY_DEFICIT`, vì luật phác thảo trong prereg chỉ áp cho F06.
+- Composition của chính product (`test_f05_complete.py`) khẳng định `NUMERIC_FAILED` với Δ 4/25 = 0,16.
+- Phác thảo dùng động học native thật: EGO L02-S1 trên Town12 lên khoảng 1,9 m/s sau khoảng 0,3 s, rồi giữ khoảng 1,88 m/s. Theo
+  phác thảo này, t_queue_exit của A ≈ 6,48 s và của B ≈ 4,99 s, nên Δ ≈ 0,23: chỉ sát ngưỡng.
+- Chi phí của v14 cho F05 lớn hơn kế hoạch. Ngoài luật căn trục và hiệu chỉnh, mỗi tick còn phải kiểm lại toàn bộ history. Đo
+  trên v14 lúc CARLA đang chạy: NPC 0,37–0,9 s mỗi lần gọi khi history khoảng 300 frame, EGO 2–3,7 s, có một lần vọt lên 19,9 s.
+  Muốn chạy được thì cần thêm thay đổi kiểm tăng dần trong product.
+- F05 có thể được làm lại sau, nếu mọi việc có lợi hơn đã xong.
+
+**v14:** dừng ở phần 1 (luật căn trục, 0e2d233). Không merge cho tới khi giải thích được lỗi `BLOCKED_CONTROLLER` lúc có lúc không
+trong composition F06. Lỗi xuất hiện một lần, lúc CARLA đang chạy, rồi không lặp lại.
