@@ -243,3 +243,18 @@ tải, nên các job offline vẫn chạy song song được. Đã gửi một t
 **Thứ tự việc offline:** F03 B dùng lùi (`_reverse_inputs`), nên cần v14 khi chạy native. Vì vậy việc giải thích lỗi
 `BLOCKED_CONTROLLER` lúc có lúc không của v14 nằm trên đường găng của F03 và được làm trước. Regression v14 đang chạy lại lúc 15:0x
 UTC.
+
+**Giải thích lỗi `BLOCKED_CONTROLLER` của v14** (CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent):
+- Lần hỏng duy nhất (02:53 UTC 10/11, NPC frame 209, phase start 109/20) chạy trên đúng code đã commit 0e2d233. Sau commit không có
+  sửa nào. Cùng code đó chạy sạch về sau: PYTHONHASHSEED 0–3 với cả A và B, `dbg_v14`, `time_guard14` (495 lần gọi). Vậy đây không
+  phải lỗi logic phụ thuộc thứ tự hash. Các cache khóa theo `id()` (`response.py` 112, 231; `metrics.py` 281, 1049, 1147, 1173) đều
+  kiểm `is` hoặc giữ weakref nên không thể dùng nhầm id.
+- Lần hỏng đó bắt đầu 4 s sau khi r1 khởi động CARLA, lúc Town12 đang nạp và RAM cùng I/O chịu tải nặng nhất. `evidence._source_bytes`
+  đổi mọi `OSError` thành `None`, nên kiểm reverse fail-closed thành `ValueError` rồi thành `BLOCKED_CONTROLLER`. Code này giống hệt
+  v13; v14 chỉ sửa `response.py`.
+- Tiêm một `OSError` tạm thời (WinError 1450) vào lần đọc `_source_bytes` đầu tiên trong lời gọi NPC ở frame 209 (file
+  `frozen-stop-NPC.json`) tái hiện **đúng y** chữ ký `(209, 'NPC', BLOCKED_CONTROLLER, start=109/20)`.
+- Kết luận: cơ chế đủ để gây lỗi và tái hiện chính xác. Nguyên nhân trực tiếp (lỗi đọc I/O tạm thời lúc thiếu tài nguyên) chưa quan
+  sát được, chỉ suy ra. Đây không phải hồi quy logic của v14, nên v14 không còn bị giữ vì lỗi này; còn chờ kết quả regression.
+- Rủi ro native: một lỗi đọc tạm thời trong episode sẽ thành `BLOCKED_CONTROLLER` và tốn quota P5. Đường lùi đọc lại nguồn frozen ở
+  mỗi tick nên phơi nhiều hơn. Biện pháp vận hành: không chạy job offline nặng song song với episode F native.
