@@ -303,3 +303,18 @@ sáng mai để tắt máy"):
   resume bỏ qua những cảnh DONE, dựa trên bản ghi dừng.
 - Lưu ý: checkpoint của watchdog đánh dấu AB_STARTED cho mọi cảnh có mặt trong sự kiện SCENES, nên không được dùng nó một mình để
   chạy tiếp.
+
+## Kết quả Q1 r2, Town12 (`outputs/m56_v2_ab_Town12_20261110T145403Z`, chấm cặp v12, CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent)
+
+| Cảnh | Cặp v12 | Δ của 2 metric | Ghi chú |
+|---|---|---|---|
+| C02-S1 | **PASS** | ≈0,782; 55/207 ≈ 0,266 | raster dv1 mất khoảng 3,5 h; CLEAR_N có xảy ra |
+| L02-S1 | **PASS** | ≈0,898; 59/195 ≈ 0,303 | |
+| L05-S1 | **PASS** | ≈0,866; 45/149 ≈ 0,302 | |
+| M06-S1 | FAILED | –; – | A: CONTACT_PROOF_INVALID, không có CLEAR_N, E_ENTRY và DESTINATION. B: EARLY_ENTRY_BEFORE_NPC_CLEAR, CONTACT_PROOF_INVALID |
+
+- **Điều kiện kèm theo:** các cặp PASS này được tính dưới các luật A-SEL2 hậu-số (addendum 8: x/y 1 mm; addendum 9: outer 1500 s;
+  dv1). Dưới luật đóng băng gốc thì không cặp nào hợp lệ (nguyên tắc 6).
+- **Tổng hiện tại:** 13 cặp hợp lệ có điều kiện (10 cặp cũ cộng C02-S1, L02-S1, L05-S1).
+- **M06-S1:** đã dùng hết quota P5 trên phiên bản này. Theo B3 nó là ứng viên thay bằng successor (cổng B5); việc thay được quyết sau
+  khi xong Q1. Không tinh chỉnh gì sau thất bại.
