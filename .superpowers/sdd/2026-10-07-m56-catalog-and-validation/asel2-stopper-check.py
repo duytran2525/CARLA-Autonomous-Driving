@@ -18,6 +18,10 @@ with tempfile.TemporaryDirectory() as tmp:
     assert S.unsafe([(2, 0, 'python native-v6-pair.py x')]), 'pair writer is unsafe'
     assert S.unsafe([]) == [], 'no job is safe'
     assert S.unsafe([(3, 0, 'python native-f-ab.py rev Town12 M56-P-F02 ')]) == [], 'f-ab compile mode is safe'
+    assert S.unsafe([(4, 0, 'python native-io-ab.py rev Town12 M56-P-I01 ')]) == [], 'io-ab compile mode is safe'
+    S.SINCE[0] = time.time() + 3600
+    assert S.unsafe(ab) == [], 'a root older than --since is ignored'
+    S.SINCE[0] = 0.
     st = S.status(S.datetime(2000, 1, 1, tzinfo=S.timezone.utc))
     assert st == {f'{root.name}/M56-P-L02-S1': 'DONE', f'{root.name}/M56-P-L05-S1': 'FIXTURE_NO_RESULT'}, st
 print('ALL_OK')

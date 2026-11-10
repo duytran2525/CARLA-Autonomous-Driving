@@ -8,7 +8,7 @@
 cd "$(dirname "$0")"
 O=../../../outputs; V12=D:/AI/CARLA-Funny-Moments.worktrees/m56-v12; PY=../../../.venv-m56-native-v1/Scripts/python.exe
 REV1=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs/m56_c0_partial_io_asel2prep_20261108T114946Z/c0-partial-v5-frozen-revision.json
-grep -q -E '^Q2 |^Q3 ' $O/m56_asel2_queue_r2.stdout.txt && { echo "REFUSED: queue r2 had reached Q2/Q3; resume those by hand"; exit 4; }
+cat $O/m56_asel2_queue_r*.stdout.txt | grep -q -E '^Q2 |^Q3 ' && { echo "REFUSED: an earlier queue run (r*) had reached Q2/Q3; resume those by evidence, not from their first scene"; exit 4; }
 LOG=$O/m56_asel2_q3_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
 pair() { M56_CODE=$V12 $PY -I -X utf8 native-v6-pair.py $1 >> $LOG/pair-v12.log 2>&1

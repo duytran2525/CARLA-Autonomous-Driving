@@ -318,3 +318,20 @@ sáng mai để tắt máy"):
 - **Tổng hiện tại:** 13 cặp hợp lệ có điều kiện (10 cặp cũ cộng C02-S1, L02-S1, L05-S1).
 - **M06-S1:** đã dùng hết quota P5 trên phiên bản này. Theo B3 nó là ứng viên thay bằng successor (cổng B5); việc thay được quyết sau
   khi xong Q1. Không tinh chỉnh gì sau thất bại.
+
+**Sửa công cụ dừng và chạy tiếp** (sau khi advisor rà; Claude quyết dưới ủy quyền):
+- **Queue 3c:** cổng chặn đọc stdout của mọi lượt chạy `m56_asel2_queue_r*`. Việc này ngăn lượt chạy tiếp thứ hai chạy lại Q2/Q3 từ cảnh
+  đầu.
+- **`asel2-q1-remaining.py`:** nhãn lấy từ sự kiện trong log `ab-<Town>.log`. Các cảnh SCENE_ERROR, BLOCKED_FIXTURE, NOT_ADMITTED,
+  INFRA_INTERRUPTED và NO_RUN_DIR đều bị SKIP. Chạy lại bất kỳ cảnh SKIP nào phải là một quyết định có ghi log.
+- **`asel2-stopper.py`:**
+  - Chế độ compile của io-ab và f-ab (không có `--ab`) được coi là an toàn.
+  - Root cũ hơn `--since` bị bỏ qua.
+  - `--at` không còn bắt buộc.
+  - `M56_SAFE_TO_SHUTDOWN.txt` chỉ được ghi khi không còn tiến trình nào và cổng 2610 đã đóng.
+  - Bản kiểm tra vẫn ALL_OK.
+- **`run-asel2-resume-20261111.sh`:** đổi tên (không xóa) file SAFE và STOP cũ, rồi khởi động một stopper chỉ chạy theo file STOP.
+- **Stopper tối nay** được thay bằng `m56_asel2_stopper_r2b`, `--at 2026-11-11T00:00:00Z` (07:00 giờ máy). Bằng chứng từ Town12: 4 cảnh
+  hết 63 phút, mỗi cửa sổ episode khoảng 10–15 phút, chấm cặp khoảng 5 phút mỗi cảnh. Vì vậy thường dừng xong trước khoảng 00:30Z;
+  trường hợp xấu nhất vẫn trước 01:00Z (08:00).
+- **Còn mở:** nếu lần dừng sau rơi vào Q2/Q3 (io/cl2) thì cần một resume dựa trên bằng chứng cho hai bước đó. 3c sẽ từ chối chạy.

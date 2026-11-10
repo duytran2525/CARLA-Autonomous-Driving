@@ -24,6 +24,7 @@ OURS = re.compile(r'run-asel2-|run-f0[1-3]-|run-io-|asel2-watchdog\.py|native-[\
 AB = re.compile(r'native-(v2-ab|io-ab|f-ab)\.py')
 WRITER = re.compile(r'native-v6-pair\.py|native-v5-revision\.py|native-v5-reeval\.py')
 ROOTS = {'v2-ab': 'm56_v2_ab_{t}_2*', 'io-ab': 'm56_io_ab_{t}_2*', 'f-ab': 'm56_f_ab_{t}_2*'}
+SINCE = [0.]  # epoch s; set from --since in main (roots older than this are ignored)
 
 
 def procs():
@@ -49,10 +50,11 @@ def unsafe(ps):
         if WRITER.search(cmd):
             why.append(f'result writer running pid {pid}: {WRITER.search(cmd).group(0)}')
         m = AB.search(cmd)
-        if not m or (m.group(1) == 'f-ab' and '--ab' not in cmd):
+        if not m or (m.group(1) in ('f-ab', 'io-ab') and '--ab' not in cmd):  # compile mode runs no episode
             continue
         town = re.search(r'\b(Town\d+\w*)\b', cmd)
-        roots = sorted(glob.glob(str(OUT / ROOTS[m.group(1)].format(t=town.group(1) if town else '*'))))
+        roots = [r for r in sorted(glob.glob(str(OUT / ROOTS[m.group(1)].format(t=town.group(1) if town else '*'))))
+                 if os.path.getmtime(r) >= SINCE[0]]  # an old root must never read as unsafe forever
         if not roots:
             continue
         ds = scene_dirs(roots[-1])
@@ -88,10 +90,11 @@ def kill(ps):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--at', required=True); ap.add_argument('--since', default='2026-11-10T14:50:00Z')
+    ap.add_argument('--at', default='9999-01-01T00:00:00Z'); ap.add_argument('--since', default='2026-11-10T14:50:00Z')
     ap.add_argument('--dry', action='store_true')
     a = ap.parse_args()
     at = datetime.fromisoformat(a.at.replace('Z', '+00:00')); since = datetime.fromisoformat(a.since.replace('Z', '+00:00'))
+    SINCE[0] = since.timestamp()
     if a.dry:
         ps = procs()
         print(json.dumps({'unsafe': unsafe(ps), 'would_kill': [c[:160] for _, _, c in ps if OURS.search(c) and 'claude' not in c.lower()],
@@ -113,8 +116,11 @@ def main():
                        'status': status(since)}
                 f = OUT / f"m56_asel2_stop_{now().strftime('%Y%m%dT%H%M%SZ')}.json"
                 f.write_text(json.dumps(rec, indent=1), encoding='utf-8')
-                (OUT / 'M56_SAFE_TO_SHUTDOWN.txt').write_text(
-                    f"{rec['t']} STOPPED ({trigger}); left={len(left)}; record {f.name}\n", encoding='utf-8')
+                if not left and not rec['port_2610_listening']:  # never a false green light
+                    (OUT / 'M56_SAFE_TO_SHUTDOWN.txt').write_text(
+                        f"{rec['t']} STOPPED ({trigger}); record {f.name}\n", encoding='utf-8')
+                else:
+                    print(json.dumps({'event': 'NOT_SAFE_AFTER_KILL', 'left': left}), flush=True)
                 print(json.dumps({k: rec[k] for k in ('t', 'event', 'trigger', 'left', 'port_2610_listening')}), 'RECORD', f, flush=True)
                 return
             if why != last:

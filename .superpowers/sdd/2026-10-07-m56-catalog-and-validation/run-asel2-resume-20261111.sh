@@ -7,9 +7,12 @@
 cd "$(dirname "$0")"
 S=${1:?usage: bash run-asel2-resume-20261111.sh SUFFIX  (e.g. r3)}; B=D:/Git/usr/bin/bash.exe
 tasklist | grep -qi CarlaUE4 && { echo "REFUSED: a CarlaUE4 is running (port 2610 must be free)"; exit 4; }
+O=../../../outputs; T=$(date -u +%Y%m%dT%H%M%SZ)
+for f in M56_SAFE_TO_SHUTDOWN.txt m56_asel2_STOP; do [ -e $O/$f ] && mv $O/$f $O/$f.consumed_$T; done  # never a stale green light
+python -I start-detached.py m56_asel2_stopper_$S python -I -X utf8 asel2-stopper.py --since $(date -u +%FT%TZ) || exit 4  # STOP file only
 python -I start-detached.py m56_asel2_watchdog_$S python -I -X utf8 asel2-watchdog.py 300 1800 1800 || exit 4
 python -I start-detached.py m56_asel2_queue_$S $B run-asel2-queue3c.sh || exit 4
 M56_WAIT_QUEUE=m56_asel2_queue_$S python -I start-detached.py m56_f03_probe_$S $B run-f03-probe-after-q3.sh || exit 4
 M56_WAIT_F03=m56_f03_probe_$S python -I start-detached.py m56_f01_chain_$S $B run-f01-after-f03.sh || exit 4
 M56_WAIT_F01=m56_f01_chain_$S python -I start-detached.py m56_f02_chain_$S $B run-f02-after-f01.sh || exit 4
-echo "RESUMED $S: outputs/m56_asel2_queue_$S.stdout.txt, m56_f03_probe_$S, m56_f01_chain_$S, m56_f02_chain_$S"
+echo "RESUMED $S (STOP file: outputs/m56_asel2_STOP): outputs/m56_asel2_queue_$S.stdout.txt, m56_f03_probe_$S, m56_f01_chain_$S, m56_f02_chain_$S"
