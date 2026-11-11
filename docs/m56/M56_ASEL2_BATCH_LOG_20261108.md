@@ -339,3 +339,13 @@ sáng mai để tắt máy"):
 **Bằng chứng cho câu "không cặp nào hợp lệ dưới luật đóng băng gốc"** (Town12, r2): theo `ab-Town12.log`, sự kiện AB của C02-S1,
 L02-S1, L05-S1 và M06-S1 đều có `old_initial_rule_failures = ['EGO','NPC']` ở cả A và B. Nghĩa là trạng thái ban đầu x/y vi phạm luật
 1e-4 cũ (addendum 8 nới thành 1 mm), nên dưới luật cũ cả 4 episode đều không hợp lệ.
+
+## Dừng an toàn 11/11, 00:00:14 UTC (07:00 giờ máy)
+
+- Stopper `m56_asel2_stopper_r2b` dừng vì tới giờ (TIME). Bản ghi: `outputs/m56_asel2_stop_20261111T000014Z.json`.
+- Đã kill 10 tiến trình của mình. Không còn tiến trình nào sót lại, cổng 2610 đã đóng, `M56_SAFE_TO_SHUTDOWN.txt` đã được ghi.
+- Trạng thái lúc dừng: Q1 Town12 xong 4/4, đã chấm cặp. Town13: C07-S1 đang ở raster dv1 (khoảng 4 h 10 phút, chưa có FIXTURE),
+  nên **không tốn quota nào**. L03, L06, M01 và M03 chưa bắt đầu.
+- **Chạy tiếp:** `bash run-asel2-resume-20261111.sh r3`, chạy một lần từ thư mục tooling. Kế hoạch của queue 3c lúc dừng: Town12 SKIP
+  4/4 (đã chấm cặp); Town13 RUN C07-S1, L03-S1, L06-S1, M01-S1 và M03-S1. Sau đó là Q2 I/O, Q3 batch 2, F03, F01, F02 như queue 3b.
+- Raster của C07-S1 phải chạy lại từ đầu, mất khoảng 4 h hoặc hơn.
