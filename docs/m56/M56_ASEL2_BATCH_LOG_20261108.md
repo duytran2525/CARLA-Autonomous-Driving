@@ -387,3 +387,18 @@ các frame. Chẩn đoán chỉ đọc episode đã niêm phong, dùng consumer 
   Town12. Bộ dựng revision tự đặt id S2 (vòng thay đầu tiên của slot M06). Bước chuẩn bị và đúng một A/B chạy như các cảnh khác
   trong batch 2.
 - Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
+## Chạy tiếp r3 (11/11 14:59Z) và hẹn dừng an toàn sáng 12/11
+
+- `run-asel2-resume-20261111.sh r3` lúc 14:59:40Z. Q1 Town12 SKIP 4/4 (đã chấm cặp); Town13 RUN 5. Log `outputs/m56_asel2_q3_20261111T145942Z`.
+- Người dùng yêu cầu chạy tới 9 h sáng 12/11 rồi dừng an toàn. Claude quyết dưới ủy quyền: đặt `--at 2026-11-12T01:45:00Z` (08:45 giờ
+  máy), để việc chờ điểm an toàn vẫn xong quanh 9 h.
+- **Sửa lỗi stopper** (phát hiện bằng `--dry` trước khi tới giờ):
+  - `procs()` crash vì một tiến trình của phiên khác có dòng lệnh không phải UTF-8. Lúc đó `stdout` là None, nên `AttributeError`.
+  - Stopper r3 (chỉ theo file STOP) và stopper hẹn giờ vừa chạy đều sẽ crash lúc kích hoạt, tức là **không dừng được**.
+  - Cách sửa: PowerShell xuất UTF-8, decode với `errors='replace'`, và lỗi liệt kê tiến trình chỉ thử lại ở lượt poll sau, không làm
+    chết vòng lặp.
+  - Kiểm: `asel2-stopper-check.py` ALL_OK; `--dry` trên máy thật liệt kê đúng 11 tiến trình M56, không có tiến trình nào của phiên
+    khác.
+  - Hai stopper cũ (pid 37316, 39624, đã kiểm cmdline) được kill. Thay bằng `m56_asel2_stopper_r3u` (file STOP + `--at 01:45Z`,
+    `--since 14:59Z`).

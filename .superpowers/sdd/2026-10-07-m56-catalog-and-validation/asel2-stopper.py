@@ -28,9 +28,14 @@ SINCE = [0.]  # epoch s; set from --since in main (roots older than this are ign
 
 
 def procs():
-    ps = ("Get-CimInstance Win32_Process | ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.ParentProcessId, "
+    # 2026-11-11: foreign non-ASCII command lines crashed the utf-8 decode (stdout None) -> force UTF-8 + replace.
+    ps = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+          "Get-CimInstance Win32_Process | ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.ParentProcessId, "
           "($_.CommandLine -replace '[\\r\\n]', ' ') }")
-    r = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=120)
+    r = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=120,
+                       encoding='utf-8', errors='replace')
+    if r.returncode != 0 or not r.stdout:
+        raise RuntimeError(f'PROCESS_LIST_FAILED rc={r.returncode}')
     out = []
     for line in r.stdout.splitlines():
         p = line.split('|', 2)
@@ -106,7 +111,12 @@ def main():
         text = STOP.read_text(errors='replace').strip().lower() if STOP.exists() else None
         trigger = 'STOP_FILE_NOW' if text == 'now' else 'STOP_FILE' if text is not None else 'TIME' if now() >= at else None
         if trigger:
-            ps = procs(); why = [] if trigger == 'STOP_FILE_NOW' else unsafe(ps)
+            try:
+                ps = procs()
+            except Exception as e:  # never die on a transient listing failure: retry next poll
+                print(json.dumps({'t': iso(now()), 'event': 'PROCS_RETRY', 'error': repr(e)[:300]}), flush=True)
+                time.sleep(15); continue
+            why = [] if trigger == 'STOP_FILE_NOW' else unsafe(ps)
             if not why:
                 killed = kill(ps); time.sleep(5)
                 left = [c[:160] for _, _, c in procs() if OURS.search(c) and 'claude' not in c.lower()]
