@@ -34,6 +34,7 @@ M56_CODE=$V12 M56_SPAWN_TILT=1 bash run-asel2-io.sh "Town12:M56-P-I01-S1,M56-P-I
 echo "Q3 C/L/M batch 2 $(date -u +%FT%TZ)"
 while tasklist | grep -qi CarlaUE4; do sleep 15; done
 R=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs
-M56_CODE=$V12 M56_SPAWN_TILT=1 M56_ASEL2_REPLACE=$R/m56_fill_v4_replace1_20261108.json,$R/m56_fill_v4_replace2b_20261108.json,$R/m56_fill_v4_replace3_20261108.json,$R/m56_fill_v4_replace4_20261109.json \
-  bash run-asel2-cl2.sh "Town12:M56-P-C04-S2,M56-P-M05-S1,M56-P-L08-S1,M56-P-M07-S2,M56-P-M08-S2 Town13:M56-P-C03-S2,M56-P-C06-S1,M56-P-M02-S1,M56-P-L07-S2,M56-P-M04-S2"
+# 2026-11-11 replacement 5 (B3, M06-S1 failed): M06-S2 added to Town12 batch 2 (Claude quyết dưới ủy quyền, see batch log)
+M56_CODE=$V12 M56_SPAWN_TILT=1 M56_ASEL2_REPLACE=$R/m56_fill_v4_replace1_20261108.json,$R/m56_fill_v4_replace2b_20261108.json,$R/m56_fill_v4_replace3_20261108.json,$R/m56_fill_v4_replace4_20261109.json,$R/m56_fill_v4_replace5_20261111.json \
+  bash run-asel2-cl2.sh "Town12:M56-P-C04-S2,M56-P-M05-S1,M56-P-L08-S1,M56-P-M07-S2,M56-P-M08-S2,M56-P-M06-S2 Town13:M56-P-C03-S2,M56-P-C06-S1,M56-P-M02-S1,M56-P-L07-S2,M56-P-M04-S2"
 echo "QUEUE3B_DONE $(date -u +%FT%TZ)"

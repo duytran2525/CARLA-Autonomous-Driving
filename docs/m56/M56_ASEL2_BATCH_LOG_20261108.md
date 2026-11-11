@@ -349,3 +349,41 @@ L02-S1, L05-S1 và M06-S1 đều có `old_initial_rule_failures = ['EGO','NPC']`
 - **Chạy tiếp:** `bash run-asel2-resume-20261111.sh r3`, chạy một lần từ thư mục tooling. Kế hoạch của queue 3c lúc dừng: Town12 SKIP
   4/4 (đã chấm cặp); Town13 RUN C07-S1, L03-S1, L06-S1, M01-S1 và M03-S1. Sau đó là Q2 I/O, Q3 batch 2, F03, F01, F02 như queue 3b.
 - Raster của C07-S1 phải chạy lại từ đầu, mất khoảng 4 h hoặc hơn.
+
+## M06-S1: nguyên nhân hỏng và thay cảnh lần 5 (11/11, Claude quyết dưới ủy quyền)
+
+**Đính chính:** dòng "M06-S1 FAILED (contact)" ở commit `60f1779` chưa đủ. Có hai nguyên nhân độc lập, cùng xuất hiện ở cả A và B, cùng
+các frame. Chẩn đoán chỉ đọc episode đã niêm phong, dùng consumer v12.
+
+1. **NPC không bao giờ CLEAR_N** (hình học của site, đúng như addendum F dự báo cho cảnh lệch trục):
+   - Mặt `n_exit` là một mặt của hộp thẳng trục, rộng 4,3 m theo x. NPC đi chéo 13–25° (yaw −103 … −115).
+   - Ở frame thứ 442, NPC vượt mặt phẳng `n_exit` (margin 0,13 m). Lúc đó hình chiếu thân xe đã chìa ra ngoài bề rộng mặt cắt
+     (`_section_corridor` = False). Từ frame 446 margin ≥ 0,5 m, nhưng hành lang không bao giờ đúng trở lại.
+   - Spec §5.2 đòi điều kiện "correct corridor" khi clear, và erratum 5 cố ý giữ nó. Vì vậy **không sửa consumer**.
+   - Hệ quả online: A dừng chờ CLEAR tới hết episode (INCOMPLETE). B vào hộp khi NPC chưa clear (`EARLY_ENTRY_BEFORE_NPC_CLEAR`,
+     FAILED). Đánh giá lại offline không cứu được, vì controller của A đã chờ đúng event này lúc chạy.
+   - Cùng cơ chế, đo lại: C04-S1 và L07 có đúng 2–3 frame hành lang đúng sau vượt mặt (0,10–0,15 s < hold 0,25 s). C03-S1 không có
+     frame nào.
+2. **CONTACT_PROOF_INVALID và CONTINUOUS_FIT_UNPROVEN:**
+   - Có 113 interval với `minimum_road_edge_m` dưới 0,15 m (nhỏ nhất 0,03 m), ở frame 244–356.
+   - Phép kiểm fit theo từng actor (`_oriented_fit` trên vùng drivable dv1) cho thấy **NPC** gây ra: 108 interval, đúng lúc NPC
+     đang rẽ từ yaw −162 sang −108.
+   - M07 (Town05, 08/11) có đúng mẫu này: NPC, 117 interval, trong lúc rẽ. Không cảnh M nào từng PASS.
+   - **Rủi ro đã biết, chưa có cổng:** B5 chỉ chặn được nguyên nhân 1. Cảnh thay M06-S2 có NPC rẽ phải 89,9°, nên có thể hỏng giống
+     nguyên nhân 2. Một cổng chọn mới cho lỗi này sẽ là luật đặt sau khi thấy số (nguyên tắc 6), phải có addendum riêng. Claude
+     **không** đặt cổng đó ở đây.
+
+**Thay cảnh lần 5 (B3):**
+- Lần thay này được dời từ "sau Q1" lên bây giờ theo yêu cầu của người dùng. Thứ tự B3 không phụ thuộc kết quả Town13 Q1.
+- Theo addendum C: M04 và M07 đang được giữ ở dạng S2, nên lần thay này chỉ có M06.
+- State `outputs/m56_asel2_replace_state_5.json` = state 4, cộng hai site đề xuất ở replace 4 (C03-S2 Town13 J4753, C04-S2 Town12
+  J9428) vào `assigned` và `tried`. M06-S1 (Town12 J13615) đã có sẵn trong `tried`. Giữ chain = true và axis = true (B5).
+- Lệnh: `fill-v4-generate.py outputs/m56_fill_v4_replace5_20261111.json ceb87fa --replace outputs/m56_asel2_replace_state_5.json`.
+  - Kết quả: sha256 `c2175bf3`, pool như replace 4 (C 3676, L 1964, M 899).
+  - Ứng viên: **M06 → Town12 J18974**, rule lookahead. EGO 322/+2→18996/+2→321/+2; NPC 529/-1→18980/-1→321/+2 (rẽ phải
+    −89,9°). Descriptor: vN 2,4, G 25, LrefN 15,27. Số ứng viên bị B5 loại: 353.
+- `m56_asel2_replacements.jsonl`: M56-P-M06-S2, consumed 1, used_after 39.
+- `run-asel2-queue3c.sh` (chưa chạy lúc sửa): Q3 thêm `replace5` vào `M56_ASEL2_REPLACE`, và thêm `M56-P-M06-S2` vào cuối danh sách
+  Town12. Bộ dựng revision tự đặt id S2 (vòng thay đầu tiên của slot M06). Bước chuẩn bị và đúng một A/B chạy như các cảnh khác
+  trong batch 2.
+- Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
