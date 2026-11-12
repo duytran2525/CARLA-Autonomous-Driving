@@ -402,3 +402,39 @@ các frame. Chẩn đoán chỉ đọc episode đã niêm phong, dùng consumer 
     khác.
   - Hai stopper cũ (pid 37316, 39624, đã kiểm cmdline) được kill. Thay bằng `m56_asel2_stopper_r3u` (file STOP + `--at 01:45Z`,
     `--since 14:59Z`).
+
+## Dừng an toàn 12/11, 01:45:20 UTC, và tech fix 5 (raster synchronous)
+
+**Dừng:**
+- Stopper `m56_asel2_stopper_r3u` dừng vì tới giờ (TIME). Bản ghi: `outputs/m56_asel2_stop_20261112T014520Z.json`.
+- Đã kill 10 tiến trình của mình. `left = []`, cổng 2610 đã đóng, `M56_SAFE_TO_SHUTDOWN.txt` đã được ghi.
+- **Không có cặp mới.** C07-S1 (cảnh đầu tiên của Town13) nằm 10 h 43 phút ở raster dv1. Trạng thái NO_FIXTURE, nên không tốn
+  quota nào. L03, L06, M01 và M03 chưa bắt đầu.
+
+**Nguyên nhân** (probe `native-raster-speed-probe.py`, log `outputs/m56_raster_speed_probe_Town13_r2.stdout.txt`, Town13 nạp mới, tại
+tâm C07):
+- Ở chế độ async, mỗi `cast_ray` mất 230–670 ms và mỗi `get_settings` mất 250–790 ms, tức mỗi RPC phải chờ một frame của server. Sau
+  12 phút vẫn không nhanh hơn.
+- Ở chế độ synchronous, không tick: 4,3–4,5 ms mỗi ray, 0,17 ms mỗi RPC. Sau 200 tick vẫn vậy.
+- Quay lại async thì lại chậm (445 ms).
+- Raster cảnh đầu sau `load_world` chạy ở async, nên mới chậm hàng giờ.
+
+**Tech fix 5** (chỉ hiệu năng; Claude quyết dưới ủy quyền):
+- Trong `native_v2_common.drivable_union`, nếu server đang async thì chuyển sang synchronous (dt 0,05 s), tick một lần, chạy
+  raster, rồi khôi phục cài đặt cũ trong `finally` và `wait_for_tick`.
+- Lưới, tia, thứ tự quét và nhãn đều giữ nguyên. Cả `native-v2-ab`, `native-io-ab` và `native-f-ab` đều đi qua hàm này.
+
+**Kiểm** (`native-raster-sync-check.py`, Town12 server mới, log `outputs/m56_raster_sync_check_Town12_20261112.stdout.txt`): tính lại
+drivable union của các cảnh r2 với code mới, rồi so từng byte WKT với file A/B đã ghi.
+
+| Cảnh | Thời gian | Kết quả |
+|---|---|---|
+| C02-S1 (cảnh đầu, trước mất 13.776 s) | **43,0 s** | **SAME**, sha `e177dafa5675a709`, 177.127 byte |
+| L02-S1 | 38,2 s | **SAME**, sha `d36d08db07bd0b80`, 182.745 byte |
+
+Settings trước và sau raster đều async (đã khôi phục đúng).
+
+**Hệ quả:**
+- Không cảnh nào đổi ô raster. Các kết quả cũ giữ nguyên.
+- Kiểm này chưa làm trên Town13 vì chưa có WKT tham chiếu. Lý do giống hệt: cùng hàm, cùng lệnh RPC.
+- Hàng đợi **chưa** chạy tiếp, theo yêu cầu của người dùng. Lệnh chạy tiếp khi được phép: `bash run-asel2-resume-20261111.sh r4`.

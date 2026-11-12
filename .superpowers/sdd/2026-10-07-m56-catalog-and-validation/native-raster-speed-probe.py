@@ -47,6 +47,9 @@ with own_server(log) as (client, proc, start):
     s = world.get_settings(); s.synchronous_mode, s.fixed_delta_seconds = True, .05; world.apply_settings(s)
     world.tick(120.)
     batch(world, carla, 'sync-no-tick')
+    for _ in range(200):
+        world.tick(120.)
+    batch(world, carla, 'sync-after-200-ticks')
     s.synchronous_mode, s.fixed_delta_seconds = False, None; world.apply_settings(s)
     world.wait_for_tick(120.)
     batch(world, carla, 'async-after')

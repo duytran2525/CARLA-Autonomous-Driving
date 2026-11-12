@@ -505,17 +505,31 @@ def drivable_union(m, center, radius=90., world=None, routes=None):
     gx = x0 + cell * np.arange(ni, dtype=np.int64).astype(np.float64)
     gy = y0 + cell * np.arange(nj, dtype=np.int64).astype(np.float64)
     inside = shapely.contains_xy(corridor, np.repeat(gx, nj), np.tile(gy, ni)).reshape(ni, nj)
-    for i in range(ni):
-        for j in range(nj):
-            if not inside[i, j]:
-                continue
-            x, y = x0 + cell * i, y0 + cell * j
-            z = local_z(x, y)
-            if z is None:
-                continue
-            hits = world.cast_ray(carla.Location(x, y, z + 3.), carla.Location(x, y, z - 3.))
-            if hits and str(hits[0].label) in ('Roads', 'RoadLines'):
-                cells.append(box(x - cell / 2, y - cell / 2, x + cell / 2, y + cell / 2))
+    # A-SEL2 technical fix 5 (performance only, 2026-11-12, native-raster-speed-probe.py): in asynchronous mode every RPC
+    # waits for a server frame (Town13 ~250-670 ms per cast_ray; synchronous 4.5 ms). The first scene after load_world
+    # rasters asynchronously (Town12 C02-S1 3.8 h, Town13 C07-S1 > 10.7 h; later Town12 scenes 34-49 s). So the raster runs
+    # in synchronous mode (static geometry, no tick during it) and the previous settings are restored after. Same grid,
+    # same rays, same order (WKT bytes checked against r2 by native-raster-sync-check.py).
+    before = world.get_settings()
+    if not before.synchronous_mode:
+        s = world.get_settings(); s.synchronous_mode, s.fixed_delta_seconds = True, .05; world.apply_settings(s)
+        world.tick(120.)
+    try:
+        for i in range(ni):
+            for j in range(nj):
+                if not inside[i, j]:
+                    continue
+                x, y = x0 + cell * i, y0 + cell * j
+                z = local_z(x, y)
+                if z is None:
+                    continue
+                hits = world.cast_ray(carla.Location(x, y, z + 3.), carla.Location(x, y, z - 3.))
+                if hits and str(hits[0].label) in ('Roads', 'RoadLines'):
+                    cells.append(box(x - cell / 2, y - cell / 2, x + cell / 2, y + cell / 2))
+    finally:
+        if not before.synchronous_mode:
+            world.apply_settings(before)
+            world.wait_for_tick(120.)
     paved = unary_union(cells).buffer(-cell / 2) if cells else Polygon()
     return unary_union([union, paved]).buffer(0)
 
