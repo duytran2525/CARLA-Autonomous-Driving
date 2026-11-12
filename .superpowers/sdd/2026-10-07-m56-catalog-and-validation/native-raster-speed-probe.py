@@ -2,7 +2,7 @@
 load_world take hours (Town12 C02-S1 3.8 h at ~70 ms per cast_ray; later scenes 34-49 s; Town13 C07-S1 > 10.7 h)?
 Loads TOWN with the A/B settings (native_v2_common.load, no_rendering), streams to (X, Y, Z) like stream_to, then times
 batches of cast_ray (same ray shape as drivable_union: z+3 -> z-3) at fixed pseudo-random points within 60 m:
-  phase ASYNC: a batch every 60 s for MINUTES (does the latency fall as the server settles?), with a get_settings RPC as
+  phase ASYNC: batches with a 60 s sleep between them, for MINUTES (does the latency fall as the server settles?), with a get_settings RPC as
                a plain round-trip reference;
   phase SYNC : synchronous_mode on (no tick during the batch), one batch; then async restored and one more batch.
 usage: python -I native-raster-speed-probe.py TOWN X Y Z MINUTES"""
@@ -43,7 +43,7 @@ with own_server(log) as (client, proc, start):
     i = 0
     while time.monotonic() < t_end:
         batch(world, carla, f'async-{i}'); i += 1
-        time.sleep(max(0., 60 - 0))
+        time.sleep(60)
     s = world.get_settings(); s.synchronous_mode, s.fixed_delta_seconds = True, .05; world.apply_settings(s)
     world.tick(120.)
     batch(world, carla, 'sync-no-tick')
