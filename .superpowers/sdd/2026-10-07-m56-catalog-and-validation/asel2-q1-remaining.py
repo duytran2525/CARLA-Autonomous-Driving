@@ -12,7 +12,7 @@ OUT = Path(__file__).resolve().parents[3] / 'outputs'
 town, ids, since = sys.argv[1], sys.argv[2].split(','), sys.argv[3]
 recent = lambda pat: [p for p in sorted(glob.glob(str(OUT / pat))) if Path(p).name.rsplit('_', 1)[1] >= since]
 roots = recent(f'm56_v2_ab_{town}_2*')
-logs = recent('m56_asel2_q3_2*')
+logs = recent('m56_asel2_q3_2*') + recent('m56_asel2_q1t13_2*')  # 12/11: Q1 Town13 ran alone (run-asel2-q1-town13.sh)
 paired, events = set(), {}
 for d in logs:
     f = Path(d) / 'pair-v12.log'
