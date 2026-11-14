@@ -546,3 +546,5 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - Dải chấp nhận, chốt trước khi chạy native: |d0_r − d0| ≤ 0,3 m (hàng route cách 0,2 m, `routes_for` đẩy NPC tới hàng kế tiếp, cộng 0,1 m dung sai station của `first_ready`). Ngoài dải: đúng **một** probe sửa (`probe2b`, shift += phần dư); vẫn ngoài dải → `BLOCKED_FIXTURE D0_OUTSIDE_BAND`. Mọi thứ phía sau (routes, pose, target, marker, khung ready) lấy từ probe cuối.
 - Áp dụng cho cả F02. `recipe_rev: f-v1.2`.
 - Trước A/B: bật watchdog, kiểm stopper r8 còn sống, kiểm bộ nhớ ảo còn trống.
+
+**F01 f-v1.2 bước 1 (14/11 12:48–12:56Z):** prepare `m56_v2_prepare_Town13_20261114T124840Z` **PREPARED**: probe 1 ready sau 4,85 s, probe 2 T_r 4,85 s (khớp); **d0_r = 11,352 m** (đăng ký 11,4; trong dải 0,3 m; không cần `probe2b`); target 3,862 / 3,265; PID stock. Revision `m56_c0_partial_io_asel2fprep_20261114T125450Z`. Compile `m56_f_compile_Town13_20261114T125510Z`: **FROZEN** sha `c36e0a14…`, **ADMITTED**, contract EGO:A/EGO:B/NPC OK. Chưa episode, chưa tiêu P5. Prepare f-v1.1 (d0 12,96) và revision 122622Z giữ trong hồ sơ, không dùng cho A/B.
