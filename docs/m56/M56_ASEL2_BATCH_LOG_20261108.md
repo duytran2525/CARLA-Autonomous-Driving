@@ -598,3 +598,13 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
   - A và B: spawn CONFIRMED, physical COMPLETE, witness VALID; w05 INTEGRITY_VALID.
   - **PASS**. Δ v_mean_E = 0,2323 (dự báo 0,23–0,26, biên mỏng đúng như ghi); Δ g_rear_min = 0,6894.
 - Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent. Recipe f-v1.2 là luật sau số (nguyên tắc 6): báo cạnh kết quả f-v1 r8 (BLOCKED ở probe 1).
+## 14/11 ~14:23Z: F01-S2 stage 1 (Town06 road 30, F01-v2 + F01-v3), chưa tiêu P5
+
+- Base revision `m56_c0_partial_io_asel2f01s2base_20261114T142058Z`.
+- Prepare `m56_v2_prepare_Town06_20261114T142115Z`: PREPARED. target_gap_at_ready_m 15,5 (d0 của addendum đã tới prepare). d0_r 15,591 (lệch 0,091, không cần probe2b). Plateau EGO 3,863 / NPC 3,267. T_r 4,4.
+- Section: F01_BRAKE_START 19,62 / F01_END 39,62 (frame NPC); DESTINATION 65,82 (frame EGO). Site [1,0; 94,76]; không có F_WINDOW_TOO_SHORT.
+- Compile `m56_f_compile_Town06_20261114T142300Z`: FROZEN cfffa5cf…; ADMITTED; mọi contract OK.
+- REVF `outputs/m56_c0_partial_io_asel2f01s2prep_20261114T142245Z/c0-partial-v5-frozen-revision.json`.
+- Cổng mục 5 F01-v3: loss₂ = 11,85 (plateau ≈ S1), gap_N ≈ 3,74, **gap_dest ≈ 2,24 m ≥ 1,0: ĐẠT**.
+- Trạng thái: **mọi cổng trước A/B đạt; A/B F01-S2 chờ Duy duyệt** (F01-v3 §4.4). Lệnh khi được duyệt:
+  `python -I start-detached.py m56_f01s2_ab D:/Git/usr/bin/bash.exe run-f01-s2.sh ab <REVF> "<câu duyệt của Duy>"`.
