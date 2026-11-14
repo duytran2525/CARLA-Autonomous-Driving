@@ -101,6 +101,8 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     mech = (c.environment.get('mechanism') or c.slot).replace('-ALT1', '')
     assert mech in INPUTS, f'F_MECHANISM_NOT_IN_PART1:{mech}'
     inp = INPUTS[mech]; L = 2 * bbox['extent'][0]
+    if 'd0' in c.parameters:  # addendum F01-v2 (2026-11-14): the candidate's declared d0 (F01-S2: 31/2), not the table
+        inp = {**inp, 'd0': F(c.parameters['d0'].values[0])}
     rr = c.actors[0].route_recipe; road = int(rr['road']); lane = int(rr['lanes'][0] if isinstance(rr['lanes'], (list, tuple)) else rr['lanes'])
     sg = 1 if lane < 0 else -1
     import xodr_routes as xr
@@ -237,7 +239,9 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     if mech == 'F01':
         npc_front = P.front_station(npc, routes2['NPC'])
         brake = npc_front + 3 * float(inp['vN_char']); end = brake + 20.
-        ego_end = ego_front + (end - npc_front) + d0r + L + 10.
+        # addendum F01-v2: run-out after F01_END 10 -> 6 m (v13 DESTINATION_ROOM needs >= 5); S1's EGO B lost ~0.6 m/s
+        # of gap after RESUME, so every metre of run-out past the window is gap spent for nothing
+        ego_end = ego_front + (end - npc_front) + d0r + L + 6.
         sections = {'F01_BRAKE_START': {'route': 'NPC', 'station': brake}, 'F01_END': {'route': 'NPC', 'station': end},
                     'DESTINATION': {'route': 'EGO', 'station': ego_end}}
         npc_need = end + TAIL_M

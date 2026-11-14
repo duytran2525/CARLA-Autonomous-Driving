@@ -271,6 +271,7 @@ def asel2_f(done, decision_ref, xodr, weather):
                            'reason': e['status'] if e['status'] != 'PROPOSED' else 'F builder pending'}); continue
         s, old = e['site'], by_slot.get(slot)
         cid = f'M56-P-{slot}-S1' if old is not None else f'M56-P-{slot}'
+        cid = e.get('candidate_id', cid)  # B3 replacement entry (f-site-replace.py, 2026-11-14): its own id, lineage below
         route = {'road': s['road'], 'section': s['section'], 'lanes': list(s['lanes']), 'travel': s['travel'],
                  'xpath': f"/OpenDRIVE/road[@id='{s['road']}']/lanes/laneSection[{s['section'] + 1}]"}
         actors = tuple(ActorRecipe(r, 'vehicle.audi.a2', F(0), None, {'pose': 'PENDING_RUNTIME_QUERY'}, dict(route), None)
@@ -283,7 +284,8 @@ def asel2_f(done, decision_ref, xodr, weather):
         # no 'mechanism' ParameterProposal: units '' fail the strict Candidate decoder (C0 F01/F04 carry one and do not
         # decode); the mechanism is environment['mechanism']
         site_id = f"{s['town']}-R{s['road']}-S{s['section']}"
-        bare = Candidate(cid, slot, '1', ('F-ASEL2-PREREG-3fb9865',) + ((old.id,) if old else ()), 'F', s['town'], site_id,
+        bare = Candidate(cid, slot, '1', ('F-ASEL2-PREREG-3fb9865',) + ((old.id,) if old else ())
+                         + ((e['replaces'],) if e.get('replaces') else ()), 'F', s['town'], site_id,
                          actors, params, (), {'poses': 'PENDING_RUNTIME_QUERY', 'destination': 'PENDING_RUNTIME_QUERY',
                                              'mechanism': slot, 'selector': e['selector'],
                                              'asel2': {'predecessor': old.id if old else None, 'rule': e.get('rule')}},
