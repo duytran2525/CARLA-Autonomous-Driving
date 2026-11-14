@@ -2,7 +2,9 @@
 as f-site-generate.py (pool, stable key, seed, gates, town cap), run for ONE slot: the next first-fit after every site the
 original run took (they stay taken and count toward the town cap). The other entries are copied byte-for-byte, so their
 candidates do not change. The replaced entry gets candidate_id / replaces / descriptors from the addendum.
-  python -I f-site-replace.py SITES_IN.json SLOT CANDIDATE_ID D0 OUT.json ADDENDUM_COMMIT"""
+  python -I f-site-replace.py SITES_IN.json SLOT CANDIDATE_ID D0 OUT.json ADDENDUM_COMMIT [NEED_M]
+NEED_M (addendum F01-v3, 2026-11-14): the site length/axis need in metres replaces length + vE^2/3 + 20 for this slot;
+prepare's F_WINDOW_TOO_SHORT stays the exact gate."""
 import hashlib, importlib.util, json, random, sys
 from collections import Counter
 from pathlib import Path
@@ -13,7 +15,7 @@ S = importlib.util.module_from_spec(s_); s_.loader.exec_module(S)  # main only r
 G, v2, v3, cen = S.G, S.v2, S.v3, S.cen
 
 
-def main(src, slot, cid, d0, out_path, commit):
+def main(src, slot, cid, d0, out_path, commit, need_m=None):
     old = json.loads(Path(src).read_text(encoding='utf-8'))
     for t in G.TOWNS:
         assert hashlib.sha256(cen.xodr(t).read_bytes()).hexdigest() == G.HASHES[t], t
@@ -38,6 +40,8 @@ def main(src, slot, cid, d0, out_path, commit):
     taken = {(e['site']['town'], e['site']['road']) for e in old['entries'] if e.get('site')}
     counts = Counter(t for t, _ in taken)
     length, vE = S.MECH[slot]
+    if need_m is not None:  # S.gates needs length + vE^2/3 + 20; solve for the length term so need == NEED_M exactly
+        length = float(need_m) - vE ** 2 / 3 - 20.
     why, chosen = Counter(), None
     for x in pool:
         if any((x['town'], r) in v2.CURRENT_ROADS for r in x['roads']):
@@ -55,7 +59,8 @@ def main(src, slot, cid, d0, out_path, commit):
         if e['slot'] != slot:
             entries.append(e); continue
         n = dict(e, skipped=dict(why), candidate_id=cid, replaces=f'M56-P-{slot}-S1',
-                 descriptors={**e['descriptors'], 'd0': d0}, replacement='B3 (addendum F01-v2 ' + commit + ')')
+                 descriptors={**e['descriptors'], 'd0': d0}, replacement='B3 (addendum ' + commit + ')',
+                 site_need_m=None if need_m is None else str(need_m))
         if chosen is None:
             n.update(status='EMPTY_NO_ELIGIBLE_CANDIDATE'); n.pop('site', None)
         else:
@@ -71,4 +76,4 @@ def main(src, slot, cid, d0, out_path, commit):
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:7])
+    main(*sys.argv[1:8])
