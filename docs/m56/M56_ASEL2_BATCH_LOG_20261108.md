@@ -558,3 +558,21 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - Quyết định (Claude dưới ủy quyền): không chạy lại F01-S1 dưới bất kỳ recipe nào. **F02 bị hoãn**: NPC đuổi từ phía sau nhanh hơn ~1 m/s, phải dự báo khoảng hở sau tối thiểu qua cả A và B trước khi tiêu lượt. Thay recipe hay thay cảnh là quyết định của Duy.
 
 **Đính chính F01 (14/11 ~13:25Z, Claude):** va chạm của B nằm **trong** cửa sổ metric, không phải ở đoạn chạy tới DESTINATION như ghi ở trên. `F01_N_CLEAR` (metrics.py v13) = lúc toàn thân NPC vượt F01_END (= vạch phanh + 20 m) sau N_MOVE. Từ trajectory: mũi NPC đi được 20 + L ≈ 23,7 m sau lúc phanh vào khoảng 18,5 s (A và B như nhau); B chạm ở 17,6 s. Tính với số danh nghĩa (4,0 / 3,4 / 11,4): khoảng hở lúc phanh ~9,6 m, B ở ~2 m/s trong ~3 s khi NPC đứng, còn ~3,6 m lúc chạy lại; khép 0,6 m/s trong ~7 s tới N_CLEAR cần ~4,2 m. Vậy **va chạm của B là hệ quả của chính tham số F01 đã đăng ký** (vE > vN cùng làn, F01_END = +20 m, hành động B), không do tooling. Sửa DESTINATION **không** cứu được F01. Một cảnh thay thế B3 cho F01 với cùng tham số sẽ gần như chắc chắn va chạm y như vậy, nên chưa chạy, chờ Duy quyết về recipe F01.
+
+## 14/11 ~13:40Z: F02 stage 1 (f-v1.2) và tìm site thay thế F01-S2 (Claude dưới ủy quyền)
+
+**F02 stage 1** (`run-f02-v12.sh`, chưa tiêu P5):
+- prepare `m56_v2_prepare_Town12_20261114T132922Z`: NPC PID (1/2, 1/20, 0); plateau EGO 3,864 / NPC 4,713; d0_r 21,066 (đích 21, dải ±0,3, không cần probe2b); T_r 4,8.
+- compile `m56_f_compile_Town12_20261114T133601Z`: FROZEN bb5e0fc3…, F02_END 102,309, DESTINATION 107,309; ADMITTED; mọi contract OK.
+- REVF `outputs/m56_c0_partial_io_asel2f02prep_20261114T133542Z/c0-partial-v5-frozen-revision.json`.
+- Kiểm offline trước A/B:
+  - Chuỗi event (metrics.py v13 `_detect_f02`): TRIGGER khi khoảng hở sau cắt 20 m với vN > vE, khoảng 1,3 s sau ready. F02_END = mũi EGO danh định lúc TRIGGER + 60.
+  - Response (response.py: F02 chỉ một transition sau TRIGGER, A = 4, B = 11/2): EGO B chỉ tăng tốc **sau** TRIGGER, nên TRIGGER vẫn xảy ra.
+  - Dự báo A (EGO hằng): khép 0,849 m/s; khoảng hở nhỏ nhất ≈ 5,4 m (≥ 1,0); v_mean_E ≈ 3,86.
+  - Dự báo B: khoảng hở ≈ 19–20 m. v_mean_E ≈ 5,0–5,2 (gain EGO mặc định; plateau ở 5,5 chưa đo), Δ ≈ 0,23–0,26. **Biên mỏng**: B cần trung bình ≥ 4,83.
+  - Quyết định: chạy A/B F02 (một lần, P5).
+
+**F01-S2 tìm site thay thế** (`f-site-replace.py`, đúng thuật toán đã đăng ký, addendum F01-v2 eabacab):
+- Kết quả **EMPTY_NO_ELIGIBLE_CANDIDATE**. Skip: TOWN_CAP 36, SECTION_SHORT 47, B5_AXIS_RUN_SHORT 20, SITE_USED 4.
+- Lưu `docs/m56/M56_F_SITES_REPLACE_F01_20261114.json` (sha256 7eeeeda789bbbbd5b035a152923b3c60fe23d5fe6396ba7d7962788ad4d8ed0d).
+- Dưới luật đã commit, F01 không có cảnh thay thế. Đang chẩn đoán offline xem ràng buộc nào chặn (trần town hay cổng độ dài/trục). Chưa chạy native F01 nào.
