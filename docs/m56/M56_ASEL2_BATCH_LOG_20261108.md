@@ -576,3 +576,16 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - Kết quả **EMPTY_NO_ELIGIBLE_CANDIDATE**. Skip: TOWN_CAP 36, SECTION_SHORT 47, B5_AXIS_RUN_SHORT 20, SITE_USED 4.
 - Lưu `docs/m56/M56_F_SITES_REPLACE_F01_20261114.json` (sha256 7eeeeda789bbbbd5b035a152923b3c60fe23d5fe6396ba7d7962788ad4d8ed0d).
 - Dưới luật đã commit, F01 không có cảnh thay thế. Đang chẩn đoán offline xem ràng buộc nào chặn (trần town hay cổng độ dài/trục). Chưa chạy native F01 nào.
+## 14/11 ~13:50Z: F01-v3 (luật sau số lần 2) và site F01-S2 (Claude dưới ủy quyền, đã hỏi advisor)
+
+- Chẩn đoán EMPTY (offline): trần town chỉ chặn Town12, và cả 36 ứng viên bị trần cũng trượt cổng. Ràng buộc thật là cổng độ dài 145,33 m. Không ứng viên nào trong pool có ≥ 100 m.
+- Addendum `PREREG_M56_F_ASEL2_ADDENDUM_F01V3_20261114.md` (văn bản ghi 13:50:15Z; commit d95827e; tooling e46ebf1, NEED_M).
+  - Nhu cầu site của F01 thành 91,4 m, tính từ prepare S1: NPC = 20,35 + 41,03 + 30.
+  - Luật dừng: một lần chọn. Nếu stage 1 hỏng vì bất kỳ lý do nào thì F01 FAILED, không chỉnh thêm.
+  - Sàn khoảng hở tính theo plateau S2.
+  - A/B F01-S2 chờ Duy.
+- Kết quả chọn (13:50:28Z, một lần): **M56-P-F01-S2 = Town06 road 30 section 0, lanes −3/−4** (biên ≈ 2,4 m).
+  - Skip: TOWN_CAP 2, B5_AXIS_RUN_SHORT 1, SITE_USED 1.
+  - `docs/m56/M56_F_SITES_REPLACE_F01_V3_20261114.json`, sha d470f360….
+  - Thay cảnh B3 +1.
+- `run-f01-s2.sh` (69af8e5): stage 1 xếp hàng sau F02V12_END (`m56_f01s2_stage1`). Stage 2 từ chối chạy nếu không có câu duyệt của Duy.
