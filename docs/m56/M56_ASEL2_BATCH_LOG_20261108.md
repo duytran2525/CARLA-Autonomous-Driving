@@ -589,3 +589,12 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
   - `docs/m56/M56_F_SITES_REPLACE_F01_V3_20261114.json`, sha d470f360….
   - Thay cảnh B3 +1.
 - `run-f01-s2.sh` (69af8e5): stage 1 xếp hàng sau F02V12_END (`m56_f01s2_stage1`). Stage 2 từ chối chạy nếu không có câu duyệt của Duy.
+## 14/11 14:04Z: F02 A/B (f-v1.2), P5 đã tiêu: **pair v13 PASS** (Claude dưới ủy quyền)
+
+- A/B `outputs/m56_f_ab_Town12_20261114T134404Z`:
+  - FROZEN 0f15b6b6…; bản compile-only là bb5e0fc3…, khác vì binding theo phiên (pid/world). Section y hệt: F02_END 102,309, DESTINATION 107,309.
+  - ADMITTED; sealed; stop A/B CLEANED, không còn survivor.
+- Pair `outputs/m56_v6_pair_20261114T140359Z/M56-P-F02/pair-result.json`:
+  - A và B: spawn CONFIRMED, physical COMPLETE, witness VALID; w05 INTEGRITY_VALID.
+  - **PASS**. Δ v_mean_E = 0,2323 (dự báo 0,23–0,26, biên mỏng đúng như ghi); Δ g_rear_min = 0,6894.
+- Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent. Recipe f-v1.2 là luật sau số (nguyên tắc 6): báo cạnh kết quả f-v1 r8 (BLOCKED ở probe 1).
