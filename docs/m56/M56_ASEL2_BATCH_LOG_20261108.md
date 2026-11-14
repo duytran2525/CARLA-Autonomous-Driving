@@ -608,3 +608,10 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - Cổng mục 5 F01-v3: loss₂ = 11,85 (plateau ≈ S1), gap_N ≈ 3,74, **gap_dest ≈ 2,24 m ≥ 1,0: ĐẠT**.
 - Trạng thái: **mọi cổng trước A/B đạt; A/B F01-S2 chờ Duy duyệt** (F01-v3 §4.4). Lệnh khi được duyệt:
   `python -I start-detached.py m56_f01s2_ab D:/Git/usr/bin/bash.exe run-f01-s2.sh ab <REVF> "<câu duyệt của Duy>"`.
+## 14/11 ~14:29Z: F01-S2, sửa attest trước A/B (theo advisor)
+
+- Lỗi: revision 142245Z niêm phong d0 15,5 và site S2 với câu "PREREG F part 1 … no hand tuning" / "pre-registered F site algorithm". Câu này sai: cả hai là luật sau số. Đã sửa `asel2_f` (00ab60b): entry có `replaces` ghi "AS AMENDED POST-NUMBER (principle 6)" và trích ref tới hai addendum F01-v2/F01-v3.
+- Rebuild dùng lại prepare `m56_v2_prepare_Town06_20261114T142115Z`, không probe lại. Compile `m56_f_compile_Town06_20261114T142820Z`: FROZEN fa77cfe0…, section y hệt, ADMITTED, contracts OK. Cổng mục 5 không đổi (gap_dest ≈ 2,24 m).
+- **REVF dùng cho A/B:** `outputs/m56_c0_partial_io_asel2f01s2prep_20261114T142805Z/c0-partial-v5-frozen-revision.json`. Bản 142245Z bỏ, không dùng.
+- Đính chính mục F02 ở trên: fixture compile-only (bb5e0fc3) và A/B (0f15b6b6) có cùng section/route/response/actor/pose. Hash khác vì đường dẫn thư mục output và biên nhận authority A/B (750 → 988 byte), không phải pid/world.
+- Ngân sách thay cảnh B3: 40/150 (F01-S2 +1).
