@@ -532,3 +532,10 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - `native-f-ab.py`: gắn PID mà preparation đã chọn (như native-io-ab).
 - Kiểm offline: `native-f-offline-check.py` với target đo được (F01 3,862/3,265; F02 3,862/4,847) cho F01 và F02 đều `ALL_OK`. Revision offline trên prepare r8 với env mới chạy được (F01 BLOCKED như mong đợi). Chương trình trước readiness của A/B (EGO A/B và `f_npc`: SETTLE 0 → NOMINAL sau CAPTURE_START + 21/20 s) trùng chương trình probe.
 - `run-f01-v11.sh`: bước 1 = prepare → revision → compile/admission (không episode), dừng để đọc; bước 2 (`ab <REVF>`) = A/B duy nhất (P5) + pair v13, đọc `run/episodes/<scene>/{A,B}/runner/stop.json`. F02 chỉ chạy sau khi đọc kết quả F01.
+
+**F01 f-v1.1 bước 1 (14/11 12:18–12:45Z):**
+- Prepare `m56_v2_prepare_Town13_20261114T121821Z`: **PREPARED** (lần đầu một cảnh F qua prepare native). PID stock (EGO/NPC range 0,0001 m/s); target 3,862 / 3,265 m/s; marker EGO 10,117, NPC 8,987; T_r 4,85 s; `m56_recipe: v6`.
+- `d0_realised_m` = **12,96 m** so với d0 đăng ký 11,4 m. Nguyên nhân: shift tính từ thời điểm steady ở probe 1 (`steady_at`), còn readiness ở probe 2 là `first_ready` (sớm hơn ~2,6 s); NPC chậm hơn EGO ~0,6 m/s. Có sẵn trong thiết kế f-v1, không do f-v1.1. Chưa quyết: chạy A/B với d0 thực tế (báo nguyên giá trị) hay sửa prepare cho khớp 11,4 m (chạy lại prepare không tốn P5). Chờ Duy.
+- Revision lần đầu lỗi `TypeError` ở `native_f_common.f_routes` (đọc routes-f.json thiếu `plain()`; F chưa từng PREPARED native). Sửa một dòng (cca0f87). Revision `m56_c0_partial_io_asel2fprep_20261114T122622Z`: F01 PREPARED.
+- Compile/admission lần 1: CARLA time-out 600 s (lúc đó bộ nhớ ảo còn ~4 GB). Lần 2 (`m56_f_compile_Town13_20261114T123905Z`): **FROZEN** sha `ccf25857…`, **ADMITTED**, contract EGO:A, EGO:B, NPC:NPC_COMMON đều OK. Chưa episode nào, chưa tiêu P5.
+- Rủi ro trước A/B: pagefile trên C: tới 22 GB, bộ nhớ ảo có lúc chỉ còn 4 GB; crash giữa episode sẽ tiêu P5 của F01.
