@@ -627,3 +627,12 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
   - F01-v2: EMPTY;
   - **F01-v3: S2 PASS**. Đây là luật sau số lần 2: nhu cầu site 91,4 m tính sau khi thấy pool, chỉ một road đạt, đổi town.
 - Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+## 14/11 ~15:13Z: release partial A-SEL2 (Claude dưới ủy quyền)
+
+- Revision release `outputs/m56_c0_partial_io_asel2release_20261114T150743Z` (`run-asel2-release-revision.sh`, offline): 44 candidate, gồm cả hai preparation F đã PASS (F02 Town12, F01-S2 Town06). F01-S2 mang câu attest POST-NUMBER.
+- Dry (product m56-v13), `m56_asel2_release_20261114T150*`:
+  - **21 cảnh delivered**: C 7, L 7, O 3, I 2, F 2.
+  - So realized: C 20 PASS / 1 DIVERSITY_DEFICIT; L 19 / 2; I 1 PASS; O 3 PASS. F không có so realized vì assembler chỉ so CLMIO và chưa có bảng descriptor F.
+  - Deficit: CANDIDATE_COUNT, JUNCTION_SHORTFALL, C0_MISSING, COMPARISON_COVERAGE, AB_PROOF. RELEASE_BLOCKED, không export (đúng luật, không ép).
+- `--full` đang chạy detached (`m56_asel2_release_full`, output `m56_asel2_release_20261114T151317Z`), khoảng 10 phút mỗi cảnh.
+- Tồn đọng đã kiểm: `COLLISION_FRAME_MISSING` / `CONTACT_PROOF_INVALID` có ở mọi episode có `COLLISION_OBSERVED` (I05-S1 A, I06 A/B, I07-S1 A/B, F01-S1 B). Đây là witness hỏng sau va chạm thật, physical đã FAILED, nên không verdict nào đổi.
