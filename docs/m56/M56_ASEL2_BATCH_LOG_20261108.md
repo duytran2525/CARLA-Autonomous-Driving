@@ -539,3 +539,10 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - Revision lần đầu lỗi `TypeError` ở `native_f_common.f_routes` (đọc routes-f.json thiếu `plain()`; F chưa từng PREPARED native). Sửa một dòng (cca0f87). Revision `m56_c0_partial_io_asel2fprep_20261114T122622Z`: F01 PREPARED.
 - Compile/admission lần 1: CARLA time-out 600 s (lúc đó bộ nhớ ảo còn ~4 GB). Lần 2 (`m56_f_compile_Town13_20261114T123905Z`): **FROZEN** sha `ccf25857…`, **ADMITTED**, contract EGO:A, EGO:B, NPC:NPC_COMMON đều OK. Chưa episode nào, chưa tiêu P5.
 - Rủi ro trước A/B: pagefile trên C: tới 22 GB, bộ nhớ ảo có lúc chỉ còn 4 GB; crash giữa episode sẽ tiêu P5 của F01.
+
+**f-v1.2 (14/11 ~12:55Z, Duy [chat] "b"; luật sau-số, nguyên tắc 6; prepare 12,96 m được giữ trong hồ sơ):**
+- Kiểm offline trên quan sát probe 1 lúc 12:18Z: theo luật `first_ready` của probe 2, probe 1 cũng "ready" sau ~4,9 s (probe 2: T_r 4,85 s), còn `steady_at` cho 7,55 s. Lệch 2,65 s × 0,597 m/s ≈ 1,58 m, giải thích đủ khoảng lệch 1,56 m.
+- Sửa `native-f-prepare.py`: probe 1 lấy khoảng hở tại khung `first_ready` (target = plateau probe 1 làm tròn 1/1000); không có → `READINESS_NOT_REACHED_IN_PROBE1`.
+- Dải chấp nhận, chốt trước khi chạy native: |d0_r − d0| ≤ 0,3 m (hàng route cách 0,2 m, `routes_for` đẩy NPC tới hàng kế tiếp, cộng 0,1 m dung sai station của `first_ready`). Ngoài dải: đúng **một** probe sửa (`probe2b`, shift += phần dư); vẫn ngoài dải → `BLOCKED_FIXTURE D0_OUTSIDE_BAND`. Mọi thứ phía sau (routes, pose, target, marker, khung ready) lấy từ probe cuối.
+- Áp dụng cho cả F02. `recipe_rev: f-v1.2`.
+- Trước A/B: bật watchdog, kiểm stopper r8 còn sống, kiểm bộ nhớ ảo còn trống.

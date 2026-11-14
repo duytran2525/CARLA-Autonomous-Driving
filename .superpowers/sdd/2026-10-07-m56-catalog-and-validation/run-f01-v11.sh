@@ -13,7 +13,7 @@ export M56_ASEL2_IO=1 M56_ASEL2_F=1 M56_ASEL2_FSITES=$A/m56_f_sites_20261109.jso
   M56_NO_RENDER=1 M56_SPECTATOR=1 M56_SPAWN_TILT=1 M56_RECIPE=v6 M56_DRIVABLE=dv1 M56_CODE=$V13
 done_path() { python -I -c "import re,sys;t=open(sys.argv[1],encoding='utf-8',errors='replace').read();m=re.findall(r'^DONE (.+)$',t,re.M);print(m[-1].strip().replace(chr(92),'/') if m else '')" "$1"; }
 S=M56-P-F01-S1; RB=$A/m56_c0_partial_io_asel2fbase_20261109T153007Z/c0-partial-v5-frozen-revision.json
-echo "recipe f-v1.1 product $(git -C $V13 log -1 --format=%h) tooling $(git -C ../../.. log -1 --format=%h)" | tee $LOG/head.txt
+echo "recipe f-v1.2 product $(git -C $V13 log -1 --format=%h) tooling $(git -C ../../.. log -1 --format=%h)" | tee $LOG/head.txt
 stage1() {
 while tasklist | grep -qi CarlaUE4; do sleep 15; done
 M56_REV=$RB $PY -I -X utf8 native-f-prepare.py Town13 $S > $LOG/prep.log 2>&1

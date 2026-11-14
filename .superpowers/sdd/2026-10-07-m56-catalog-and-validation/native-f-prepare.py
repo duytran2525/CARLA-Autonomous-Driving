@@ -177,30 +177,61 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     out.update(probe1_steady_s={'EGO': tE, 'NPC': tN})
     if tE is None or tN is None:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NOT_STEADY'); return P.finish(c, out)
-    T = max(tE, tN)
-    fr = next(f for f in p1 if f.simtime >= T)
-    act = {a.role: a for a in fr.actors}
+    # f-v1.2 (2026-11-14, Duy [chat] "b"; POST-NUMBER, principle 6): f-v1.1 took the probe-1 gap at max(steady_at), but
+    # probe 2 is ready at first_ready (~2.6 s earlier), so d0 at readiness came out 12.96 m, not 11.4 m. Probe 1 now uses
+    # the same first_ready rule (speeds do not depend on the lead's start, so probe 2 is ready at the same elapsed time).
+    out['recipe_rev'] = 'f-v1.2'
+    t1 = {'EGO': F(round(plat['EGO'] * 1000), 1000), 'NPC': F(round(plat['NPC'] * 1000), 1000)}
+    r1 = P.first_ready(p1, routes, t1, boundary_t2=float(p1[0].simtime) - .05)
+    if r1 is None:
+        out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_REACHED_IN_PROBE1'); return P.finish(c, out)
+    act = {a.role: a for a in r1[0].actors}
     gap = IO.rear_station(act[lead], routes[follow]) - P.front_station(act[follow], routes[follow])
     # F02 recipe notes 2: gap at readiness d0 + (vN - vE) * 1 s, so TRIGGER (gap 20 m) comes 1 s after readiness
     target = float(inp['d0']) + (float(inp['vN_char'] - inp['vE']) if mech == 'F02' else 0.)
     shift = target - gap
-    out.update(probe1_gap_at_ready_m=gap, lead_shift_m=shift, target_gap_at_ready_m=target, lead=lead)
-    routes2, prow2, k2 = routes_for(first + shift)
-    poses2 = poses_for(prow2, k2)
-    p2 = run('probe2', routes2, prow2, poses2, npc_gains, ego_gains)
-    if not p2:
-        out.update(status='BLOCKED_FIXTURE', reason='PROBE2_NO_FRAMES:' + ','.join(P.LAST_REASONS)); return P.finish(c, out)
-    plat2 = P.plateaus(p2, routes2, body, FAR, 0, npc_until='last')
-    out['probe2'] = plat2
-    if plat2.get('reason'):
-        out.update(status='BLOCKED_FIXTURE', reason=plat2['reason']); return P.finish(c, out)
-    targets = {'EGO': F(round(plat2['EGO'] * 1000), 1000), 'NPC': F(round(plat2['NPC'] * 1000), 1000)}  # f-v1.1
-    ready = P.first_ready(p2, routes2, targets, boundary_t2=float(p2[0].simtime) - .05)
-    if ready is None:
-        out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_REACHED_IN_PROBE2'); return P.finish(c, out)
-    frr, markers = ready
-    act = {a.role: a for a in frr.actors}; ego, npc = act['EGO'], act['NPC']
-    d0r = IO.rear_station(act[lead], routes2[follow]) - P.front_station(act[follow], routes2[follow])
+    out.update(probe1_ready_s=float(r1[0].simtime) - float(p1[0].simtime), probe1_gap_at_ready_m=gap, lead_shift_m=shift,
+               target_gap_at_ready_m=target, lead=lead)
+
+    def probe_at(shift, label):
+        """One readiness probe with the lead shifted by `shift`; everything downstream comes from this probe only."""
+        routes2, prow2, k2 = routes_for(first + shift)
+        poses2 = poses_for(prow2, k2)
+        p2 = run(label, routes2, prow2, poses2, npc_gains, ego_gains)
+        if not p2:
+            return {'reason': f'{label.upper()}_NO_FRAMES:' + ','.join(P.LAST_REASONS)}
+        plat2 = P.plateaus(p2, routes2, body, FAR, 0, npc_until='last')
+        if plat2.get('reason'):
+            return {'reason': plat2['reason'], 'plat': plat2}
+        targets = {'EGO': F(round(plat2['EGO'] * 1000), 1000), 'NPC': F(round(plat2['NPC'] * 1000), 1000)}  # f-v1.1
+        ready = P.first_ready(p2, routes2, targets, boundary_t2=float(p2[0].simtime) - .05)
+        if ready is None:
+            return {'reason': f'READINESS_NOT_REACHED_IN_{label.upper()}', 'plat': plat2}
+        a = {x.role: x for x in ready[0].actors}
+        d0r = IO.rear_station(a[lead], routes2[follow]) - P.front_station(a[follow], routes2[follow])
+        return {'routes2': routes2, 'prow2': prow2, 'k2': k2, 'poses2': poses2, 'p2': p2, 'plat': plat2, 'targets': targets,
+                'ready': ready, 'act': a, 'd0r': d0r, 'shift': shift}
+    # f-v1.2 band, fixed before any native run: route rows are 0.2 m apart and routes_for snaps the lead to the next row
+    # (miss up to +0.2 m), plus the 0.1 m station tolerance of first_ready -> |d0_r - target| <= 0.3 m. At most ONE
+    # corrective re-probe (label probe2b, shift += residual); still outside -> BLOCKED_FIXTURE D0_OUTSIDE_BAND.
+    BAND = .3
+    pr = probe_at(shift, 'probe2')
+    out['probe2'] = pr.get('plat')
+    if pr.get('reason'):
+        out.update(status='BLOCKED_FIXTURE', reason=pr['reason']); return P.finish(c, out)
+    out['probe2_d0_m'] = pr['d0r']
+    if abs(pr['d0r'] - target) > BAND:
+        pr = probe_at(pr['shift'] + (target - pr['d0r']), 'probe2b')
+        out['probe2b'] = pr.get('plat')
+        if pr.get('reason'):
+            out.update(status='BLOCKED_FIXTURE', reason=pr['reason']); return P.finish(c, out)
+        out['probe2b_d0_m'] = pr['d0r']
+        if abs(pr['d0r'] - target) > BAND:
+            out.update(status='BLOCKED_FIXTURE', reason='D0_OUTSIDE_BAND', d0_band_m=BAND); return P.finish(c, out)
+    out.update(d0_band_m=BAND, lead_shift_final_m=pr['shift'])
+    routes2, prow2, k2, poses2, p2 = pr['routes2'], pr['prow2'], pr['k2'], pr['poses2'], pr['p2']
+    targets, (frr, markers), act, d0r = pr['targets'], pr['ready'], pr['act'], pr['d0r']
+    ego, npc = act['EGO'], act['NPC']
     ego_front = P.front_station(ego, routes2['EGO'])
     extra = {}
     if mech == 'F01':
