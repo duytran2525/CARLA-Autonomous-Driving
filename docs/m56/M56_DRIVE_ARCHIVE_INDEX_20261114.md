@@ -10,6 +10,8 @@
 - Từ r3 (14/11 ~12:20Z) script **bỏ qua**: `m56_f_*`; root không có dấu thời gian (như `m56_offline_v1`, là input của revision); root có dấu thời gian ≥ 20261108 (đợt A-SEL2, còn đang phân tích); root chứa một cảnh từng PASS (`asel2-release.py --full` đọc lại episode đã niêm phong và D09 của nó).
 - **Có trên Drive nhưng đã đưa về đủ tại chỗ:** các root trong `outputs/m56_drive_archive_restored_in_place_20261114.txt` (39 root, gồm `m56_offline_v1` đưa về trước đó). Bản đầy đủ của chúng nằm ở `outputs/`, không phải trong thùng rác. Bản khung cũ (chỉ có file nhỏ) của chúng nằm ở `_TRASH_UPLOADED_20261114/<root>.skeleton`.
 
+**Xác nhận đã lên mây (14/11 12:35Z, Claude):** cơ sở dữ liệu metadata của Drive for Desktop (`%LOCALAPPDATA%\Google\DriveFS\<account>\metadata_sqlite_db`, đọc trên bản sao) cho thấy cả 85 file của manifest có ID file Drive phía server (dạng `1…`, không có ID `local…`), kích thước khớp từng byte với manifest, không bị trash, và hàng đợi `operations` = 0. Thư mục Drive có ID `1Ekn7oY33og4hqf1XO4BaA6aLj4H7Cr56`. Thừa một file dở `m56_v2_ab_Town12_20261110T145403Z.tar.zst.part` (không trong manifest, xóa tay được).
+
 ## Cái gì còn ở máy
 
 - Mỗi root đã archive vẫn còn thư mục cũ nhưng chỉ chứa file kết quả nhỏ: `pair-result.json`, `ab-result.json`, `fixture-frozen.json`, `prepare.json`, `a2-bbox.json`, `plan-source.json`, `ab_report.json`, `ab-log.json` và (từ r3) `runner/stop.json`. Với các root archive trước r3, `stop.json` không còn tại chỗ: một root I/O A/B không còn `run/` **không có nghĩa** là chưa chạy A/B; xem manifest và thùng rác.
