@@ -438,3 +438,51 @@ Settings trước và sau raster đều async (đã khôi phục đúng).
 - Không cảnh nào đổi ô raster. Các kết quả cũ giữ nguyên.
 - Kiểm này chưa làm trên Town13 vì chưa có WKT tham chiếu. Lý do giống hệt: cùng hàm, cùng lệnh RPC.
 - Hàng đợi **chưa** chạy tiếp, theo yêu cầu của người dùng. Lệnh chạy tiếp khi được phép: `bash run-asel2-resume-20261111.sh r4`.
+
+## Đêm 12→13/11: Q2/Q3 chạy, dừng an toàn 23:44:46Z, và chạy tiếp 13/11 (Claude quyết dưới ủy quyền)
+
+Kết quả đêm qua: xem `outputs/m56_asel2_queue_r5.stdout.txt` và `outputs/m56_asel2_stop_20261112T234446Z.json`. Dừng an toàn, không scene nào bị cắt giữa episode.
+
+| Nhóm | Kết quả |
+|---|---|
+| Q2 O05-S1, O07-S1 | FAILED |
+| Q2 O06 | BLOCKED_WITNESS |
+| Q2 I08, O04-S1 | prepare `RUNIN_NOT_STRAIGHT` (35,59 m và 46,15 m): scene không đạt, chưa tốn A/B |
+| Q2 O08-S2 | BLOCKED_FIXTURE, chưa tốn A/B |
+| Q3 Town12 C04-S2 | PASS theo pair chạy với v12 (`pair-v10.log` của cl2 thực chất chạy `M56_CODE=v12`), BLOCKED_WITNESS theo v10abs và v6. Báo cả hai cách (nguyên tắc 6) |
+| Q3 Town12 L08-S1, M05-S1, M08-S2 | FAILED |
+| Q3 Town12 M06-S2 | BLOCKED_WITNESS |
+| Q3 Town12 M07-S2, Town13 M04-S2 | BLOCKED_FIXTURE (không có đèn tín hiệu; probe không có frame), chưa tốn A/B |
+| Q3 Town13 C03-S2, C06-S1, L07-S2, M02-S1 | A/B xong, chưa pair khi dừng |
+
+**Nguyên nhân I01-S1, I02-S2, I05-S1, I06, I07-S1 không chạy A/B:** lỗi tooling, không phải lỗi scene. `run-asel2-io.sh` gọi `native-io-selfcheck.py` cho mọi scene, mà self-check này chỉ viết cho loại O (`a.phases['reference_switches']` của EGO A). Với loại I, đổi làn là của EGO B nên `KeyError`. Prereg io-i-v1 mục j nói rõ: "Self-check và replay của O chưa có bản cho I; admission là cổng offline". Cả 5 fixture đều FROZEN và ADMITTED, chưa có thư mục `m56_io_ab_*` nào của chúng, nên lượt A/B P5 còn nguyên.
+
+**Quyết định (Claude quyết dưới ủy quyền, không độc lập):**
+1. Bỏ self-check O cho loại I (đúng prereg j); cổng là admission.
+2. Chạy chỉ bước `--ab` trên revision có sẵn `m56_c0_partial_io_asel2ioprep_20261112T144015Z`, không prepare lại, không chạy lại queue 3c (nó sẽ chạy lại các A/B đã tiêu P5). Script `run-asel2-resume2.sh`: ghép cặp 4 scene Town13 Q3 dưới v12, rồi I01-S1 làm canary, các scene I còn lại chỉ chạy nếu canary tạo được thư mục `run`.
+3. `run-asel2-cl2-pair-town13.sh` chạy pass đầu mà không đặt `M56_CODE` (mặc định là gói m56 của worktree v1), nên nhãn `pair-v10.log` của lần chạy đó không phải v12. Kết quả chuẩn lấy từ pass v12 của resume2 (`pair-v12-town13q3.log`), pass v10abs và v6 giữ nhãn thật.
+
+## Kết quả resume2 (13→14/11, Claude quyết dưới ủy quyền; CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent)
+
+**Town13 Q3 (pair xong):** C03-S2, C06-S1, L07-S2 = **PASS theo v12**; BLOCKED_WITNESS theo v10abs và v6 (`m56_asel2_cl2p_20261113T135745Z/pair-v10abs.log`, `pair-v6.log`). M02-S1 = BLOCKED_WITNESS ở mọi quy tắc (A và B INCOMPLETE, thiếu E_ENTRY và DESTINATION). Theo nguyên tắc 6 báo cả hai: **19 cặp theo v12** (15 + C04-S2 + 3 cảnh này), nhưng 4 cặp mới (C04-S2, C03-S2, C06-S1, L07-S2) chỉ PASS theo v12, BLOCKED_WITNESS theo v10abs/v6.
+
+**Q1 Town13 (12/11):** L03-S1 và L06-S1 PASS; C07-S1 FAILED; M01-S1 FAILED (COLLISION_OBSERVED ở cả A, B); M03-S1 BLOCKED_WITNESS.
+
+**5 cảnh I, A/B chạy 1 lần mỗi cảnh, tất cả không thành cặp. Lượt P5 của cả 5 đã tiêu:**
+
+| Cảnh | Pair | Lý do |
+|---|---|---|
+| I01-S1 | không ghép được (`EPISODE_NOT_SEALED:A`) | Cả A và B dừng ở `runner/stop.json`: `READINESS_NOT_REACHED`; xe chưa tới ready markers |
+| I02-S2 | BLOCKED_WITNESS | `INITIALIZATION_INVALID`, `X_END_MISSING` ở cả A và B |
+| I05-S1 | FAILED | A: COLLISION_OBSERVED, RESUMED_BEFORE_NPC_MERGED_AHEAD; B: INCOMPLETE (X_END_MISSING) |
+| I06 | FAILED | A: COLLISION_OBSERVED, RESUMED_BEFORE_NPC_MERGED_AHEAD; B: COLLISION_OBSERVED, CHANGED_BEFORE_SOURCE_CLEAR |
+| I07-S1 | FAILED | A: COLLISION_OBSERVED, UNPLANNED_LANE_CHANGE, RESUMED_BEFORE_NPC_MERGED_AHEAD; B: COLLISION_OBSERVED, CHANGED_BEFORE_SOURCE_CLEAR |
+
+**Sai sót của Claude:** cổng canary tôi đặt trong `run-asel2-resume2.sh` chỉ kiểm có thư mục `run`. I01 có thư mục `run` nhưng cả hai episode dừng ở `READINESS_NOT_REACHED`, nên cổng không chặn và 4 cảnh I còn lại vẫn chạy (đều tiêu lượt P5). Cổng đúng phải đọc `runner/stop.json` của từng episode. Ba cảnh I05, I06, I07 cùng một chữ ký (A tiếp tục trước khi NPC nhập làn, B đổi làn trước khi làn nguồn trống, rồi va chạm), nên có thể là giới hạn của recipe I chứ không phải lỗi từng cảnh. Chưa điều tra sâu.
+
+**Kiểm tra sha:** fixture của A/B khác fixture lúc compile ở cả O05, O06, O07 (đã chạy 12/11) lẫn 5 cảnh I, nên khác sha là bình thường do biến chỉ có ở bước A/B, không phải lệch harness.
+
+**Quyết định:**
+1. Không chạy lại cảnh I nào. Không lấy cảnh I từ ngân sách thay thế B3 cho tới khi có phiên bản recipe I mới được ghi nhận và được Duy duyệt.
+2. `run-asel2-io.sh` bỏ self-check cho loại I (prereg io-i-v1 j). Hai script `run-io-compile.sh` và `run-io-prepare.sh` chỉ in kết quả, không chặn, nên để nguyên.
+3. Chuỗi F (F03 → F01 → F02) chạy từ 14/11 00:50Z với nhãn `r7` (marker `m56_fq_marker_r7` thay `QUEUE3B_DONE`), vì queue 3c không được chạy lại (sẽ lặp lại các A/B đã tiêu P5).

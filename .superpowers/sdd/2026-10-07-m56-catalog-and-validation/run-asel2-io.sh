@@ -36,7 +36,7 @@ for spec in $1; do
     timeout 2400 $PY -I -X utf8 native-io-ab.py $REVF $t $s > $LOG/compile-$s.log 2>&1
     C=$(done_path $LOG/compile-$s.log)
     [ -f "$C/$s/fixture-frozen.json" ] || { echo "$s: compile failed"; grep -a '"event"' $LOG/compile-$s.log | tail -2 | cut -c1-300; continue; }
-    $PY -I -X utf8 native-io-selfcheck.py $C/$s > $LOG/selfcheck-$s.log 2>&1 || { echo "$s: self-check failed"; tail -3 $LOG/selfcheck-$s.log; continue; }
+    case $s in M56-P-I*) echo "selfcheck skipped (category I: prereg io-i-v1 j, admission is the gate)" > $LOG/selfcheck-$s.log;; *) $PY -I -X utf8 native-io-selfcheck.py $C/$s > $LOG/selfcheck-$s.log 2>&1;; esac || { echo "$s: self-check failed"; tail -3 $LOG/selfcheck-$s.log; continue; }
     while tasklist | grep -qi CarlaUE4; do sleep 15; done
     M56_IO_KAPPA=pointwise M56_IO_PREREG_APPROVED=34bd4d8 M56_RUN_TAG=asel2 \
       M56_AB_AUTHORITY="[chat] 2026-11-08 Duy (self-stated): spec addendum A-SEL2 (9fa85f8); fill v4 prereg 03fb2ca + addenda A ddce811, B 34bd4d8; one A/B per scene (P5)" \
