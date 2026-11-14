@@ -20,10 +20,10 @@ stage1() {
 [ -f "$RB" ] || RB=$(bash run-asel2-revision.sh asel2f01s2base | tee $LOG/base.log | grep -o 'REVISION .*' | tail -1 | cut -d' ' -f2 | tr -d '\r')/c0-partial-v5-frozen-revision.json
 [ -f "$RB" ] || { echo "F01-S2 NOT RUN: base revision"; cut -c1-300 $LOG/base.log; echo F01S2_STAGE1_END; exit 4; }
 echo "RB $RB"
-while tasklist | grep -qi CarlaUE4; do sleep 15; done
-M56_REV=$RB $PY -I -X utf8 native-f-prepare.py Town06 $S > $LOG/prep.log 2>&1
+if [ -n "$PREP" ]; then P=$PREP; echo "reuse prepare $P (rebuild: attestation fix, batch log 14/11)"; else
+while tasklist | grep -qi CarlaUE4; do sleep 15; done; M56_REV=$RB $PY -I -X utf8 native-f-prepare.py Town06 $S > $LOG/prep.log 2>&1
 grep -a '"event": "\(SCENE\|SCENE_ERROR\|PROBE\)"\|^DONE\|^Traceback' $LOG/prep.log | cut -c1-400
-P=$(done_path $LOG/prep.log)
+P=$(done_path $LOG/prep.log); fi
 [ -n "$P" ] || { echo "F01 NOT RUN: prepare did not finish"; echo F01S2_END; exit 4; }
 R=$(bash run-asel2-revision.sh asel2f01s2prep $P | tee $LOG/revision.log | grep -o 'REVISION .*' | tail -1 | cut -d' ' -f2 | tr -d '\r')
 REVF=$R/c0-partial-v5-frozen-revision.json
@@ -52,4 +52,4 @@ for e in A B; do echo "stop $e: $(cat $D/$S/run/episodes/$S/$e/runner/stop.json 
 tail -c 1500 $LOG/pair-v13.log 2>/dev/null
 echo F01S2_END
 }
-if [ "$1" = ab ]; then stage2 "$2" "$3"; else stage1; fi
+if [ "$1" = ab ]; then stage2 "$2" "$3"; elif [ "$1" = rebuild ]; then RB=/rebuild; PREP=$2; stage1; else stage1; fi
