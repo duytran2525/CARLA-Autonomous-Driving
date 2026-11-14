@@ -526,3 +526,9 @@ Mọi preparation C/L/M/I/O đều dùng luật khác: đo plateau (biên độ 
 Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 
 **Archive Drive (sửa lỗi của Claude):** script archive đã chuyển cả root còn đang dùng. Đã dừng (r2), đưa về chỗ cũ 12 root đợt A-SEL2 (dấu thời gian ≥ 20261108) và 27 root chứa `run/` của các cảnh từng PASS (`asel2-release.py --full` cần đọc lại episode đã niêm phong). Danh sách: `outputs/m56_drive_archive_restored_in_place_20261114.txt`. Archive r3 bỏ qua các root đó, root không có dấu thời gian, và giữ thêm `runner/stop.json` tại chỗ.
+
+**Cập nhật 14/11 ~12:20Z:** Duy duyệt f-v1.1 ("làm theo hướng bạn đề xuất"). Đã làm (commit 412f9b6 + script chia hai bước):
+- `native-f-prepare.py`: luật plateau + lưới PID như I/O, target probe 2 = plateau đo được; `recipe_rev: f-v1.1` trong prepare.json (trường `recipe` vẫn `f-v1` để revision và native-f-ab nhận).
+- `native-f-ab.py`: gắn PID mà preparation đã chọn (như native-io-ab).
+- Kiểm offline: `native-f-offline-check.py` với target đo được (F01 3,862/3,265; F02 3,862/4,847) cho F01 và F02 đều `ALL_OK`. Revision offline trên prepare r8 với env mới chạy được (F01 BLOCKED như mong đợi). Chương trình trước readiness của A/B (EGO A/B và `f_npc`: SETTLE 0 → NOMINAL sau CAPTURE_START + 21/20 s) trùng chương trình probe.
+- `run-f01-v11.sh`: bước 1 = prepare → revision → compile/admission (không episode), dừng để đọc; bước 2 (`ab <REVF>`) = A/B duy nhất (P5) + pair v13, đọc `run/episodes/<scene>/{A,B}/runner/stop.json`. F02 chỉ chạy sau khi đọc kết quả F01.

@@ -29,7 +29,7 @@ def f_routes(prep, plain, town):
     """(routes {'EGO','NPC'}, rows {'EGO','NPC': (rows, arc)}, continuity ref). EGO destination = the prepared DESTINATION
     station; NPC destination = its route end - 5 m (as in the probes)."""
     path = Path(prep['routes_f'])
-    rows_all = json.loads(path.read_text(encoding='utf-8'))
+    rows_all = plain(json.loads(path.read_text(encoding='utf-8')))  # write_ref stores binary64 dicts (as io_routes)
     cont = SourceRef(str(path), prep['routes_f_sha256'], path.stat().st_size, '1', 'claude-g4', 'NATIVE_ROUTE')
     site = prep['site']; note = f"{site['road']}/{site['lane']}"
     rows, routes = {}, {}
