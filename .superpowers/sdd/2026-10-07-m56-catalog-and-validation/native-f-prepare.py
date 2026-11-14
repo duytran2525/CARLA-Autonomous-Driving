@@ -24,7 +24,7 @@ sys.argv = [str(here / 'native-v2-prepare.py'), TOWN]
 _spec = importlib.util.spec_from_file_location('v2prep', here / 'native-v2-prepare.py')
 P = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(P)  # shared root, authority, probe machinery
 
-from native_v2_common import NO_RENDER, V6, REV, arcs, body_record, directed, load, own_server, ownership, write_ref, stream_to  # noqa: E402
+from native_v2_common import NO_RENDER, V6, NPC_PID_GRID, REV, arcs, body_record, directed, load, own_server, ownership, write_ref, stream_to  # noqa: E402
 from m56 import runtime  # noqa: E402
 from m56.catalog import _digest  # noqa: E402
 from m56.metrics import _metric_station, _speed  # noqa: E402
@@ -140,14 +140,41 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     mid = rows['EGO'][len(rows['EGO']) // 2]
     stream_to(world, mid['x'], mid['y'], mid['z'])
 
-    def run(label, rts, pr, ps):
+    def run(label, rts, pr, ps, ng=None, eg=None):
         resp = (nominal_response('EGO', 'A', inp['vE'], rts['EGO']), nominal_response('NPC', 'NPC_COMMON', inp['vN_char'], rts['NPC']))
-        return P.probe(client, proc, start, world, identity, c.id, rts, pr, ps, resp, label, None, None, None)
+        return P.probe(client, proc, start, world, identity, c.id, rts, pr, ps, resp, label, None, ng, eg)
     p1 = run('probe1', routes, prow, poses)
     if not p1:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NO_FRAMES:' + ','.join(P.LAST_REASONS)); return P.finish(c, out)
-    tE = P.steady_time(p1, 'EGO', inp['vE']); tN = P.steady_time(p1, 'NPC', inp['vN_char'])
-    out.update(probe1_steady_s={'EGO': tE and float(tE), 'NPC': tN and float(tN)})
+    # f-v1.1 (2026-11-14, Claude under Duy delegation, POST-NUMBER rule, principle 6; batch log 14/11): f-v1 required
+    # |v - nominal| <= 0.05 m/s, which the stock controller never reaches (it settles ~0.14 m/s low: F01/F02 r8 blocked).
+    # Now exactly the I/O rule (native-io-prepare.py): plateau (range <= 0.10 over 2 s), PID grids, readiness targets =
+    # the probe-2 plateau. F has no decision station, so the plateau window is each probe's last 2 s (e_entry far away).
+    out['recipe_rev'] = 'f-v1.1'
+    FAR = 1e9
+    ego_gains, npc_gains, grid = None, None, []
+    plat = P.plateaus(p1, routes, body, FAR, 0, npc_until='last')
+    grid.append({'who': 'stock', 'EGO_range': plat.get('EGO_range'), 'NPC_range': plat.get('NPC_range')})
+    if plat.get('EGO_range', 1.) > .10:
+        for ei, eg in enumerate(NPC_PID_GRID[1:], 1):
+            q = run(f'probe1-egopid{ei}', routes, prow, poses, None, eg)
+            pq = P.plateaus(q, routes, body, FAR, 0, npc_until='last') if q else {}
+            grid.append({'who': 'EGO', 'gains': [str(x) for x in eg], 'EGO_range': pq.get('EGO_range')})
+            if q and pq.get('EGO_range', 1.) <= .10:
+                ego_gains, p1, plat = eg, q, pq; break
+    if plat.get('NPC') is None:
+        for gi, ng in enumerate(NPC_PID_GRID[1:], 1):
+            q = run(f'probe1-pid{gi}', routes, prow, poses, ng, ego_gains)
+            pq = P.plateaus(q, routes, body, FAR, 0, npc_until='last') if q else {}
+            grid.append({'who': 'NPC', 'gains': [str(x) for x in ng], 'NPC_range': pq.get('NPC_range')})
+            if q and pq.get('NPC') is not None:
+                npc_gains, p1, plat = ng, q, pq; break
+    out.update(pid_grid=grid, ego_longitudinal=None if ego_gains is None else [str(x) for x in ego_gains],
+               npc_longitudinal=None if npc_gains is None else [str(x) for x in npc_gains], probe1=plat)
+    if plat.get('reason') or plat.get('NPC') is None:
+        out.update(status='BLOCKED_FIXTURE', reason=plat.get('reason') or 'READINESS_NOT_STEADY'); return P.finish(c, out)
+    tE = P.steady_at(p1, 'EGO', plat['EGO']); tN = P.steady_at(p1, 'NPC', plat['NPC'])
+    out.update(probe1_steady_s={'EGO': tE, 'NPC': tN})
     if tE is None or tN is None:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE1_NOT_STEADY'); return P.finish(c, out)
     T = max(tE, tN)
@@ -160,10 +187,14 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     out.update(probe1_gap_at_ready_m=gap, lead_shift_m=shift, target_gap_at_ready_m=target, lead=lead)
     routes2, prow2, k2 = routes_for(first + shift)
     poses2 = poses_for(prow2, k2)
-    p2 = run('probe2', routes2, prow2, poses2)
+    p2 = run('probe2', routes2, prow2, poses2, npc_gains, ego_gains)
     if not p2:
         out.update(status='BLOCKED_FIXTURE', reason='PROBE2_NO_FRAMES:' + ','.join(P.LAST_REASONS)); return P.finish(c, out)
-    targets = {'EGO': inp['vE'], 'NPC': inp['vN_char']}
+    plat2 = P.plateaus(p2, routes2, body, FAR, 0, npc_until='last')
+    out['probe2'] = plat2
+    if plat2.get('reason'):
+        out.update(status='BLOCKED_FIXTURE', reason=plat2['reason']); return P.finish(c, out)
+    targets = {'EGO': F(round(plat2['EGO'] * 1000), 1000), 'NPC': F(round(plat2['NPC'] * 1000), 1000)}  # f-v1.1
     ready = P.first_ready(p2, routes2, targets, boundary_t2=float(p2[0].simtime) - .05)
     if ready is None:
         out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_REACHED_IN_PROBE2'); return P.finish(c, out)

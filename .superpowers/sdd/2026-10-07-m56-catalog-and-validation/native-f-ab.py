@@ -193,7 +193,10 @@ def run_scene(c, client, proc, start, world, m, identity):
     def geometry_review(p):
         return review(p, 'CAPABILITY:CONTINUOUS_GEOMETRY', tuple(p['raw_refs']),
                       ('dt 1/20; observed consecutive frames of owned actors; not independent',))
-    backend.bind(fixture, policy_maker(fixture, rows, review, source), geometry_review, kit)
+    # f-v1.1: the PID gains the preparation chose (None = stock), exactly as native-io-ab.py
+    gains = {k: (None if raw_prep.get(k) is None else tuple(F(g) for g in raw_prep[k])) for k in ('npc_longitudinal', 'ego_longitudinal')}
+    backend.bind(fixture, policy_maker(fixture, rows, review, source, gains['npc_longitudinal'], gains['ego_longitudinal']),
+                 geometry_review, kit)
     out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)
     log(event='AB', scene=c.id, sealed=isinstance(out, tuple), blocked=list(getattr(out, 'blocked', ())) if not isinstance(out, tuple) else [])
 
