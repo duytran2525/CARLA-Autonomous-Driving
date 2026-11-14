@@ -615,3 +615,15 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - **REVF dùng cho A/B:** `outputs/m56_c0_partial_io_asel2f01s2prep_20261114T142805Z/c0-partial-v5-frozen-revision.json`. Bản 142245Z bỏ, không dùng.
 - Đính chính mục F02 ở trên: fixture compile-only (bb5e0fc3) và A/B (0f15b6b6) có cùng section/route/response/actor/pose. Hash khác vì đường dẫn thư mục output và biên nhận authority A/B (750 → 988 byte), không phải pid/world.
 - Ngân sách thay cảnh B3: 40/150 (F01-S2 +1).
+## 14/11 14:37Z: F01-S2 A/B (Duy duyệt), P5 đã tiêu: **pair v13 PASS**
+
+- Duyệt: Duy [chat] 14/11 "duyệt A/B F01-S2". REVF `m56_c0_partial_io_asel2f01s2prep_20261114T142805Z` (bản attest đã sửa).
+- A/B `outputs/m56_f_ab_Town06_20261114T143133Z`: FROZEN e2dc126f… (section y hệt compile-only); ADMITTED; sealed; stop A/B CLEANED.
+- Pair `outputs/m56_v6_pair_20261114T143721Z/M56-P-F01-S2/pair-result.json`:
+  - A và B: spawn CONFIRMED, physical COMPLETE, witness VALID; w05 INTEGRITY_VALID. Không va chạm.
+  - **PASS**. Δ a_peak_025 = 0,4029 (dự báo ≈ 0,44); Δ g_front_min = 0,6668 (dự báo ≈ 0,67).
+- F01 báo dưới ba luật:
+  - prereg gốc: S1 FAILED, không có thay thế;
+  - F01-v2: EMPTY;
+  - **F01-v3: S2 PASS**. Đây là luật sau số lần 2: nhu cầu site 91,4 m tính sau khi thấy pool, chỉ một road đạt, đổi town.
+- Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
