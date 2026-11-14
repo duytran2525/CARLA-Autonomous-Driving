@@ -4,7 +4,7 @@ Per root: tar.zst -> G:/My Drive/M56_ARCHIVE_<stamp>/<root>.tar.zst; verify = re
 equal to the source file list; only then rename. Resumable: roots listed in the manifest as VERIFIED are skipped.
 Skipped: roots touched in the last 3 h, m56_f_* (live F chain), roots < 50 MB, anything already in the manifest.
 usage: PYTHONPATH=<dir with zstandard> python -I archive-to-drive.py [--dry]"""
-import hashlib, io, json, os, shutil, sys, tarfile, time
+import hashlib, io, json, os, re, shutil, sys, tarfile, time
 from pathlib import Path
 
 import zstandard as z
@@ -15,7 +15,7 @@ DEST = Path('G:/My Drive') / f'M56_ARCHIVE_{STAMP}'
 TRASH = OUT / f'_TRASH_UPLOADED_{STAMP}'
 MAN = OUT / f'm56_drive_archive_manifest_{STAMP}.jsonl'
 KEEP = {'pair-result.json', 'ab-result.json', 'fixture-frozen.json', 'prepare.json', 'a2-bbox.json', 'plan-source.json',
-        'ab-report.json', 'ab-log.json'}
+        'ab_report.json', 'ab-log.json', 'stop.json'}  # stop.json: runner/stop.json = the in-place sign an A/B was spent
 MIN_MB, RECENT_S, MIN_FREE_GB = 50, 3 * 3600, 2
 
 
@@ -57,8 +57,17 @@ def main(dry):
         sys.exit('G: not available')
     DEST.mkdir(parents=True, exist_ok=True); TRASH.mkdir(exist_ok=True)
     skip = done(); now = time.time()
+    # 2026-11-14 r3: never archive live evidence. asel2-release --full re-reads the sealed episodes and D09 of every PASS
+    # scene, and the A-SEL2 batch (roots stamped >= 20261108) is still under analysis; roots without a stamp are inputs.
+    import csv
+    passed = {r['scene'] for r in csv.DictReader(open(OUT / f'm56_results_digest_{STAMP}.csv', encoding='utf-8'))
+              if r['kind'] == 'pair' and r['status'] == 'PASS'}
+
+    def live(d):
+        m = re.search(r'_(\d{8})T\d{6}Z$', d.name)
+        return not m or m.group(1) >= '20261108' or any((d / s).is_dir() for s in passed)
     roots = sorted(d for d in OUT.iterdir() if d.is_dir() and d.name.startswith('m56_') and not d.name.startswith('m56_f_')
-                   and d.name not in skip and now - d.stat().st_mtime > RECENT_S)
+                   and d.name not in skip and now - d.stat().st_mtime > RECENT_S and not live(d))
     for root in roots:
         fl = files_of(root); nb = sum(s for _, s in fl)
         if nb < MIN_MB * 2**20:

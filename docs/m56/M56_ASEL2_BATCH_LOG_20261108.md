@@ -486,3 +486,43 @@ Kết quả đêm qua: xem `outputs/m56_asel2_queue_r5.stdout.txt` và `outputs/
 1. Không chạy lại cảnh I nào. Không lấy cảnh I từ ngân sách thay thế B3 cho tới khi có phiên bản recipe I mới được ghi nhận và được Duy duyệt.
 2. `run-asel2-io.sh` bỏ self-check cho loại I (prereg io-i-v1 j). Hai script `run-io-compile.sh` và `run-io-prepare.sh` chỉ in kết quả, không chặn, nên để nguyên.
 3. Chuỗi F (F03 → F01 → F02) chạy từ 14/11 00:50Z với nhãn `r7` (marker `m56_fq_marker_r7` thay `QUEUE3B_DONE`), vì queue 3c không được chạy lại (sẽ lặp lại các A/B đã tiêu P5).
+
+## Chuỗi F r8 (14/11/2026 10:49–11:00Z) và điều tra
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
+**Chạy:** chuỗi r7 chết mà không chạy bước nào (stdout F01/F02 rỗng). Chạy lại thành r8 (`m56_f01_chain_r8`, `m56_f02_chain_r8`, chờ marker của `m56_f03_probe_r7`).
+- F01 (Town13, M56-P-F01-S1, road 1165 lane -2): `BLOCKED_FIXTURE` `PROBE1_NOT_STEADY`. Log `outputs/m56_f01_20261114T104923Z`, prepare `m56_v2_prepare_Town13_20261114T104925Z`.
+- F02 (Town12, M56-P-F02): `BLOCKED_FIXTURE` `PROBE1_NOT_STEADY`. Log `outputs/m56_f02_20261114T105524Z`, prepare `m56_v2_prepare_Town12_20261114T105525Z`.
+- Không A/B nào chạy, nên **không tiêu lượt P5 nào**.
+- Lý do `READINESS_NOT_REACHED` ở dòng PROBE là theo thiết kế: `probe()` đặt target 1000 m/s nên probe không bao giờ "ready". Thứ chặn là phép thử steady.
+- Bước revision của cả hai chuỗi lỗi `FileNotFoundError` vì script archive đã chuyển `m56_offline_v1` vào thùng rác (lỗi của Claude). Root này đã được đưa về chỗ cũ; lỗi đó không đổi kết quả hai cảnh vì cả hai bị chặn trước bước revision.
+
+**Nguyên nhân gốc:** `native-f-prepare.py` dòng 149 dùng `steady_time(p1, role, nominal)`, tức đòi |v − tốc độ danh nghĩa| ≤ 0,05 m/s suốt 1 s. Bộ điều khiển stock luôn ổn định dưới mức danh nghĩa:
+| Cảnh | Xe | Danh nghĩa | Plateau đo được | Biên độ 2 s cuối |
+|---|---|---|---|---|
+| F01 | EGO | 4,0 | 3,862 | 0,0001 |
+| F01 | NPC | 3,4 | 3,265 | 0,0001 |
+| F02 | EGO | 4,0 | 3,864 | 0,0002 |
+| F02 | NPC | 5,0 | 4,847 | 0,1545 (dao động 4,77–4,92) |
+
+Mọi preparation C/L/M/I/O đều dùng luật khác: đo plateau (biên độ ≤ 0,10 m/s), thử lưới PID khi cần, rồi lấy plateau đo được làm target readiness. Ví dụ cảnh PREPARED: EGO danh nghĩa 4,0 → target 3,862–3,866 (C03-S2, C04-S2, C06-S1, M02-S1, M05-S1, M06-S2, M08-S2). Nên F là ngoại lệ, và với luật hiện tại F không bao giờ qua được. Dòng 166 (target probe 2 = danh nghĩa) cũng sẽ chặn y như vậy.
+
+**Thử lại offline luật plateau trên bản ghi probe 1:**
+- F01: plateau EGO 3,862, NPC 3,265, cả hai steady (EGO sau 7,55 s, NPC sau 5,05 s). Sẽ qua.
+- F02: EGO qua; NPC dao động 0,15 m/s, không có cửa sổ 2 s nào đạt ≤ 0,10, nên cần lưới PID NPC (`NPC_PID_GRID`) như C/L/M/I/O.
+- Khoảng hở lúc ready chưa tính lại offline (cần routes).
+
+**Consumer v13:** `_f_script_contract` chỉ kiểm tốc độ *lệnh* của NPC (F01: 3 hoặc 17/5; F02: 5). Tốc độ lệnh giữ nguyên, nên đổi target readiness sang plateau đo được không chạm contract. Chưa chạy `native-f-offline-check.py` với target đo được.
+
+**Ghi chú khác:** bước prepare của F01/F02 chạy *trước* dòng `export M56_RECIPE=v6 M56_DRIVABLE=dv1`, nên bản ghi prepare không có `m56_recipe: v6` (chuỗi I/O export v6 trước). F03 `ok: false` ở cả 6 mẫu là câu hỏi riêng (probe độ dốc), chưa phân tích.
+
+**Đề xuất (chưa làm, chờ Duy duyệt):** recipe f-v1.1, ghi là luật sau-số (nguyên tắc 6), không sửa byte prereg:
+1. Probe 1: thay `steady_time` theo danh nghĩa bằng `P.plateaus` + lưới PID (EGO rồi NPC) + `P.steady_at` theo plateau, đúng như `native-io-prepare.py`.
+2. Probe 2: target readiness = plateau đo được ở probe 2 (làm tròn 1/1000), như C/L/M/I/O.
+3. Giữ tốc độ danh nghĩa trong các công thức hình học (F01 brake start = mũi NPC + 3 s · vN; F02 khoảng hở 21 m; `nominal_front_t0_m`), vì đó là thay đổi nhỏ nhất.
+4. Export `M56_RECIPE=v6 M56_DRIVABLE=dv1` trước bước prepare.
+5. Test offline (`native-f-offline-check.py`) rồi mới chạy native: F01 trước, đọc `runner/stop.json` của cả hai episode và kết quả pair, rồi mới tới F02. Tạm dừng archive trong lúc A/B.
+Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
+
+**Archive Drive (sửa lỗi của Claude):** script archive đã chuyển cả root còn đang dùng. Đã dừng (r2), đưa về chỗ cũ 12 root đợt A-SEL2 (dấu thời gian ≥ 20261108) và 27 root chứa `run/` của các cảnh từng PASS (`asel2-release.py --full` cần đọc lại episode đã niêm phong). Danh sách: `outputs/m56_drive_archive_restored_in_place_20261114.txt`. Archive r3 bỏ qua các root đó, root không có dấu thời gian, và giữ thêm `runner/stop.json` tại chỗ.

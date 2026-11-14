@@ -6,11 +6,14 @@
 
 - Vị trí: Google Drive của Duy, ổ `G:\My Drive\M56_ARCHIVE_20261114\<tên root>.tar.zst` (mỗi root trong `outputs/` là một file `.tar.zst`; zstd level 9).
 - Danh sách chính xác từng root (đường dẫn Drive, sha256, số file, số byte): `outputs/m56_drive_archive_manifest_20261114.jsonl` (bản sao đã commit: `docs/m56/M56_DRIVE_ARCHIVE_MANIFEST_20261114.jsonl`). Mỗi dòng chỉ có mặt sau khi đã tải lại file từ Drive, kiểm sha256 và so số file/số byte với nguồn.
-- Phạm vi: các root `m56_*` trong `outputs/` (pair `m56_v6_pair_*`, A/B `m56_v2_ab_*`, `m56_io_ab_*`, `m56_offline_v1`, ...) cũ hơn 3 giờ và nặng ≥ 50 MB, đã chạy xong hoặc FAILED. Không động tới `m56_f_*` (chuỗi F) và các root nhỏ.
+- Phạm vi: các root `m56_*` trong `outputs/` cũ hơn 3 giờ và nặng ≥ 50 MB. **Chưa nén xong mọi root**: manifest là danh sách duy nhất đúng.
+- Từ r3 (14/11 ~12:20Z) script **bỏ qua**: `m56_f_*`; root không có dấu thời gian (như `m56_offline_v1`, là input của revision); root có dấu thời gian ≥ 20261108 (đợt A-SEL2, còn đang phân tích); root chứa một cảnh từng PASS (`asel2-release.py --full` đọc lại episode đã niêm phong và D09 của nó).
+- **Có trên Drive nhưng đã đưa về đủ tại chỗ:** các root trong `outputs/m56_drive_archive_restored_in_place_20261114.txt` (39 root, gồm `m56_offline_v1` đưa về trước đó). Bản đầy đủ của chúng nằm ở `outputs/`, không phải trong thùng rác. Bản khung cũ (chỉ có file nhỏ) của chúng nằm ở `_TRASH_UPLOADED_20261114/<root>.skeleton`.
 
 ## Cái gì còn ở máy
 
-- Mỗi root vẫn còn thư mục cũ nhưng chỉ chứa file kết quả nhỏ: `pair-result.json`, `ab-result.json`, `fixture-frozen.json`, `prepare.json`, `a2-bbox.json`, `plan-source.json`, `ab-report.json`, `ab-log.json`. Các bước pair, ledger, release đọc các file này.
+- Mỗi root đã archive vẫn còn thư mục cũ nhưng chỉ chứa file kết quả nhỏ: `pair-result.json`, `ab-result.json`, `fixture-frozen.json`, `prepare.json`, `a2-bbox.json`, `plan-source.json`, `ab_report.json`, `ab-log.json` và (từ r3) `runner/stop.json`. Với các root archive trước r3, `stop.json` không còn tại chỗ: một root I/O A/B không còn `run/` **không có nghĩa** là chưa chạy A/B; xem manifest và thùng rác.
+- `native-v6-pair.py` và `asel2-release.py --full` cần `run/` đầy đủ. Muốn chấm lại một root đã archive, phải lấy lại nó trước.
 - Bản đầy đủ của phần nặng (`run/native`, `run/episodes`, `w05-*`, `d09`, journal, ...) đã được **chuyển** (không xóa) sang `outputs/_TRASH_UPLOADED_20261114/<root>/`. Duy tự xóa thư mục đó khi muốn: `Remove-Item -Recurse -Force outputs\_TRASH_UPLOADED_20261114`.
 - Nếu thư mục trash đã bị xóa mà cần dữ liệu nặng: tải `<root>.tar.zst` từ Drive, kiểm `sha256` theo manifest, rồi giải nén (`zstd -d` rồi `tar -xf`, hoặc Python `zstandard`) vào `outputs/`.
 
@@ -24,4 +27,5 @@
 
 - Không chạy lại cảnh nào đã có A/B (P5). Không chạy lại cảnh I khi chưa có recipe I mới được Duy duyệt.
 - Không sửa byte spec. Kết quả gắn nhãn `CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent`.
-- `m56_f_*` và chuỗi F (r7) không nằm trong archive này.
+- `m56_f_*` và chuỗi F (r7, r8) không nằm trong archive này.
+- Digest chỉ có dòng cho cảnh có `pair-result.json` hoặc `ab-result.json`. Cảnh mà pair bị crash (như I01-S1, `EPISODE_NOT_SEALED:A`) không có dòng; xem batch log.
