@@ -791,3 +791,20 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - O05-S1, O06, O07-S2 (io16), với M56_CODE = m56-v15.
   - Suite không đạt thì không chạy gì.
 - Pair luật cũ (m56-v12) sẽ chạy tay sau, vì là offline: pair không tốn P5.
+## 15/11 tối (6): hàng đợi chỉ O, lỗi kẹp NPC, addendum L
+
+- Hàng đợi `run-asel2-v15-queue.sh` và `run-asel2-r9-queue.sh` bị thay trước khi chạy bước nào. Hàng đợi mới
+  `run-asel2-v15o-queue.sh` chỉ chạy O: O05-S1, O06, O07-S2 (Town12), O04-S3, O08-S3 (Town13), product m56-v15, sau khi suite 12
+  `CHAIN_PASSED`. Chạy detached nhãn `m56_asel2_v15o2` (nhãn `m56_asel2_v15o` bị khóa file stdout).
+- I01-S1, I02-S2, I05-S2…I08-S2 giữ lại chờ recipe thời điểm đổi làn của B. I08-S2 bị rút ra vì cùng dạng với I02-S2.
+- **Lỗi tìm thấy (addendum L, `PREREG_M56_IO_GAP_GATE_ADDENDUM_L_20261115.md`):** prepare kẹp điểm xuất phát NPC ở đầu road site.
+  Khi NPC cần lùi ra trước road đó, gap thực tăng đúng |shift|.
+  - I04: 46,42 m thay vì 13,18 m. Cặp I04 đang được tính PASS. Recipe io-v1 đã đặt trước dung sai |gap − spec| ≤ 0,5 m, nên I04
+    vi phạm luật đã đăng ký. Claude không đổi status; người dùng quyết.
+  - I02-S2 (27,36 thay vì 7,80; BLOCKED_WITNESS), I05-S1 (11,08 thay vì 4,62; FAILED), I01-S1 (21,37 thay vì 6,00; chưa A/B) cũng
+    bị kẹp. Kết quả I02-S2 và I05-S1 không phải kết quả ở gap catalog.
+  - O01–O07: lệch ≤ 0,42 m, không bị ảnh hưởng.
+- Cổng `asel2-io-gap-gate.py` (fail closed, 0,5 m) được gắn vào `run-asel2-io-v16.sh` và `run-asel2-io-i12j.sh` trước compile/A/B.
+- Rút lại hai nhận định trước: "I05–I07 không khả thi" và bảng cửa sổ thời gian (`m56_i_b_window_20261115.txt`). Bảng đó dùng gap
+  catalog làm gap lúc TRIGGER. I06, I07 thật sự chạy ở gần gap catalog, nên cửa sổ ngắn của chúng vẫn đúng. Successor I05-S2…I08-S2
+  chưa có prepare, nên chưa biết gap thực.
