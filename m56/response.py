@@ -1436,9 +1436,10 @@ def nominal_old_rule(fixture, role='EGO'):
 
 
 def _io_dlc(nominal, npc=False):
-    """v15 (Duy 2026-11-15, post-number; io-v1.6, PREREG_M56_CONSUMER_V15_DLC_FLOOR_20261115.md): an EGO I/O lane change
-    is Dlc = max(3 vE, 18 m), exactly; the NPC (I) keeps 3 vN. OLD RULE spec 7.4 / v14 and before: dlc_old_rule."""
-    return 3*nominal if npc else max(3*nominal,Number(18))
+    """v15 (Duy 2026-11-15, post-number; io-v1.6, PREREG_M56_CONSUMER_V15_DLC_FLOOR_20261115.md + addendum J
+    PREREG_M56_NPC_DLC_FLOOR_ADDENDUM_J_20261115.md): an I/O lane change of the EGO and of the NPC (I) is exactly
+    Dlc = max(3 v, 18 m). OLD RULE spec 7.4 / v14 and before: dlc_old_rule. `npc` is kept for the call site."""
+    return max(3*nominal,Number(18))
 
 
 def dlc_old_rule(nominal):
