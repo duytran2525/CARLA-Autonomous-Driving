@@ -1435,6 +1435,17 @@ def nominal_old_rule(fixture, role='EGO'):
     return fixture.environment.get('readiness',{}).get('targets_mps',{}).get(role)
 
 
+def _io_dlc(nominal, npc=False):
+    """v15 (Duy 2026-11-15, post-number; io-v1.6, PREREG_M56_CONSUMER_V15_DLC_FLOOR_20261115.md): an EGO I/O lane change
+    is Dlc = max(3 vE, 18 m), exactly; the NPC (I) keeps 3 vN. OLD RULE spec 7.4 / v14 and before: dlc_old_rule."""
+    return 3*nominal if npc else max(3*nominal,Number(18))
+
+
+def dlc_old_rule(nominal):
+    """Report-only: spec 7.4 Dlc = 3 * nominal (EGO and NPC), the rule through v14."""
+    return 3*nominal
+
+
 def _lateral_contract(response, fixture):
     """Analytic offline admission of frozen horizontal parallel references.
 
@@ -1493,7 +1504,7 @@ def _lateral_contract(response, fixture):
                 raise ValueError('LATERAL_MARKER_GUARD_MISSING')
         profiles=(response.profile,*(s['profile'] for s in switches))
         moving=tuple(s for p in profiles for s in p['segments'] if s['start_offset_m']!=s['end_offset_m'])
-        if len(moving)!=(1 if category=='I' else 2) or any(s['length_m']!=3*nominal for s in moving):
+        if len(moving)!=(1 if category=='I' else 2) or any(s['length_m']!=_io_dlc(nominal,npc) for s in moving):
             raise ValueError('LATERAL_LENGTH_INVALID')
         for s in moving:
             if abs(s['end_offset_m']-s['start_offset_m'])!=abs(separation):
