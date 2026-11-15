@@ -1,0 +1,8 @@
+
+M56-P-I04 B trig-ready 8.5 frames 465 ready_s 7.4 {'LANE_CHANGE_PATH_CLEAR': 15.9, 'TRIGGER': 15.9, 'SOURCE_CLEAR_CONFIRMED': 18.05, 'TARGET_LANE_CONFIRMED': 22.45, 'X_END': 22.5, 'DESTINATION_CONFIRMED': 23.2} clear-trig(event) 2.15 tclear_geom 1.45 box True
+M56-P-I02-S2 B trig-ready 8.35 frames 366 ready_s 6.85 {'LANE_CHANGE_PATH_CLEAR': 15.2, 'TRIGGER': 15.2} clear-trig(event) None tclear_geom 2.05 box True
+M56-P-I03 B trig-ready 9.35 frames 461 ready_s 6.1 {'TRIGGER': 15.45, 'LANE_CHANGE_PATH_CLEAR': 17.3, 'SOURCE_CLEAR_CONFIRMED': 18.0, 'TARGET_LANE_CONFIRMED': 22.0, 'X_END': 22.2, 'DESTINATION_CONFIRMED': 23.0} clear-trig(event) 2.55 tclear_geom 1.65 box True
+M56-P-I05-S1 B trig-ready 10.75 frames 364 ready_s 4.25 {'TRIGGER': 15.0, 'LANE_CHANGE_PATH_CLEAR': 17.95} clear-trig(event) None tclear_geom 2.6 box True
+M56-P-I06 B trig-ready 10.75 frames 355 ready_s 3.45 {'TRIGGER': 14.2} clear-trig(event) None tclear_geom None box True
+M56-P-I07-S1 B trig-ready 9.9 frames 353 ready_s 4.4 {'TRIGGER': 14.3} clear-trig(event) None tclear_geom None box True
+FORECAST_END
