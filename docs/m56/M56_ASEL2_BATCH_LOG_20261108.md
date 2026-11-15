@@ -820,3 +820,20 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - `native-io-prepare-i13.py` (io-i-v1.3 a, bản nháp bf78050): đặt NPC của cảnh I theo arc, không kẹp ở đầu road site. Tự kiểm
   offline: NPC lùi đúng |shift| (I04 33,4; I02-S2 19,6; I05-S1 6,6; I01-S1 15,2 m). Ở I04, I02-S2, I01-S1, NPC sẽ xuất phát trên
   đoạn nối trong nút giao. Chưa gắn vào script chạy nào. Lần dùng native đầu tiên sẽ chỉ là prepare I01-S1 (không A/B).
+
+## 16/11 rạng sáng: suite 12 rớt, sửa fixture test, ổ C đầy, HOLD
+
+- Suite 12 (`m56-full-suite-12-20261115`, byte v15): `PYTEST_TESTS_FAILED`, 4 failed / 1248 passed (3 h 50). Hàng đợi O
+  (`m56_asel2_v15o2`) in `NOT RUN: suite 12 not CHAIN_PASSED`, không chạy cảnh nào.
+  - `test_io_complete.py::test_source_producer_public_witness_completes_stop_then_merged_cut_in`,
+    `::test_source_cut_in_ab_does_not_turn_two_valid_actions_into_automatic_pass`,
+    `::test_source_producer_public_witness_completes_supported_cut_in`,
+    `test_lateral_contract.py::test_npc_cut_in_uses_its_own_parallel_reference_and_three_second_scale`.
+  - Nguyên nhân: fixture tổng hợp của NPC cut-in dài 3·vN = 15 m (vN = 5). Theo v15/addendum J (đã duyệt), độ dài phải là
+    max(3·vN, 18 m) = 18 m, nên consumer chặn `LATERAL_LENGTH_INVALID`. Claude không chạy các file test này trước khi bắt đầu
+    suite 12. Đây là lỗi quy trình của Claude.
+- Sửa (036688b trên feat/m56-v15, f140093 trên feat/m56-v1): cập nhật fixture theo luật v15. Đoạn NPC 18 m, giữ nguyên điểm cuối
+  (17,5→14,5 + 18 = 32,5; ở test lateral 10→7 + 18 = 25). Đây không phải đổi ngưỡng. Ba file test qua: 20 passed.
+- **Ổ C còn 0 GB** (pagefile.sys 31 GB; Temp nhỏ). Claude không xóa gì. Claude tạo `outputs/m56_asel2_HOLD`: mọi hàng đợi native
+  dừng cho tới khi ổ C có chỗ trống, vì một episode chết vì thiếu RAM/đĩa là một A/B đã tốn mà không chạy lại được. Suite 13 chạy
+  được vì nó chạy lại được và basetemp nằm trên ổ D.
