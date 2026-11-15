@@ -696,3 +696,32 @@ ative-io-prepare-v16.py có self-test offline: 3 trường hợp đều OK.
   2. `m56_asel2_repl7`: O04-S2.
   3. `m56_asel2_io16` (696ea72): O05-S1, O06, O07-S2, O08-S2.
 - **Ngân sách B3:** 44/150.
+
+## 15/11 tối: kết quả native sau khi HOLD được nhả
+
+Nguồn [repo]: `outputs/m56_asel2_repl6b.stdout.txt`, `m56_asel2_repl7.stdout.txt`, `m56_asel2_io16.stdout.txt`, các log trong
+`m56_asel2_cl2_20261115T090414Z`, `m56_asel2_io_20261115T100537Z`, `m56_asel2_io_20261115T101626Z`.
+
+- **Full suite 11** (`m56-full-suite-11-20261115`): 1249 passed, `CHAIN_PASSED`, 2 h 02 min.
+- **Release --full2** (`m56_asel2_release_20261115T054325Z`): 21/21 eligibility PASS. RAM của process chính đứng yên. Status vẫn là
+  `RELEASE_BLOCKED` (`CANDIDATE_COUNT`, `JUNCTION_SHORTFALL`, `C0_MISSING`, `COMPARISON_COVERAGE`): đây là các thiếu hụt về độ phủ,
+  không phải lỗi eligibility.
+- **C07-S2, L08-S2** (B5 successors, Town12): cặp PASS dưới consumer m56-v12. Dưới m56-v10 và m56-v6 là `BLOCKED_WITNESS`. Lưu ý: dòng
+  echo của `run-asel2-cl2.sh` ghi nhãn "v10:" nhưng thật ra là `pair-v10.log`, chạy với `M56_CODE` = m56-v12.
+- **O04-S2** (io-v1.4, `run-asel2-io.sh`): `BLOCKED_FIXTURE EGO_NOT_AT_DECISION_IN_PROBE1`, không có A/B. Phạm vi io-v1.5 (§3) chỉ gồm
+  O08-S2, nên O04-S2 **không** được chạy lại dưới io-v1.5. Muốn chạy lại thì phải có quyết định mở rộng phạm vi.
+- **O05-S1, O06, O07-S2** (io-v1.6): prepare PREPARED, compile FROZEN, cổng κ đạt. Admission ADMITTED, nhưng contract của
+  consumer báo `EGO:A LATERAL_LENGTH_INVALID`, nên runner **không chạy A/B**: không có thư mục `run`, P5 chưa tốn.
+  - Nguyên nhân: m56-v12 `response.py` 1490 yêu cầu `length_m == 3 * nominal`, tức Dlc = 3·vE của spec 7.4. Contract này nằm trong
+    đường đánh giá của consumer (`evidence._lateral_integrity` gọi `_lateral_contract`).
+  - Như vậy sàn Dlc_eff = max(3·vE, 18 m) của io-v1.6 đòi **đổi luật consumer**, và việc đó nằm ngoài phạm vi người dùng đã duyệt
+    ("không gồm luật consumer").
+  - **Lỗi của Claude:** mục 3b của io-v1.6 ghi "kiểm offline builder", nhưng lần kiểm đó không chạy contract của consumer trên
+    response mới, nên không bắt được lỗi này trước khi chạy native.
+- **O08-S2** (io-v1.5): probe dài chạy được, ready 10,65 s sau settle (≤ 14 s). Revision builder chặn với `BLOCKED_FIXTURE
+  IO_LANE_SEPARATION_MISMATCH`.
+  - Khoảng cách làn đo trên trục thế giới tại O_DECISION là 3,2494 m, làm tròn mm ra 3,249. Profile A cần đúng 3,25 (13/4).
+  - Lý do: road 1432 lệch trục 0,75° (spec cho phép tới 1°), và hai route lệch nhau 0,05 m theo arc.
+  - Theo io-v1.5 §3, O08 ghi **FAILED dưới io-v1.5**. Dưới io-v1.4 thì đã là `BLOCKED_FIXTURE EGO_NOT_AT_DECISION_IN_PROBE1`.
+- Bổ sung cho gate G (việc phải làm trước mọi successor I/O mới): kiểm `length == 3·nominal` (contract consumer) và khoảng cách làn
+  làm tròn mm tại decision. Phép làm tròn giữ nguyên.
