@@ -43,7 +43,7 @@ for spec in $1; do
     $PY -I -X utf8 asel2-io16-kappa-gate.py $C/$s > $LOG/kappa-$s.log 2>&1 || { echo "$s: io-v1.6 2b LANE_CHANGE_CURVATURE (no A/B)"; cat $LOG/kappa-$s.log; continue; }
     while tasklist | grep -qi CarlaUE4; do sleep 15; done
     M56_IO_KAPPA=pointwise M56_IO_PREREG_APPROVED=34bd4d8 M56_RUN_TAG=asel2 \
-      M56_AB_AUTHORITY="[chat] 2026-11-08 Duy (self-stated): spec addendum A-SEL2 (9fa85f8); fill v4 prereg 03fb2ca + addenda A ddce811, B 34bd4d8; one A/B per scene (P5); recipes io-v1.5 62593d9 + io-v1.6 30462c3/093239d + io-i-v1.2 52fc169 + addendum H ADDH approved by the session user [chat] 2026-11-15" \
+      M56_AB_AUTHORITY="[chat] 2026-11-08 Duy (self-stated): spec addendum A-SEL2 (9fa85f8); fill v4 prereg 03fb2ca + addenda A ddce811, B 34bd4d8; one A/B per scene (P5); recipes io-v1.5 62593d9 + io-v1.6 30462c3/093239d + io-i-v1.2 52fc169 + addendum H 77e262a approved by the session user [chat] 2026-11-15" \
       timeout 3000 $PY -I -X utf8 native-io-ab-i12.py $REVF $t $s --ab > $LOG/ab-$s.log 2>&1
     D=$(done_path $LOG/ab-$s.log)
     grep -a '"event": "IO_I12_GATES"' $LOG/ab-$s.log | cut -c1-600
