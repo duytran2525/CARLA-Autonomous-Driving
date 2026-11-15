@@ -122,33 +122,25 @@ from m56.model import CatalogAudit
 audit = CatalogAudit(component.counts, component.towns, component.sites, component.comparisons,
                      tuple(d for d in component.deficits if d != 'RELEASE_EVIDENCE_REQUIRED'), 'COMPONENT_AUDITED')
 evidence = ()
-if FULL:  # 2. EligibilityRecord per delivered scene: same steps as native-v6-pair.pair_scene, under the release product
-    from m56.evidence import open_run, append_record, seal, snapshot_sources
-    from m56.metrics import compare_ab, evaluate_episode, _ab_review_subject
-    from m56.model import EligibilityRecord, load_json
-    ps = importlib.util.spec_from_file_location('pairmod', here / 'native-v6-pair.py'); pm = importlib.util.module_from_spec(ps)
-    ps.loader.exec_module(pm)
-    elig = []
-    for c, p in delivered:
-        sd = Path(p['source_scene_dir']); dest = OUT / 'elig' / c.id; dest.mkdir(parents=True)
-        try:
-            fixture = decode_record('CompiledFixture', load_json(sd / 'fixture-frozen.json'))
-            (a, auth_a, _), (b, auth_b, _) = pm.evidence(sd, 'A', dest, fixture), pm.evidence(sd, 'B', dest, fixture)
-            va, vb = evaluate_episode(a, fixture), evaluate_episode(b, fixture)
-            pair = fixture.pair
-            left, right = (tuple(v.metrics[n] for n in pair.names) for v in (va, vb))
-            refs = tuple(r for e in (a, b) for r in (e.fixture, e.manifest, *e.journal, e.integrity['trajectory_ref']))
-            review = ReviewRecord(_digest(_ab_review_subject(a, b, pair, left, right)), 'REALIZED_AB_COMPARABILITY_D09',
-                                  tuple(dict.fromkeys(refs)), REVIEWER, now()[:10], 'APPROVED',
-                                  tuple(f'{k}: automated consumer checks on both sealed episodes; {LABEL}' for k in pm.AREAS), auth_a)
-            bundle = open_run(dest / 'd09', 'd09', 'm56-claude'); append_record(bundle, 'review.json', review)
-            snapshot_sources(bundle, (*review.refs, auth_a)); seal(bundle)
-            verdict = compare_ab(a, b, pair, review)
-            elig.append(EligibilityRecord(c.id, verdict, (a.fixture, b.fixture), (review,), (a.manifest, b.manifest)))
-            rows.append({'id': c.id, 'eligibility': verdict.status})
-        except Exception as e:  # recorded; the AB_PROOF deficit then names the scene
-            rows.append({'id': c.id, 'eligibility_error': repr(e)[:300]})
-    evidence = tuple(elig)
+if FULL:  # 2. EligibilityRecord per delivered scene (asel2-elig-one.py), one process per scene so its RAM is returned
+    import subprocess
+    from m56.model import load_json
+    first = next((a.split('=', 1)[1].split(',') for a in sys.argv if a.startswith('--first=')), [])
+    got = {}
+    for c, p in sorted(delivered, key=lambda cp: cp[0].id not in first):  # --first=ID,.. only changes the run order
+        dest = OUT / 'elig' / c.id
+        r = subprocess.run([sys.executable, '-I', '-X', 'utf8', str(here / 'asel2-elig-one.py'), p['source_scene_dir'], c.id,
+                            str(dest)], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        if r.returncode == 0:
+            got[c.id] = decode_record('EligibilityRecord', load_json(dest / 'eligibility-record.json'))
+            print(r.stdout.strip(), flush=True)
+        else:  # recorded; the AB_PROOF deficit then names the scene
+            got[c.id] = (r.stderr.strip().splitlines() or [f'exit {r.returncode}'])[-1][:300]
+            print(json.dumps({'id': c.id, 'eligibility_error': got[c.id]}), flush=True)
+    for c, _ in delivered:  # rows and evidence keep the delivered order
+        g = got[c.id]
+        rows.append({'id': c.id, 'eligibility_error': g} if isinstance(g, str) else {'id': c.id, 'eligibility': g.AB.status})
+    evidence = tuple(got[c.id] for c, _ in delivered if not isinstance(got[c.id], str))
 summary = summarize(delivered_rev, audit, evidence)
 exported = None
 if not summary['deficits']:  # 5. export only without any deficit (never forced)
