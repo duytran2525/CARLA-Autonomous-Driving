@@ -45,6 +45,18 @@
 - Một revision. Hỏng dưới io-v1.6 thì ghi FAILED, không chỉnh 18 m / 0,4 / ngưỡng.
 - Báo O05/O06/O07 dưới io-v1.4 (kết quả cũ) và io-v1.6.
 
+## 2b. Thay cổng 2.4 (15/11, trước mọi bước native, chưa có số mới)
+
+- Cổng steer ở 2.4 **không chạy được ở prepare**. Chương trình EGO A thật cần các guard sự kiện (TRIGGER, LANE_CHANGE_PATH_CLEAR, …),
+  mà guard chỉ có sau compile, trong runner A/B. Chạy chương trình đó thì thực chất đã là episode A. Vì vậy 2.4 **bị thay** bằng
+  cổng dự báo offline trên fixture đã compile:
+  - κ_max = (10/√3) · |offset| / Dlc_eff², đây là độ cong lớn nhất của quintic dịch ngang;
+  - yêu cầu **κ_max ≤ 0,0624**, đúng giá trị của O01 (PASS, κ lớn nhất trong O01–O03).
+  - Fixture đã niêm cho κ: O01 0,0624, O02 0,0399, O03 0,0255 (PASS); O05-S1 0,0905, O07-S1 0,1414, O06 0,2379 (hỏng).
+- Dưới io-v1.6, mọi candidate I/O có κ_max ≤ 0,0624: O05-S1 0,0579, O06 0,0624, O07-S2 0,0579, O08-S2 0,0062, O04-S2 0,0152. Với
+  offset ≤ 3,5 m thì sàn 18 m tự đảm bảo cổng này. Vì vậy cổng chủ yếu là **kiểm tra lại**, không phải bộ lọc mới.
+- Điều này nằm trong ghi chú rủi ro: "độ cong quyết định steer bão hòa" là **nhận định của Claude**. A/B mới là kiểm chứng.
+
 ## 3b. Kiểm offline builder (15/11, trước mọi bước native)
 
 - `native-v5-revision-io16.py` chỉ thay dòng `dlc = 3 * vE` của `catalog-recipes.io_recipe` khi gọi `asel2_io`. Lần đầu áp cho cả

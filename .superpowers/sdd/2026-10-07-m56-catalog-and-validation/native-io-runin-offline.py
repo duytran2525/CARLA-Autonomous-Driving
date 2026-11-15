@@ -18,7 +18,15 @@ body = [n for n in tree.body if (getattr(n, 'name', None) in NAMES) or
         (isinstance(n, ast.Assign) and any(getattr(t, 'id', None) in NAMES for t in n.targets))]
 assert {getattr(n, 'name', None) or n.targets[0].id for n in body} == NAMES, 'EXTRACT'
 ns = {'math': math, '_step': _step, '_wp_row': _wp_row, '__builtins__': __builtins__}
-exec(compile(ast.Module(body=body, type_ignores=[]), str(SRC), 'exec'), ns)
+code = compile(ast.Module(body=body, type_ignores=[]), str(SRC), 'exec')
+import os  # noqa: E402
+if os.environ.get('M56_IO_RECIPE') == 'io-v1.6':  # io-v1.6: frozen lane-change length is Dlc_eff = max(3 vE, 18 m)
+    OLD_A = "assert seg['length_m'] == 3 * p['vE'], (seg['length_m'], p['vE'])"
+    NEW_A = "assert seg['length_m'] == max(3 * p['vE'], 18), (seg['length_m'], p['vE'])"
+    src16 = ast.unparse(ast.Module(body=body, type_ignores=[]))
+    assert src16.count(OLD_A) == 1, 'IO16_ASSERT_SITE'
+    code = compile(src16.replace(OLD_A, NEW_A), str(SRC) + ' [io-v1.6]', 'exec')
+exec(code, ns)
 # constants of _prepare_o, read from the same source (asserted, not copied)
 consts = {t.id: ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) for t in n.targets
           if getattr(t, 'id', None) in ('RUNIN_M', 'EGO_TAIL_M')}
