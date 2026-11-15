@@ -37,6 +37,11 @@ Chỉ prepare và compile; consumer và ngưỡng không đổi.
    product, nên phải làm trong worktree mới `m56-v15`, có test riêng, và chạy full suite trên byte cuối trước khi dùng.
    **Chưa làm hôm nay.** Khi chưa có v15, cảnh I nào có G1–G3 đạt mà A vẫn có rủi ro này thì ghi rõ trong báo cáo.
 
+5. **Sàn Dlc (bổ sung trước mọi bước native, 15/11):** profile đổi làn của EGO B ở I dùng **Dlc_eff = max(3·vE, 18 m)** và
+   cổng `LANE_CHANGE_UNSTABLE` trong probe 3, theo io-v1.6 (`PREREG_M56_IO_RECIPE_V1_6_DLC_FLOOR_20261115.md`). Bằng chứng nằm ở
+   O; ở I chỉ có I07-S1 với max |steer| 0,52 ở Dlc 11,52, còn I05/I06 có B chưa kịp đổi làn. Lý do được thêm sau 52fc169 nhưng trước
+   mọi số mới của I.
+
 ## 3. Phạm vi, P5, luật dừng
 
 - Dưới version mới (io-i-v1.2), P5 cho phép **một A/B mỗi cảnh**. Chạy lại chính cảnh nào và chạy successor B3 cho cảnh nào được
