@@ -725,3 +725,15 @@ Nguồn [repo]: `outputs/m56_asel2_repl6b.stdout.txt`, `m56_asel2_repl7.stdout.t
   - Theo io-v1.5 §3, O08 ghi **FAILED dưới io-v1.5**. Dưới io-v1.4 thì đã là `BLOCKED_FIXTURE EGO_NOT_AT_DECISION_IN_PROBE1`.
 - Bổ sung cho gate G (việc phải làm trước mọi successor I/O mới): kiểm `length == 3·nominal` (contract consumer) và khoảng cách làn
   làm tròn mm tại decision. Phép làm tròn giữ nguyên.
+
+
+## 15/11 tối: quyết định của người dùng về recipe I và luật 3·vE
+
+Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
+- **I02-S2:** "Giữ lại, chưa chạy". Cảnh không tiêu P5 dưới io-i-v1.2 và chờ một recipe sửa được mốc đổi làn của B.
+- **I01-S1:** "Chạy ngay": prepare + compile + probe 3 (addendum H). Nếu G1/G2/G3 đều đạt thì chạy A/B theo luật đã duyệt.
+- **Luật consumer length = 3·vE:** chọn "Duy duyệt đổi (v15)". Theo câu trả lời, người chọn tự xưng là Duy. Nội dung: làm consumer
+  m56-v15 chấp nhận Dlc = max(3·vE, 18 m), có prereg, test và full suite trước khi chạy, và báo kết quả dưới cả hai luật.
+  - Đây là đổi luật consumer **sau khi thấy số** (nguyên tắc 6). Luật cũ (spec 7.4, Dlc = 3·vE) giữ nguyên văn. Mọi kết quả của
+    O05/O06/O07 và I05–I07 phải báo dưới cả luật cũ lẫn luật mới.
+  - Claude không kiểm được danh tính người chat (máy dùng chung). Thẩm quyền được ghi theo lời tự xưng.
