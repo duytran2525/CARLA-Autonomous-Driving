@@ -670,3 +670,29 @@ Claude quyết dưới ủy quyền của Duy, theo yêu cầu của người d�
   - nêu rõ chạy lại chính cảnh đó dưới version mới hay dùng successor B3.
 - Thứ tự: chẩn đoán và prereg làm trước, offline. Code chỉ viết trong file mới hoặc worktree mới. Bước native chỉ chạy sau `REPL7_END`.
   Các file mà batch đang xếp hàng sẽ nạp được giữ đóng băng tới lúc đó.
+## 15/11 chiều: recipe mới (người dùng duyệt), làm offline, xếp hàng native
+
+- **Sửa RAM release đã được kiểm:** O02 và O03 đều PASS. Process cha đứng yên ở 1,59 GB qua 10 cảnh (trước đây tăng khoảng 1 GB mỗi cảnh).
+- **io-v1.5** (62593d9): probe chuẩn bị dài 60 s cho I/O, áp nguyên văn luật cl-v1 b. Cổng ready ≤ 14 s. Dùng cho O08-S2: EGO ở arc
+  192,3 m tại frame 320, còn thiếu 3,8 m mới tới ga quyết định 196,07.
+- **io-v1.6** (30462c3, 7ab7cec, 093239d): Dlc_eff = max(3·vE, 18 m). Đây là lệch khỏi spec 7.4, đã ghi rõ.
+  - Bằng chứng: O05-S1, O07-S1 và O06 đều có steer 0,8 (full lock), arc lùi 40–52 lần, Dlc ≤ 14,4. O01–O03 có steer 0,12.
+  - Builder 
+ative-v5-revision-io16.py chỉ áp io-v1.6 trong sel2_io. Bản rebuild v1 đã được assert là byte-giống.
+  - So offline với bản không patch: chỉ 5 candidate có vE < 6 thay đổi. O07-S1 bị WINDOW_TOO_SHORT nên dùng successor B3:
+    replacement 8, adca3630, **O07-S2 Town12 R148**, ROUTES_OK.
+  - Cổng 2.4 (steer trong prepare) không chạy được vì cần guard của runner A/B. Nó được thay, trước mọi bước native, bằng κ_max ≤ 0,0624
+    (giá trị của O01). Trên fixture đã niêm: O01 qua, O05-S1 trượt (0,0905).
+  - Wrapper prepare 
+ative-io-prepare-v16.py có self-test offline: 3 trường hợp đều OK.
+- **io-i-v1.2** (52fc169 + bổ sung sàn Dlc): đã chẩn đoán I01, I02, I05, I06, I07.
+  - Probe 3 chẵn với A/B, đuôi X = 2L + 10, cổng làn nguồn trống ≤ 2,3 s.
+  - Guard tiếp tục của A cần **product v15**.
+  - **Chưa code**, nên các cảnh I chưa xếp hàng.
+- **F05/F06:** consumer v14 phần 2 chưa làm (hiệu chỉnh dừng native, history refs, proof). Ước lượng 2–3 ngày.
+  **F03/F04:** cần erratum C0 cho tham số mechanism. Chưa làm.
+- **Hàng đợi native** (đều chờ file HOLD, file này được nhả khi suite 11 xong):
+  1. `m56_asel2_repl6b`: C07-S2, L08-S2.
+  2. `m56_asel2_repl7`: O04-S2.
+  3. `m56_asel2_io16` (696ea72): O05-S1, O06, O07-S2, O08-S2.
+- **Ngân sách B3:** 44/150.
