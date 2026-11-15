@@ -94,7 +94,7 @@ def test_npc_cut_in_uses_its_own_parallel_reference_and_three_second_scale(requi
     program={'method':'ordered-event-program-v1','initial':'NOMINAL','transitions':(
         {'cause':'NPC_TARGET','after_event':'NPC_TARGET_LANE_CONFIRMED','delay_s':F(0),'requires':('REFERENCE_MARKER:NPC:NPC_TARGET',)},)}
     response=replace(r,actor_role='NPC',action_id='NPC_COMMON',route=initial,targets={'NOMINAL':F(5),'NPC_TARGET':F(5)},
-        profile=c.profile(10,15,0,3),phases={'program':program,'reference_switches':(
+        profile=c.profile(7,18,0,3),phases={'program':program,'reference_switches':(
             {'cause':'NPC_TARGET','event':'NPC_TARGET_LANE_CONFIRMED','marker_arc_m':F(25),'route':target,'profile':c.profile(25,1,0,0)},)})
     c.fixture.domain.topology['npc_regions']={'NPC_INITIAL':tuple(product((-1.,101.),(-4.25,-1.75),(-1.,1.))),
                                             'NPC_TARGET':c.regions['EGO_INITIAL']}

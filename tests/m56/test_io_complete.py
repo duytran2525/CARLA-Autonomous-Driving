@@ -37,7 +37,7 @@ def _complete_i(root,action='B',shared_geometry=None):
             'initial':'SETTLE','transitions':(row('NOMINAL','CAPTURE_START',delay=F(21,20)),
                 row('STOP','TRIGGER'),row('RESUME','SOURCE_CLEAR_CONFIRMED',('STOP_AFTER_TRIGGER','NPC_TARGET_LANE_CONFIRMED')))}})
     ego=ego_a if action=='A' else ego_b
-    npc=FrozenResponse('NPC','NPC_COMMON',routes['NPC'],{'SETTLE':F(0),'NOMINAL':F(5),'NPC_TARGET':F(5)},profile(F(35,2),15,0,3),
+    npc=FrozenResponse('NPC','NPC_COMMON',routes['NPC'],{'SETTLE':F(0),'NOMINAL':F(5),'NPC_TARGET':F(5)},profile(F(29,2),18,0,3),
         {'category':'I','program':{'method':'ordered-event-program-v1','initial':'SETTLE','transitions':(
             row('NOMINAL','CAPTURE_START',delay=F(21,20)),row('NPC_TARGET','NPC_TARGET_LANE_CONFIRMED',('REFERENCE_MARKER:NPC:NPC_TARGET',)))},
          'reference_switches':({'cause':'NPC_TARGET','event':'NPC_TARGET_LANE_CONFIRMED','marker_arc_m':F(65,2),'route':route(0.),'profile':profile(F(65,2),1,0,0)},)},'c'*64)
