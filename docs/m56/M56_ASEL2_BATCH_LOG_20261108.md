@@ -765,3 +765,12 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - `m56_asel2_i12.stdout.launch1-server-died.txt`.
 - 12:50Z: chạy lại cùng script, cùng byte, từ shell nền của phiên. CARLA chạy bình thường. Đây không phải revision mới của recipe:
   lần đầu không tạo ra số đo nào.
+## 15/11 tối (4): I01-S1 được giữ trước A/B; G4 sai chẩn đoán
+
+- Addendum I (`PREREG_M56_IO_I_RECIPE_V1_2_ADDENDUM_I_NPC_LANE_CHANGE_20261115.md`): NPC đánh lái hết cỡ (0,8) ở I05-S1, I06,
+  I07-S1. Đoạn đổi làn của NPC là 3·vN = 11,4 / 6,2 / 8,5 m, κ ≥ 0,155. Ở I05 và I06, NPC va vào map. NPC sạch (≤ 0,12) ở I02-S2,
+  I03, I04, nơi κ ≤ 0,049.
+- NPC của I01-S1 có κ = 0,0834 > 0,0624. Claude đã dừng hai process bash của batch khi batch còn ở prepare: không compile, không
+  probe 3, không A/B, P5 chưa tốn. Prepare chạy nốt và tự tắt server.
+- G4 không được dựng. v15 (sàn Dlc cho EGO) không giúp các cảnh I tốc độ thấp. Chờ người dùng chọn: sàn NPC, cổng NPC trong probe 3,
+  hoặc giữ cảnh.
