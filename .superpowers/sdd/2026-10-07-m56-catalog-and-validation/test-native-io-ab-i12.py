@@ -13,7 +13,10 @@ sys.argv = [str(here / 'native-io-ab-i12.py'), rev, 'ImportTest', 'M56-P-X']
 s = importlib.util.spec_from_file_location('i12', here / 'native-io-ab-i12.py')
 I = importlib.util.module_from_spec(s); s.loader.exec_module(I)
 rt = I.runtime
-assert rt.run_ab is I.run_ab_i12 and rt._known_events is I._known_hook
+assert rt._known_events is I._known_hook and 'probe 3' in I.A.run_scene.__code__.co_filename
+src = I.A._I12_RUN_SCENE_SRC
+k = [src.index(x) for x in ("sd / 'probe3'", "_i12_probe3(ctx, backend", "sd / 'run'", "runtime.run_ab(")]
+assert k == sorted(k) and src.count('Kit(authority') == 2 and src.count('runtime.bind_owned(ctx)') == 2, k
 I.A.world_vertices = lambda body, pose: body.vertices   # synthetic frames below give world vertices directly
 
 BOX = [(F(0), F(0), F(-1)), (F(10), F(0), F(-1)), (F(10), F(3), F(3)), (F(0), F(3), F(3))]   # source lane: y in [0, 3]

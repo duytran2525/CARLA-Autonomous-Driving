@@ -1,6 +1,7 @@
 """native-io-ab.py under io-i-v1.2 for category-I scenes (PREREG_M56_IO_I_RECIPE_V1_2_20261115.md + addendum H,
 PREREG_M56_IO_I_RECIPE_V1_2_ADDENDUM_H_PROBE3_20261115.md). native-io-ab.py is loaded as a module and NOT edited.
-With --ab, before the one A/B (P5) of a scene, on the SAME compiled fixture, backend and server:
+With --ab, before the one A/B (P5) of a scene, on the SAME compiled fixture and server, with its OWN store, owned backend
+and Kit (built by the same setup lines as the A/B, recompiled from run_scene's bytes):
   G2  fixture check: DESTINATION - X >= L + 10 m (L = EGO body length)              else IO_I12_TAIL_SHORT
   probe 3: the product's own runtime.run_episode, action A, in <scene>/probe3 (never <scene>/run, never fed to a consumer),
       truncated by one stop rule (addendum H): stop at the first frame with t_clear seen, or > TRIGGER + 2.3 s, or
@@ -8,12 +9,12 @@ With --ab, before the one A/B (P5) of a scene, on the SAME compiled fixture, bac
   G1  ready - first frame <= 14.0 s (runner's own _ready predicate, replayed on the same frames)  else READINESS_PROBE3
   G3  t_clear - TRIGGER <= 2.3 s; t_clear = first frame >= TRIGGER with every NPC bbox vertex outside the fixture's
       EGO_TARGET lane box (the source lane)                                         else SOURCE_CLEAR_LATE
-Any gate failing: BLOCKED_FIXTURE, no A/B (P5 unspent). All gates pass: the unchanged runtime.run_ab.
+Any gate failing: BLOCKED_FIXTURE, no A/B (P5 unspent). All gates pass: run_scene's own A/B block, unchanged.
   python -I native-io-ab-i12.py REVISION.json TOWN ID[,ID...] --ab   (same env as native-io-ab.py)"""
-import importlib.util, json
+import ast, importlib.util, json
+from dataclasses import replace
 from fractions import Fraction as F
 from pathlib import Path
-from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('ioab', HERE / 'native-io-ab.py')
@@ -98,9 +99,6 @@ def _known_hook(frames, fixture):
 
 
 runtime._known_events = _known_hook
-_run_ab = runtime.run_ab
-
-
 def tail_check(fixture, sd):
     """L = 2 x the native EGO body half-length (the a2-bbox.json compile wrote, as prepare's L)."""
     ext = json.loads((sd / 'a2-bbox.json').read_text(encoding='utf-8'))['extent'][0]
@@ -109,35 +107,47 @@ def tail_check(fixture, sd):
     return {'destination_minus_x_m': str(room), 'L_m': float(L), 'pass': room >= L + TAIL_EXTRA_M}
 
 
-def run_ab_i12(context, fixture, scene):
-    sd = Path(context.store.root).parent
+def _i12_probe3(ctx, backend, fixture, scene, sd):
+    """Called from the recompiled run_scene with the probe-3 context/backend (own store <scene>/probe3, own owned backend,
+    own Kit: nothing it caches is shared with the A/B backend). True = all gates pass, run the A/B."""
     out = {'scene': scene, 'recipe': 'io-i-v1.2 + addendum H (native-io-ab-i12.py)'}
     if fixture.domain.topology.get('category') != 'I':
-        out.update(status='NOT_CATEGORY_I'); A.log(event='IO_I12_GATES', **out)
-        return SimpleNamespace(blocked=('IO_I12_NOT_CATEGORY_I',))
-    out['G2'] = tail_check(fixture, sd)
-    if out['G2']['pass']:
-        store = open_run(sd / 'probe3', context.store.run_id, context.store.writer)
+        reasons = ['IO_I12_NOT_CATEGORY_I']
+    else:
+        out['G2'] = tail_check(fixture, sd)
+        reasons = [] if out['G2']['pass'] else ['IO_I12_TAIL_SHORT']
+    if not reasons:
         p = PROBE['p'] = Probe(fixture); old = runtime.VALIDATION_S
         try:
-            runtime.run_episode(runtime._with(context, store=store), fixture, 'A')
+            runtime.run_episode(replace(ctx, backend=backend), fixture, 'A')
         finally:
             PROBE['p'] = None; runtime.VALIDATION_S = old
         out['probe3'] = p.gates()
-        stop = store.root / 'runner/stop.json'
+        stop = ctx.store.root / 'runner/stop.json'
         out['probe3']['runner_stop'] = stop.read_text(encoding='utf-8').splitlines()[-1] if stop.exists() else None
         reasons = out['probe3']['reasons']
-    else:
-        reasons = ['IO_I12_TAIL_SHORT']
     out.update(status='PASS' if not reasons else 'BLOCKED_FIXTURE', reasons=reasons)
     (sd / 'io-i12-gates.json').write_text(json.dumps(out, indent=1, default=str), encoding='utf-8')
     A.log(event='IO_I12_GATES', **out)
-    if reasons:
-        return SimpleNamespace(blocked=tuple(reasons))
-    return _run_ab(context, fixture, scene)
+    return not reasons
 
 
-runtime.run_ab = run_ab_i12
+# run_scene recompiled from native-io-ab.py's own bytes: its A/B setup block (run store, owned backend, Kit, plan source,
+# policy bind) is inserted once more BEFORE itself with the namespace renamed to probe3, followed by the gate call.
+_src = (HERE / 'native-io-ab.py').read_text(encoding='utf-8')
+_fn = next(n for n in ast.parse(_src).body if isinstance(n, ast.FunctionDef) and n.name == 'run_scene')
+_seg = ''.join(_src.splitlines(keepends=True)[_fn.lineno - 1:_fn.end_lineno])
+START = "    store = open_run(sd / 'run', c.id, own.writer)\n"
+END = "    out = runtime.run_ab(replace(ctx, backend=backend), fixture, c.id)\n"
+assert _seg.count(START) == 1 and _seg.count(END) == 1, 'I12_RUN_SCENE_SITE'
+_a, _b = _seg.index(START), _seg.index(END)
+_block = _seg[_a:_b]
+assert _block.count("sd / 'run'") == 1 and _block.count("sd / 'plan-source.json'") == 1, 'I12_BLOCK_SITE'
+_probe = (_block.replace("sd / 'run'", "sd / 'probe3'").replace("sd / 'plan-source.json'", "sd / 'probe3-plan-source.json'")
+          + "    if not _i12_probe3(ctx, backend, fixture, c.id, sd):  # io-i-v1.2 addendum H\n        return\n")
+A._i12_probe3 = _i12_probe3
+A._I12_RUN_SCENE_SRC = _seg[:_a] + _probe + _seg[_a:]
+exec(compile(A._I12_RUN_SCENE_SRC, str(HERE / 'native-io-ab.py') + ' [io-i-v1.2 probe 3]', 'exec'), A.__dict__)
 
 if __name__ == '__main__':
     A.main()

@@ -18,8 +18,11 @@ io-i-v1.2 mục 2.1 đặt probe 3 trong prepare, chạy bằng "đúng chương
 vì cùng lý do với io-v1.6 §2b: chương trình A/B thật cần các guard sự kiện (TRIGGER, SOURCE_CLEAR_CONFIRMED, …). Các guard đó chỉ tồn
 tại sau compile, khi runner A/B đã được bind với fixture. Vì vậy:
 
-- **Probe 3 chạy sau compile và trước A/B, trong cùng process A/B.** Nó dùng cùng fixture đã niêm, cùng backend và cùng server.
-  Nhờ vậy A/B chạy đúng trên fixture mà probe 3 đã kiểm.
+- **Probe 3 chạy sau compile và trước A/B, trong cùng process A/B.** Nó dùng cùng fixture đã niêm và cùng server. Nhờ vậy A/B chạy
+  đúng trên fixture mà probe 3 đã kiểm.
+- Probe 3 có **store, owned backend và Kit riêng**. Chúng được dựng bằng đúng các dòng setup A/B của `run_scene`, biên dịch lại từ
+  byte của nó, chỉ đổi namespace thành `probe3`. Lý do: backend ghi raw native vào store mà nó được bind, và cache plan ref, recipe
+  của kit, body giữa các episode. Nếu dùng chung backend, A/B sẽ trích file nằm trong `probe3`.
 - Probe 3 gọi **chính `runtime.run_episode` của product** với action A. Không viết lại vòng lặp runner, vì một bản chép có thể lệch
   khỏi runner, và "probe không đại diện cho A/B" chính là lỗi I01.
 
@@ -94,6 +97,16 @@ bản nháp đầu đã dùng nhầm chúng.
   - Giả định của io-i-v1.2 §2.3 ("còn biên 1 s") không đúng với I02-S2.
   - Nếu chạy đúng như đã viết, I02-S2 sẽ tiêu A/B duy nhất của nó, và B nhiều khả năng hỏng lại như cũ.
 - Đổi định nghĩa hay ngưỡng của G3 lúc này là đổi cổng sau khi thấy số. Việc đó cần người dùng quyết; addendum này không làm.
+- **I02-S2 B: nguồn trống muộn, không phải không bao giờ.** Trên B đã niêm, biên nhỏ nhất của body NPC qua ranh `I_SOURCE_BOUNDARY`
+  tăng dần: −2,27 m lúc TRIGGER, 0,00 m ở 2,0 s, 0,48 m ở 3,0 s. Suốt thời gian đó `route_valid` và corridor đều đúng, và độ bất
+  định là 0,001.
+  - Product cần biên ≥ 0,5 m và giữ 0,25 s. Ngoại suy (nhận định): khoảng 3,45 s sau TRIGGER mới có sự kiện, trong khi B dừng ở
+    guard khoảng 3,1 s.
+  - Vậy lỗi là chênh thời gian khoảng 0,35 s. io-i-v1.2 không đổi gì làm dịch mốc đổi làn của B.
+- **Kiểm `Probe` thật trên frame đã niêm** (`asel2-i12-probe-replay.py`, kết quả trong `outputs/m56_asel2_i12_probe_replay_20261115.txt`):
+  - I04 B: ready 7,45 s, t_clear − TRIGGER = 1,45 s, dừng `T_CLEAR_SEEN`;
+  - I02-S2 B: 6,90 s, 2,05 s, `T_CLEAR_SEEN`.
+  - Khớp script dự báo trong một frame (0,05 s): replay dùng mốc boundary của runner, dự báo dùng frame đầu.
 
 ## 5. Cách làm
 

@@ -1,0 +1,2 @@
+M56-P-I04 B stop T_CLEAR_SEEN at 17.35 {'pass': True, 'reasons': [], 'ready_after_first_frame_s': '149/20', 't_clear_minus_trigger_s': '29/20'} trigger_from_first 15.9
+M56-P-I02-S2 B stop T_CLEAR_SEEN at 17.25 {'pass': True, 'reasons': [], 'ready_after_first_frame_s': '69/10', 't_clear_minus_trigger_s': '41/20'} trigger_from_first 15.2
