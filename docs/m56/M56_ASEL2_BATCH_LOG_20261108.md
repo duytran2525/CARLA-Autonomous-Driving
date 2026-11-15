@@ -774,3 +774,20 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   probe 3, không A/B, P5 chưa tốn. Prepare chạy nốt và tự tắt server.
 - G4 không được dựng. v15 (sàn Dlc cho EGO) không giúp các cảnh I tốc độ thấp. Chờ người dùng chọn: sàn NPC, cổng NPC trong probe 3,
   hoặc giữ cảnh.
+## 15/11 tối (5): sàn NPC (addendum J), v15 hoàn chỉnh, suite 12, hàng đợi v15
+
+- Người dùng phiên này [chat] chọn "Sàn Dlc cho NPC". Addendum J (`PREREG_M56_NPC_DLC_FLOOR_ADDENDUM_J_20261115.md`): NPC cut-in
+  max(3·vN, 18 m) ở prepare (`native-io-prepare-i12j.py`) và ở consumer v15.
+  - v15 = v13 + ff9f1f2 + c218f2f. Đã cherry-pick vào `feat/m56-v1` (bd6bf83, ab586bf).
+- Kiểm contract dưới v15 (`outputs/m56_v15j_contract_acceptance_20261115.jsonl`):
+  - I03, I04, I02-S2, O01: OK.
+  - O05-S1, O06, O07-S2: OK.
+  - Fixture I01-S1 cũ (NPC 15 m): `NPC LATERAL_LENGTH_INVALID`, đúng như kỳ vọng. Fixture này phải dựng lại bằng i12j.
+- Prepare cũ của I01-S1 (io-i-v1.2 G2, trước sàn NPC) chạy tới cuối: PREPARED, server tự tắt. Nó không được dùng, vì batch đã dừng
+  trước revision/compile. Kết quả chỉ cho thấy readiness và đuôi G2 đạt ở site này.
+- Full suite 12 (`m56-full-suite-12-20261115`) bắt đầu trên byte v15. Hàng đợi `run-asel2-v15-queue.sh`
+  (`outputs/m56_asel2_v15q.stdout.txt`) chờ suite 12 `CHAIN_PASSED`, rồi chạy:
+  - I01-S1 (i12j);
+  - O05-S1, O06, O07-S2 (io16), với M56_CODE = m56-v15.
+  - Suite không đạt thì không chạy gì.
+- Pair luật cũ (m56-v12) sẽ chạy tay sau, vì là offline: pair không tốn P5.
