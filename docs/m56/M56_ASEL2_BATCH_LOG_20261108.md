@@ -811,3 +811,12 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - Người dùng phiên này [chat] 15/11 chọn "Hạ I04, làm successor". Progress doc: I04 chuyển từ PASS sang
   `FIXTURE_GAP_NOT_REALISED`. Release 21/21 eligibility của --full2 vẫn đếm I04; lần release sau phải bỏ I04 khỏi danh sách PASS.
   Successor I04 chờ recipe sửa cách đặt NPC (cho NPC xuất phát trên road trước road site, hoặc đòi chỗ lùi ở cổng site offline).
+- **Cách ghi khi cổng L chặn (đặt trước mọi số của O04-S3, O08-S3 và các cảnh I sau):** cảnh bị `GAP_NOT_REALISED` hoặc
+  `GAP_UNKNOWN` thì không tốn A/B (P5 chưa dùng), slot không bị ghi FAILED. Ghi là `FIXTURE_GAP_NOT_REALISED`. Được prepare lại
+  dưới cách đặt NPC đã sửa (recipe mới). Câu "Hỏng thì FAILED, không chỉnh thêm" của addendum K chỉ áp cho A/B đã chạy.
+- O08-S2: điểm xuất phát NPC đúng ở `rows[0]` của route probe 1. Shift cần −63,35 m, nhưng route NPC chỉ có 60 m phía sau
+  (`NPC_BACK_M`), nên lệch 3,25 m. Đây là giới hạn chỗ lùi, không phải kẹp đầu road. O08-S3 có cùng vE, vN, gap nên rất có thể bị
+  cổng L chặn. O04 cũ lệch −0,42 m, sát ngưỡng 0,5 m.
+- `native-io-prepare-i13.py` (io-i-v1.3 a, bản nháp bf78050): đặt NPC của cảnh I theo arc, không kẹp ở đầu road site. Tự kiểm
+  offline: NPC lùi đúng |shift| (I04 33,4; I02-S2 19,6; I05-S1 6,6; I01-S1 15,2 m). Ở I04, I02-S2, I01-S1, NPC sẽ xuất phát trên
+  đoạn nối trong nút giao. Chưa gắn vào script chạy nào. Lần dùng native đầu tiên sẽ chỉ là prepare I01-S1 (không A/B).
