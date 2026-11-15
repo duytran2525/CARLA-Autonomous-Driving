@@ -656,3 +656,17 @@ Claude quyết dưới ủy quyền của Duy, theo yêu cầu của người d�
   - F03–F06 (decode hoặc capability);
   - O04/O08 (chưa kiểm cổng run-in thẳng của generator O; để sau C/L).
 - Ghi chú: revision release (`run-asel2-release-revision.sh`) dùng replacement 1–4, thiếu replacement 5. Vì vậy M06-S2 (BLOCKED_WITNESS, đã A/B) không có trong rows của release. Không ảnh hưởng delivered.
+## 15/11: người dùng duyệt recipe mới
+
+- Nguyên văn, người dùng phiên này [chat] 15/11/2026: "tôi duyệt recipe mới bạn hãy làm đi". Lời duyệt này trả lời mục B của
+  `docs/m56/M56_FIX_MATRIX_20261115.md` (ed9831b).
+- **Phạm vi:** recipe mới cho O08 (độ dài probe), cảnh I (I01, I02, I05–I08), O05/O07 (pha return), O06, F03–F06.
+- **Ngoài phạm vi:** M (mục C, luật consumer), mọi luật verdict của consumer, ngưỡng Tag.
+- Duyệt trước khi có văn bản recipe. Vì vậy mỗi recipe vẫn phải có prereg riêng, ghi rõ là luật sau số, và commit trước bước native
+  đầu tiên. Mỗi prereg phải có:
+  - một cổng dự báo trước A/B;
+  - luật dừng: một revision cho mỗi loại, hỏng thì không chỉnh thêm;
+  - báo kết quả dưới mọi luật trước đó;
+  - nêu rõ chạy lại chính cảnh đó dưới version mới hay dùng successor B3.
+- Thứ tự: chẩn đoán và prereg làm trước, offline. Code chỉ viết trong file mới hoặc worktree mới. Bước native chỉ chạy sau `REPL7_END`.
+  Các file mà batch đang xếp hàng sẽ nạp được giữ đóng băng tới lúc đó.
