@@ -641,3 +641,18 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
 - eligible 19/21 PASS. O02, O03: eligibility_error MemoryError() (worker rò RAM, khoảng 24 GB ở cảnh 14). Không phải verdict.
 - RELEASE_BLOCKED [CANDIDATE_COUNT, JUNCTION_SHORTFALL, C0_MISSING, COMPARISON_COVERAGE, AB_PROOF]; exported None. Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
 
+
+## 15/11: sửa RAM của release, chạy lại --full; replacement 6 (C07-S2, L08-S2)
+
+Claude quyết dưới ủy quyền của Duy, theo yêu cầu của người dùng phiên này [chat 15/11]: "làm tiếp ledger rồi chạy lại full suite cho 2 cảnh này, tối ưu để không còn lỗi memory error … đồng thời tiếp tục làm tiếp những cảnh khác".
+- Ledger: M56 trạng thái + mục sổ vận hành #140 (main ca8f8ed).
+- **Sửa RAM (9305d49):** `asel2-elig-one.py` chạy mỗi cảnh trong một process riêng, cùng các bước như vòng lặp cũ; record được kiểm round-trip encode/decode rồi mới ghi. `--first=` chỉ đổi thứ tự chạy. Chạy lại: nhãn `m56_asel2_release_full2` → `outputs/m56_asel2_release_20261115T054325Z`, O02 và O03 chạy trước. "Full suite cho 2 cảnh" được hiểu là release `--full`. Test suite `tests/m56` vẫn xếp cuối, không chạy chồng việc native.
+- **Replacement 6** (B3 + addendum F/B5): C07-S1 và L08-S1 đều trialed FAILED với `CLEAR_N_CONFIRMED_MISSING` (B có thêm `EARLY_ENTRY_BEFORE_NPC_CLEAR`). Cả hai được sinh trước cổng trục B5, mà B5 sinh ra đúng cho lỗi này: C03-S2 và C04-S2 PASS sau replacement 4. State 6 (`asel2-replace-state6.py`) = state 5, cộng M06 → site của M06-S2, cộng tried. `fill-v4-generate.py … ceb87fa --replace state_6` → `outputs/m56_fill_v4_replace6_20261115.json` sha 6a03c656: **C07-S2 Town12 J13032** (vN 46875/4096, G 23/2), **L08-S2 Town12 J4219** (vN 234375/16384, G 5).
+- Ngân sách B3 (jsonl): thêm dòng F01-S2 (40; batch log 14/11 đã tính nhưng jsonl còn thiếu), C07-S2 (41), L08-S2 (42). **42/150.**
+- Chạy: `run-asel2-repl6.sh` (07e6c93), nhãn `m56_asel2_repl6`. Đợi release ghi report rồi mới chạy `run-asel2-cl2.sh "Town12:M56-P-C07-S2,M56-P-L08-S2"` với v12 + spawn tilt + replacement 1..6. Mỗi cảnh đúng một A/B (P5).
+- **Không làm**, vì cần luật mới hoặc quyết định của Duy:
+  - các cảnh I (cấm tới khi có recipe I mới);
+  - M (chưa M nào PASS; nguyên nhân đã chẩn đoán, chưa có cổng nào chặn được);
+  - F03–F06 (decode hoặc capability);
+  - O04/O08 (chưa kiểm cổng run-in thẳng của generator O; để sau C/L).
+- Ghi chú: revision release (`run-asel2-release-revision.sh`) dùng replacement 1–4, thiếu replacement 5. Vì vậy M06-S2 (BLOCKED_WITNESS, đã A/B) không có trong rows của release. Không ảnh hưởng delivered.
