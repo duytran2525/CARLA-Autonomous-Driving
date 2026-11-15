@@ -808,3 +808,6 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - Rút lại hai nhận định trước: "I05–I07 không khả thi" và bảng cửa sổ thời gian (`m56_i_b_window_20261115.txt`). Bảng đó dùng gap
   catalog làm gap lúc TRIGGER. I06, I07 thật sự chạy ở gần gap catalog, nên cửa sổ ngắn của chúng vẫn đúng. Successor I05-S2…I08-S2
   chưa có prepare, nên chưa biết gap thực.
+- Người dùng phiên này [chat] 15/11 chọn "Hạ I04, làm successor". Progress doc: I04 chuyển từ PASS sang
+  `FIXTURE_GAP_NOT_REALISED`. Release 21/21 eligibility của --full2 vẫn đếm I04; lần release sau phải bỏ I04 khỏi danh sách PASS.
+  Successor I04 chờ recipe sửa cách đặt NPC (cho NPC xuất phát trên road trước road site, hoặc đòi chỗ lùi ở cổng site offline).
