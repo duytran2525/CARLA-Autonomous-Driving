@@ -636,3 +636,8 @@ Kết quả f-v1 (cả hai BLOCKED_FIXTURE) được giữ trong hồ sơ.
   - Deficit: CANDIDATE_COUNT, JUNCTION_SHORTFALL, C0_MISSING, COMPARISON_COVERAGE, AB_PROOF. RELEASE_BLOCKED, không export (đúng luật, không ép).
 - `--full` đang chạy detached (`m56_asel2_release_full`, output `m56_asel2_release_20261114T151317Z`), khoảng 10 phút mỗi cảnh.
 - Tồn đọng đã kiểm: `COLLISION_FRAME_MISSING` / `CONTACT_PROOF_INVALID` có ở mọi episode có `COLLISION_OBSERVED` (I05-S1 A, I06 A/B, I07-S1 A/B, F01-S1 B). Đây là witness hỏng sau va chạm thật, physical đã FAILED, nên không verdict nào đổi.
+## 15/11 02:13: release --full xong (outputs/m56_asel2_release_20261114T151317Z)
+
+- eligible 19/21 PASS. O02, O03: eligibility_error MemoryError() (worker rò RAM, khoảng 24 GB ở cảnh 14). Không phải verdict.
+- RELEASE_BLOCKED [CANDIDATE_COUNT, JUNCTION_SHORTFALL, C0_MISSING, COMPARISON_COVERAGE, AB_PROOF]; exported None. Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
