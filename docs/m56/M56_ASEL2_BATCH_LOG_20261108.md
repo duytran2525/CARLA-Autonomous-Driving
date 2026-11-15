@@ -755,3 +755,13 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   trước khi viết G4. Việc này chạy sau `I12_END` vì tốn RAM.
 - Hàng đợi I01-S1 (`run-asel2-i12-queue.sh`) chưa được khởi động ở phiên trước. Đã khởi động lúc 12:36Z:
   `outputs/m56_asel2_i12.stdout.txt`.
+## 15/11 tối (3): I01-S1, lần khởi động 1 hỏng do hạ tầng
+
+- 12:36Z: hàng đợi được chạy bằng `Start-Process -WindowStyle Hidden`. Server CARLA (pid 35588) chết ngay khi khởi động. Prepare chỉ
+  ghi `CONNECT_RETRY` từ 0 tới 7, không có probe, không compile, không A/B, nên P5 chưa tốn.
+- Claude đã dừng cây process của chính mình. Dấu vết giữ nguyên:
+  - `outputs/m56_asel2_io_20261115T123629Z`;
+  - `m56_v2_prepare_Town12_20261115T123650Z` (một file);
+  - `m56_asel2_i12.stdout.launch1-server-died.txt`.
+- 12:50Z: chạy lại cùng script, cùng byte, từ shell nền của phiên. CARLA chạy bình thường. Đây không phải revision mới của recipe:
+  lần đầu không tạo ra số đo nào.
