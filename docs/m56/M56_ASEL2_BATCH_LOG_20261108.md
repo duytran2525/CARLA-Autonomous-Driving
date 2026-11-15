@@ -737,3 +737,21 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - Đây là đổi luật consumer **sau khi thấy số** (nguyên tắc 6). Luật cũ (spec 7.4, Dlc = 3·vE) giữ nguyên văn. Mọi kết quả của
     O05/O06/O07 và I05–I07 phải báo dưới cả luật cũ lẫn luật mới.
   - Claude không kiểm được danh tính người chat (máy dùng chung). Thẩm quyền được ghi theo lời tự xưng.
+
+## 15/11 tối (2): consumer v15 (sàn Dlc), kiểm offline
+
+- Prereg `PREREG_M56_CONSUMER_V15_DLC_FLOOR_20261115.md`. Worktree `m56-v15` (feat/m56-v15) tách từ v13 834e149, commit ff9f1f2.
+  - Chỉ một luật đổi: `_lateral_contract` dùng `_io_dlc`, EGO = max(3·vE, 18), NPC = 3·vN. Luật cũ giữ là `dlc_old_rule`.
+  - Không gồm v14 WIP và không gồm G4.
+- Test `tests/m56/test_v15_dlc_floor.py`: pass, cùng `test_v9_io_nominal.py`, 6 passed.
+- Kiểm contract (`v15-contract-acceptance.py`, `outputs/m56_v15_contract_acceptance_20261115.jsonl`):
+  - O05-S1, O06, O07-S2 (fixture io16): v13 báo `EGO:A LATERAL_LENGTH_INVALID`; v15 báo OK cả ba response. Sau luật độ dài không
+    còn lỗi forward/reference nào bị che.
+  - O01, O02, O03, I03, I04 (PASS), I01-S1, I02-S2: v13 và v15 giống hệt, đều OK.
+  - Đoạn return của O cũng dài 18 m trong fixture io16, nên luật khớp với từng đoạn.
+- Chưa làm: full suite trên byte v15. Chỉ chạy sau `I12_END` (I01-S1 đang chạy native). Sau đó là A/B O05-S1, O06, O07-S2 dưới v15.
+- **G4 hoãn:** I05–I07 đều có `COLLISION_OBSERVED` ở A. Chương trình A đóng băng đã chờ `SOURCE_CLEAR_CONFIRMED`
+  + `NPC_TARGET_LANE_CONFIRMED` trước khi RESUME. Phải xếp thứ tự TRIGGER / dừng / va chạm / RESUME trên các episode A đã niêm
+  trước khi viết G4. Việc này chạy sau `I12_END` vì tốn RAM.
+- Hàng đợi I01-S1 (`run-asel2-i12-queue.sh`) chưa được khởi động ở phiên trước. Đã khởi động lúc 12:36Z:
+  `outputs/m56_asel2_i12.stdout.txt`.
