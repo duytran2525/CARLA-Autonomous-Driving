@@ -45,6 +45,18 @@
 - Một revision. Hỏng dưới io-v1.6 thì ghi FAILED, không chỉnh 18 m / 0,4 / ngưỡng.
 - Báo O05/O06/O07 dưới io-v1.4 (kết quả cũ) và io-v1.6.
 
+## 3b. Kiểm offline builder (15/11, trước mọi bước native)
+
+- `native-v5-revision-io16.py` chỉ thay dòng `dlc = 3 * vE` của `catalog-recipes.io_recipe` khi gọi `asel2_io`. Lần đầu áp cho cả
+  bản rebuild C0 v1 thì builder dừng ở `V1_REBUILD_MISMATCH`: các cảnh C0 vẫn giữ recipe đóng băng.
+- So với revision không patch (`asel2g7lap1`, 43 candidate): chỉ 5 candidate vE < 6 đổi `responses` (I05-S1, I06, I07-S1 có B
+  14,4/9,22/11,52 → 18; O05-S1, O06 có A 14,4/9,22 → 18). `environment` khác ở mọi candidate, nhưng đó chỉ là đường dẫn thư mục
+  output trong URI của review.
+- **O07-S1 bị loại**: `RECIPE_FLAG:WINDOW_TOO_SHORT:114.3>113.1m`, vì Dlc_eff dài thêm 6,5 m làm cửa sổ thiếu 1,2 m.
+- **Bổ sung luật (trước khi chạy):** slot nào bị `WINDOW_TOO_SHORT` dưới io-v1.6 thì nhận **successor B3**. Successor lấy từ
+  generator fill v4 replace mode, qua gate G, và phải được builder io16 dựng không có cờ. Vòng lặp giống addendum G: tối đa 5 lượt,
+  mọi site đề xuất đều tính vào ngân sách. Hiện áp cho O07.
+
 ## 4. Cách làm
 
 Code trong file mới, bọc compile/prepare I/O. Chạy sau `REPL7_END`, khi không có HOLD. Trước native: kiểm offline rằng
