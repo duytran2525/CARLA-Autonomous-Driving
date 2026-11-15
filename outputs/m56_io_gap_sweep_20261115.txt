@@ -1,0 +1,34 @@
+M56-P-I01      e_Town04_20261107T185113Z PREPARED         io-v1.2 shift=10.34 gap=6.0 p2=6.07 ex=0.07 
+M56-P-I01-S1   e_Town12_20261112T132728Z PREPARED         io-v1.2 shift=-15.4 gap=6.0 p2=21.37 ex=15.37 CLAMP
+M56-P-I01-S1   e_Town12_20261115T124820Z PREPARED         io-v1.2 shift=-15.4 gap=6.0 p2=21.37 ex=15.37 CLAMP
+M56-P-I02      e_Town05_20261107T185210Z PREPARED         io-v1.2 shift=10.01 gap=7.8 p2=7.75 ex=-0.05 
+M56-P-I02-S2   e_Town13_20261112T141926Z PREPARED         io-v1.2 shift=-19.63 gap=7.8 p2=27.36 ex=19.56 CLAMP
+M56-P-I03      e_Town06_20261107T144354Z PREPARED         io-v1.2 shift=8.65 gap=10.14 p2=9.93 ex=-0.21 
+M56-P-I03      e_Town06_20261107T161454Z PREPARED         io-v1.2 shift=9.76 gap=10.14 p2=10.17 ex=0.03 
+M56-P-I04      e_Town06_20261107T161454Z PREPARED         io-v1.2 shift=-33.6 gap=13.18 p2=46.42 ex=33.24 CLAMP
+M56-P-I04      e_Town06_20261107T171902Z PREPARED         io-v1.2 shift=-33.6 gap=13.18 p2=46.42 ex=33.24 CLAMP
+M56-P-I05      e_Town04_20261107T162202Z PREPARED         io-v1.2 shift=4.68 gap=4.62 p2=4.54 ex=-0.07 
+M56-P-I05      e_Town04_20261107T172108Z PREPARED         io-v1.2 shift=4.68 gap=4.62 p2=4.54 ex=-0.07 
+M56-P-I05-S1   e_Town12_20261112T134014Z PREPARED         io-v1.2 shift=-6.69 gap=4.62 p2=11.08 ex=6.47 CLAMP
+M56-P-I06      e_Town12_20261112T134434Z PREPARED         io-v1.2 shift=7.4 gap=2.73 p2=2.9 ex=0.17 
+M56-P-I07      e_Town06_20261107T161454Z PREPARED         io-v1.2 shift=1.83 gap=3.55 p2=3.71 ex=0.16 
+M56-P-I07      e_Town06_20261107T171902Z PREPARED         io-v1.2 shift=1.83 gap=3.55 p2=3.71 ex=0.16 
+M56-P-I07-S1   e_Town13_20261112T140227Z PREPARED         io-v1.2 shift=1.67 gap=3.55 p2=3.67 ex=0.12 
+M56-P-O01      e_Town04_20261027T033105Z PREPARED         io-v1.2 shift=-29.02 gap=15.0 p2=14.75 ex=-0.25 
+M56-P-O02      e_Town05_20261027T033254Z PREPARED         io-v1.2 shift=-30.09 gap=19.5 p2=19.54 ex=0.04 
+M56-P-O03      e_Town06_20261026T163001Z PREPARED         None shift=-30.92 gap=25.35 p2=25.13 ex=-0.22 
+M56-P-O03      e_Town06_20261026T192604Z PREPARED         io-v1.1 shift=-30.92 gap=25.35 p2=25.13 ex=-0.22 
+M56-P-O04      e_Town06_20261107T141334Z PREPARED         io-v1.2 shift=-32.31 gap=32.95 p2=32.54 ex=-0.42 
+M56-P-O04      e_Town06_20261107T161454Z BLOCKED_FIXTURE  io-v1.2 shift=None gap=32.95 p2=None ex=None 
+M56-P-O04-S2   e_Town13_20261115T100551Z BLOCKED_FIXTURE  io-v1.2 shift=None gap=32.95 p2=None ex=None 
+M56-P-O05      e_Town04_20261107T141458Z BLOCKED_FIXTURE  io-v1.2 shift=None gap=11.54 p2=None ex=None 
+M56-P-O05      e_Town04_20261107T162202Z PREPARED         io-v1.2 shift=-16.37 gap=11.54 p2=11.5 ex=-0.04 
+M56-P-O05-S1   e_Town12_20261112T134850Z PREPARED         io-v1.2 shift=-29.51 gap=11.54 p2=11.57 ex=0.04 
+M56-P-O05-S1   e_Town12_20261115T101640Z PREPARED         io-v1.2 shift=-29.51 gap=11.54 p2=11.57 ex=0.04 
+M56-P-O06      e_Town12_20261112T135427Z PREPARED         io-v1.2 shift=-27.44 gap=6.83 p2=6.7 ex=-0.12 
+M56-P-O06      e_Town12_20261115T102011Z PREPARED         io-v1.2 shift=-27.44 gap=6.83 p2=6.7 ex=-0.12 
+M56-P-O07      e_Town06_20261107T141527Z PREPARED         io-v1.2 shift=-27.6 gap=8.88 p2=9.07 ex=0.2 
+M56-P-O07-S1   e_Town12_20261112T135833Z PREPARED         io-v1.2 shift=-27.56 gap=8.88 p2=9.05 ex=0.18 
+M56-P-O07-S2   e_Town12_20261115T102247Z PREPARED         io-v1.2 shift=-27.68 gap=8.88 p2=8.85 ex=-0.03 
+M56-P-O08-S2   e_Town13_20261112T143059Z BLOCKED_FIXTURE  io-v1.2 shift=None gap=55.69 p2=None ex=None 
+M56-P-O08-S2   e_Town13_20261115T102524Z PREPARED         io-v1.2 shift=-63.35 gap=55.69 p2=58.94 ex=3.25 CLAMP

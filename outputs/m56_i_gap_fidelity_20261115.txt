@@ -1,0 +1,19 @@
+M56 I scenes: gap at TRIGGER vs catalog gap (read-only, 2026-11-15 night). Label CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+Source: prepare.json (latest prepare before each sealed A/B) + m56_i_b_kinematics_20261115.jsonl (B episode frames).
+
+scene    gap_param  gap_at_t0_probe2  measured_B_at_TRIGGER  npc_shift_m  excess(=p2-param)
+I04        13.18        46.42              46.00               -33.60        33.24   (PASS pair)
+I03        10.14        10.17               9.67                +9.76         0.03   (PASS pair)
+I02-S2      7.80        27.36              26.89               -19.63        19.56   (BLOCKED_WITNESS)
+I05-S1      4.62        11.08              10.62                -6.69         6.47   (FAILED)
+I06         2.73         2.90               2.18                +7.40         0.17   (FAILED)
+I07-S1      3.55         3.67               2.85                +1.67         0.12   (FAILED)
+
+1. Gap at TRIGGER = gap_at_t0_probe2 - 0.4..0.8 m in all six. prepare.json predicts it; the catalog gap does not.
+2. Cause (native-io-prepare.py 377-379): shift = dec_npc + gap - rear; the NPC start row is the first row ON THE SITE ROAD R
+   at or past s_n. A negative shift (NPC must start further back) that falls before the start of road R is clamped to the
+   road start, so the gap grows by |shift|. Excess = -shift within 0.4 m in all three negative cases.
+3. No gate compares gap_at_t0_probe2 to the catalog gap. I04 (PASS) ran with 46 m instead of 13.18 m.
+4. Earlier claims to retract: "I05-I07 infeasible" and the window table m56_i_b_window_20261115.txt used gap param as gap at
+   TRIGGER; for I05-S1 the real gap was 10.6 m. I06/I07 do run at about the catalog gap (positive shift), so their short
+   window stands.

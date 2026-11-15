@@ -36,6 +36,8 @@ for spec in $1; do
   for s in $(echo ${spec#*:} | tr ',' ' '); do
     st=$(python -I -c "import json,sys;d=json.load(open(sys.argv[1],encoding='utf-8'));print(next(((c['environment'].get('runtime_recipe_v2') or {}).get('status','') for c in d['candidates'] if c['id']==sys.argv[2]),'MISSING'))" $REVF $s)
     [ "$st" = "PREPARED" ] || { echo "$s: $st (no compile/A-B)"; continue; }
+    # addendum L (15/11): the catalog gap must be realised at t0 (NPC start clamp); fail closed
+    python -I asel2-io-gap-gate.py "$(done_path $LOG/prep-$s.log)/$s" > $LOG/gap-$s.log 2>&1 || { echo "$s: addendum L $(cat $LOG/gap-$s.log) (no compile/A-B)"; continue; }
     while tasklist | grep -qi CarlaUE4; do sleep 15; done
     timeout 2400 $PY -I -X utf8 native-io-ab.py $REVF $t $s > $LOG/compile-$s.log 2>&1
     C=$(done_path $LOG/compile-$s.log)
