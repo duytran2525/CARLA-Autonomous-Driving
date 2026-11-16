@@ -857,3 +857,14 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - Hàng đợi: `m56_asel2_v15o4` (O05-S1, O06, O07-S2 Town12; O04-S3, O08-S3 Town13; mỗi cảnh một A/B) -> `m56_asel2_i13prep2`
   (prepare I01-S1, không A/B). Cảnh I khác vẫn giữ chờ recipe thời điểm đổi làn của B.
 - Trước lần tắt máy sau: tạo `outputs/m56_asel2_STOP` (graceful) và `<label>.STOP` cho runner test, chờ `M56_SAFE_TO_SHUTDOWN.txt`.
+- 03:29Z lượt test tập trung v15 PASS 253/253 (9 phút 33) → hàng đợi `m56_asel2_v15o4` bắt đầu. 03:31Z cguard ngắt:
+  commit còn 3,43 GB / giới hạn 48,2 GB (C vẫn 20 GB, pagefile không đổi 16,57 GB). Stopper dừng sạch 03:31:32Z, đang ở prepare
+  O05-S1 (record `outputs/m56_asel2_stop_20261116T033132Z.json`): không fixture, không AB_STARTED, không tốn P5. Thư mục dở:
+  `m56_v2_prepare_Town12_20261116T032932Z` (chỉ có receipt ủy quyền), log `m56_asel2_io_20261116T032909Z`.
+- Nguyên nhân: giới hạn là commit, không phải ổ C. ~30 GB commit đã bị app khác giữ (Chrome 3,5, Claude 3,3, node 2,1, python
+  MCP 6, Razer 1...), CARLA Town12 13,8 GB. Claude quyết dưới ủy quyền: không nới ngưỡng 4 GB; thêm bước chờ `room` trước MỌI
+  lần bật CARLA trong `run-asel2-io-v16.sh` và `run-asel2-i13-prep.sh` (`asel2-cguard.py --wait-commit-gb`, mặc định 25 GB =
+  CARLA ~14 + harness A/B ≤ ~7 + 4 dự phòng; Town13 chưa đo). cguard giữ làm chốt chặn. Launcher `run-asel2-resume-20261116.sh
+  SUFFIX` (đổi tên STOP/SAFE cũ, bật stopper/watchdog/cguard, hàng đợi O, rồi prepare I01-S1).
+- 03:35Z chạy `r16b`: hàng đợi `m56_asel2_v15o_r16b` đang ROOM_WAIT (commit trống ~18 GB < 25). Chạy được khi người dùng đóng
+  bớt app (~7 GB) hoặc đặt pagefile cố định trên E (khi đó phải khởi động lại và chạy launcher với hậu tố mới).

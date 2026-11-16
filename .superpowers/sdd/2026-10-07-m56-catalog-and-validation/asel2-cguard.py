@@ -31,7 +31,19 @@ def sample():
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--min-gb', type=float, default=10); ap.add_argument('--min-commit-gb', type=float, default=4)
-    ap.add_argument('--once', action='store_true'); a = ap.parse_args()
+    ap.add_argument('--once', action='store_true')
+    # --wait-commit-gb N: block (CARLA down) until commit headroom >= N and C: free >= --min-gb, then exit 0. 16/11: Town12
+    # CARLA + prepare took ~14.7 GB commit on a ~30 GB baseline of other apps (limit 48.2) -> tripped at 3.4 GB left.
+    ap.add_argument('--wait-commit-gb', type=float); a = ap.parse_args()
+    if a.wait_commit_gb is not None:
+        t = 0
+        while True:
+            s = sample()
+            if s['commit_avail_gb'] >= a.wait_commit_gb and s['c_free_gb'] >= a.min_gb:
+                print('ROOM_OK', json.dumps(s), flush=True); raise SystemExit(0)
+            if t % 300 == 0:
+                print('ROOM_WAIT need', a.wait_commit_gb, json.dumps(s), flush=True)
+            time.sleep(30); t += 30
     log = OUT / f"m56_cguard_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     fired = False
     while True:
