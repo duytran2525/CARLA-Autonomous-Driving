@@ -880,3 +880,6 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - 11:41 khởi động lại: pagefile đang dùng = `E:\pagefile.sys` 32 GB (không temp), Windows tự xóa C:\pagefile.sys; C trống 35,9 GB,
   commit 63,6 GB (trống 37,9). 04:44Z chạy `r16c`: ROOM_OK 38,7 GB, prepare O05-S1 (Town12) đang chạy, log `m56_asel2_io_20261116T044433Z`.
   (cguard ghi `pagefile_gb: null` vì chỉ đọc C:\pagefile.sys; không ảnh hưởng ngưỡng.)
+- r16c: O05-S1, O06, O07-S2 PREPARED (Town12, ~4 phút/cảnh). 05:11:44Z máy tắt từ Start menu (System 1074), không file STOP, lúc
+  đang prepare O04-S3 (Town13, probe 1 READINESS_NOT_REACHED, chưa xong prepare): chưa revision/compile/A/B, không tốn P5.
+- 09:27Z chạy `r16d` (prepare chạy lại từ đầu, được phép vì prepare không tính P5). Nhắc người dùng: tắt máy phải qua file STOP.
