@@ -887,3 +887,9 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   O08-S3 (Town13) PREPARED; O04-S3 (Town13) không ra SCENE (probe ngắn READINESS_NOT_REACHED, probe dài TICK_ERROR, log dừng sau
   ~40 phút = timeout 2400 s của hàng đợi) → không compile/A/B, không P5.
 - **O05-S1: A/B một lần (10:52–11:09Z), pair theo consumer v15 = PASS** (io-v1.6 + v15, luật sau số đã công bố). Pair v10: đang chạy.
+- O05-S1 pair v10 (`m56_v6_pair_20261116T113249Z`) = BLOCKED_WITNESS: A `INITIALIZATION_INVALID`, `LATERAL_CONTRACT_INVALID`;
+  B `INITIALIZATION_INVALID` (cả hai kèm `W01_W05_VALIDATION_PENDING`). Theo nguyên tắc 6: PASS chỉ dưới v15, chặn dưới v10.
+- **O06: A/B một lần (11:48–12:16Z), pair v15 (`m56_v6_pair_20261116T121609Z`) = BLOCKED_WITNESS.** B: spawn CONFIRMED,
+  physical COMPLETE, witness VALID, w05 INTEGRITY_VALID. A: spawn CONFIRMED, physical UNKNOWN, witness INVALID
+  (`METRIC_CONTEXT_INVALID`, `W05_REVIEW_MISSING`, `ACTION_REGION_WITNESS_UNKNOWN`); w05 A NOT_WRITTEN (metrics/events không
+  admissible), metric A v_mean_E / e_lat_peak UNKNOWN. P5 của O06 (v15) đã dùng, không chạy lại. Nguyên nhân A chưa điều tra.
