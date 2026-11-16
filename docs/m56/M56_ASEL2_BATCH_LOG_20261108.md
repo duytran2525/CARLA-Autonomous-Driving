@@ -914,3 +914,23 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   Google Drive `My Drive/m56-archive/pairs-20261116` (67/67 khớp kích thước byte qua Drive API), rồi xóa trên D và bản tạm trên E.
   Manifest (sha256, md5, số file, byte gốc): `outputs/m56_v6_pair_ARCHIVED_20261116_MANIFEST.json`. Script `archive-pairs-20261116.ps1`.
   D trống 15,2 → 44,8 GB. Còn 80 thư mục pair được tham chiếu (45 GB) giữ nguyên.
+
+## 16/11 tối: sửa bản dọn D, đếm lại cặp, prepare I02-S2 / I04
+
+- **Sửa lỗi của Claude ở bản dọn D:** kiểm "không tham chiếu" chỉ dò tên thư mục trong doc/script, nhưng `asel2-release.py`
+  (`latest_pair`) quét mọi `outputs/m56_v6_pair_*/<id>/pair-result.json`. Bản dọn đã đưa lên Drive cặp PASS duy nhất của C07-S2 và
+  L08-S2 (15/11). Đã khôi phục từ Drive, sha256 khớp manifest, đủ số file: 6 thư mục 15/11; mọi pair của C03-S1, C04-S1, M06-S2,
+  I01-S1 (cảnh chỉ còn trong bản nén); và các pair mới hơn bản tại chỗ của C02, M07, C04-S2 (để "latest" không đổi). Các PASS khác
+  trong bản nén đều cũ hơn một PASS còn tại chỗ. Khôi phục tổng 23/67; còn chỉ trên Drive 44 thư mục là lượt chấm lặp, không cảnh nào mất pair mới nhất.
+- **Đếm cặp PASS (pair-result tại chỗ, mỗi cảnh ≥ 1 PASS):** 24 cảnh = C01 C02-S1 C03-S2 C04-S2 C05 C06-S1 C07-S2 C08; L01 L02-S1
+  L03-S1 L04 L05-S1 L06-S1 L07-S2 L08-S2; O01 O02 O03 O05-S1 O07-S2; I03; F01-S2 F02. I04 bị hạ (addendum L). Theo nguyên tắc 6:
+  nhiều cặp chỉ PASS dưới luật sau số (v7/v8/v12/v15, dv1, f-v1.2, F01-v3); O05-S1, O07-S2 chỉ PASS dưới v15 (v10 BLOCKED_WITNESS).
+  Con số "23 theo v15 / 21" báo trước đó trong chat là đếm sai (bỏ sót C07-S2, L08-S2 và tính nhầm I04).
+- O06 A, thêm: route tham chiếu map của O06 có 146 chỗ gãy với sin góc > 5e-4 (tối đa 1,2e-3); O05-S1 và O07-S2 (PASS) không có chỗ
+  nào > 5e-4 (tối đa 3,1e-4). Nên luật "một normal ở góc" của `_map_offset` chạm O06 nhiều hơn hẳn. Chỉ ghi nhận, không đổi luật.
+- I01-S1 (io-i-v1.3 a) đạt mục tiêu addendum M §3: PREPARED, cổng L `GAP_OK` (6,163 vs 6,000), builder revision nhận
+  (`asel2i13dry` PREPARED). Claude quyết dưới ủy quyền: prepare-only (không compile, không A/B, không P5) cho I02-S2 (Town13) và I04
+  (Town06) bằng cùng luật (`run-asel2-i13-prep2.sh`), để biết luật đặt NPC theo arc có qua cổng L ở hai cảnh bị kẹp còn lại không.
+  A/B của cảnh I vẫn chờ recipe thời điểm đổi làn của B (G3), chưa viết.
+  - Lần 1 (`r16e`, 15:12Z) bị cguard dừng ở ROOM_WAIT (commit còn 4,1 GB, chưa bật CARLA), record `m56_asel2_stop_20261116T151422Z`.
+  - Lần 2 (`r16f`, 16:34Z): stopper/watchdog/cguard `*_r16f`, ROOM_OK 36 GB.
