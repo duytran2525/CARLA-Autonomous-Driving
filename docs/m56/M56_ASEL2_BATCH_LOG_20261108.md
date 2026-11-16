@@ -877,3 +877,6 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   không bị ghi lúc boot). Ổ E mount sớm (Ntfs 98, 11:22:57). Nguyên nhân: `PagefileOnOsVolume=1` (BitLocker để lại) ép pagefile lên
   ổ OS. Sửa elevated (UAC người dùng duyệt): sao lưu key vào `%USERPROFILE%\MemoryManagement-backup-20261116.reg`, đặt
   `PagefileOnOsVolume=0`, `TempPageFile=0`. Cần khởi động lại; sau đó kiểm E đang dùng, xóa C:\pagefile.sys nếu còn, chạy r16c.
+- 11:41 khởi động lại: pagefile đang dùng = `E:\pagefile.sys` 32 GB (không temp), Windows tự xóa C:\pagefile.sys; C trống 35,9 GB,
+  commit 63,6 GB (trống 37,9). 04:44Z chạy `r16c`: ROOM_OK 38,7 GB, prepare O05-S1 (Town12) đang chạy, log `m56_asel2_io_20261116T044433Z`.
+  (cguard ghi `pagefile_gb: null` vì chỉ đọc C:\pagefile.sys; không ảnh hưởng ngưỡng.)
