@@ -893,3 +893,6 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   physical COMPLETE, witness VALID, w05 INTEGRITY_VALID. A: spawn CONFIRMED, physical UNKNOWN, witness INVALID
   (`METRIC_CONTEXT_INVALID`, `W05_REVIEW_MISSING`, `ACTION_REGION_WITNESS_UNKNOWN`); w05 A NOT_WRITTEN (metrics/events không
   admissible), metric A v_mean_E / e_lat_peak UNKNOWN. P5 của O06 (v15) đã dùng, không chạy lại. Nguyên nhân A chưa điều tra.
+- O06 pair v10 = BLOCKED_WITNESS (A và B `INITIALIZATION_INVALID`, A thêm `LATERAL_CONTRACT_INVALID` và các lý do như dưới v15).
+- **O07-S2: A/B một lần, pair v15 (`m56_v6_pair_20261116T135749Z`) = PASS**: A và B spawn CONFIRMED, physical COMPLETE, witness VALID (io-v1.6 + v15, luật sau
+  số đã công bố). Pair v10 đang chạy.
