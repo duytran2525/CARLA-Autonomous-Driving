@@ -883,3 +883,7 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - r16c: O05-S1, O06, O07-S2 PREPARED (Town12, ~4 phút/cảnh). 05:11:44Z máy tắt từ Start menu (System 1074), không file STOP, lúc
   đang prepare O04-S3 (Town13, probe 1 READINESS_NOT_REACHED, chưa xong prepare): chưa revision/compile/A/B, không tốn P5.
 - 09:27Z chạy `r16d` (prepare chạy lại từ đầu, được phép vì prepare không tính P5). Nhắc người dùng: tắt máy phải qua file STOP.
+- r16d (log `outputs/m56_asel2_io_20261116T092756Z`, product v15 036688b, tooling fb0ca38): prepare O05-S1, O06, O07-S2 (Town12),
+  O08-S3 (Town13) PREPARED; O04-S3 (Town13) không ra SCENE (probe ngắn READINESS_NOT_REACHED, probe dài TICK_ERROR, log dừng sau
+  ~40 phút = timeout 2400 s của hàng đợi) → không compile/A/B, không P5.
+- **O05-S1: A/B một lần (10:52–11:09Z), pair theo consumer v15 = PASS** (io-v1.6 + v15, luật sau số đã công bố). Pair v10: đang chạy.
