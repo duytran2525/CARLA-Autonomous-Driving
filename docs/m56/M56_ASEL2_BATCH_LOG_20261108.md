@@ -896,3 +896,16 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - O06 pair v10 = BLOCKED_WITNESS (A và B `INITIALIZATION_INVALID`, A thêm `LATERAL_CONTRACT_INVALID` và các lý do như dưới v15).
 - **O07-S2: A/B một lần, pair v15 (`m56_v6_pair_20261116T133017Z`) = PASS**: A và B spawn CONFIRMED, physical COMPLETE, witness VALID (io-v1.6 + v15, luật sau
   số đã công bố). Pair v10 đang chạy.
+- 14:16Z `V15O_END`: O07-S2 pair v10 = BLOCKED_WITNESS. O04-S3 không compile/A/B (prepare không ra SCENE). **O08-S3: addendum L
+  `GAP_NOT_REALISED` (gap 55,694, realised 58,582) → không compile/A/B, không P5.** I01-S1 prepare: PREPARED (`I13P_END` 14:29:54Z,
+  log `m56_asel2_i13prep_20261116T141719Z`), không A/B theo kế hoạch.
+- **Chẩn đoán offline O06 A dưới v15** (không server, không chạy lại; script scratchpad `diag_o06.py`, `diag_o06b.py`, Claude quyết dưới ủy quyền):
+  - `METRIC_CONTEXT_INVALID`: 2/1068 khung (3192, 3553). Hình chiếu của EGO lên route rơi đúng đỉnh arc (station 48,4067 giữa
+    đoạn 241/242; 101,4109 giữa 506/507). Hai đoạn kề có normal hơi khác ((0,1,0) và (0,0012,1,0)), nên `_map_offset` trả None
+    theo luật "một normal duy nhất ở góc" (offset hai phía bằng nhau: 2,344 và 3,5 m). Đây là góc hình học hiếm của consumer
+    (vùng nêm vài mm ở phía ngoài chỗ route gãy), không phải lỗi dữ liệu hay harness.
+  - `ACTION_REGION_WITNESS_UNKNOWN`: 1 khung (3741, giữa LANE_CHANGE_ONSET 3103 và X_END 3848). Đỉnh thân xe số 4 có y = 3102,7687,
+    cạnh dưới hộp EGO_TARGET y = 3102,7681: lệch 0,6 mm, nhỏ hơn bất định 1 mm, nên membership ba trị = None và cả action UNKNOWN.
+    Trước đó 528 khung EGO_TARGET = True. EGO chạy sát mép làn đích, chạm dải bất định.
+  - B không gặp hai trường hợp này nên VALID. Không đổi verdict: P5 O06 đã dùng. Nếu muốn nới hai luật này thì đó là luật sau số
+    (nguyên tắc 6), phải công bố và báo song song. Chưa sửa gì.
