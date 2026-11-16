@@ -873,3 +873,7 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - Người dùng [chat] 16/11 "chuyển pagefile qua ổ E rồi xóa pagefile trong ổ C": Claude chạy script elevated (UAC người dùng duyệt):
   tắt tự quản, xóa mọi setting, `E:\pagefile.sys` cố định 32768–65536 MB (E = NVMe KIOXIA). Có hiệu lực sau khởi động lại;
   khi đó C:\pagefile.sys không còn dùng → kiểm và xóa nếu Windows để lại. Sau đó chạy `run-asel2-resume-20261116.sh r16c`.
+- 11:22 khởi động lại: Windows vẫn dùng `C:\pagefile.sys` (TempPageFile=True, commit 49,9 GB = RAM + C; E không dùng, file E
+  không bị ghi lúc boot). Ổ E mount sớm (Ntfs 98, 11:22:57). Nguyên nhân: `PagefileOnOsVolume=1` (BitLocker để lại) ép pagefile lên
+  ổ OS. Sửa elevated (UAC người dùng duyệt): sao lưu key vào `%USERPROFILE%\MemoryManagement-backup-20261116.reg`, đặt
+  `PagefileOnOsVolume=0`, `TempPageFile=0`. Cần khởi động lại; sau đó kiểm E đang dùng, xóa C:\pagefile.sys nếu còn, chạy r16c.
