@@ -868,3 +868,8 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   SUFFIX` (đổi tên STOP/SAFE cũ, bật stopper/watchdog/cguard, hàng đợi O, rồi prepare I01-S1).
 - 03:35Z chạy `r16b`: hàng đợi `m56_asel2_v15o_r16b` đang ROOM_WAIT (commit trống ~18 GB < 25). Chạy được khi người dùng đóng
   bớt app (~7 GB) hoặc đặt pagefile cố định trên E (khi đó phải khởi động lại và chạy launcher với hậu tố mới).
+- 10:46 (giờ máy) máy khởi động lại: hàng đợi `r16b` chết khi đang ROOM_WAIT (chưa bật CARLA, không thư mục mới, không P5).
+  Thiết lập pagefile lúc đó chưa ăn (registry `?:\pagefile.sys` = tự quản, C:\pagefile.sys 18,4 GB vẫn dùng).
+- Người dùng [chat] 16/11 "chuyển pagefile qua ổ E rồi xóa pagefile trong ổ C": Claude chạy script elevated (UAC người dùng duyệt):
+  tắt tự quản, xóa mọi setting, `E:\pagefile.sys` cố định 32768–65536 MB (E = NVMe KIOXIA). Có hiệu lực sau khởi động lại;
+  khi đó C:\pagefile.sys không còn dùng → kiểm và xóa nếu Windows để lại. Sau đó chạy `run-asel2-resume-20261116.sh r16c`.
