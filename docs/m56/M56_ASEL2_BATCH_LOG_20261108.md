@@ -934,3 +934,13 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   A/B của cảnh I vẫn chờ recipe thời điểm đổi làn của B (G3), chưa viết.
   - Lần 1 (`r16e`, 15:12Z) bị cguard dừng ở ROOM_WAIT (commit còn 4,1 GB, chưa bật CARLA), record `m56_asel2_stop_20261116T151422Z`.
   - Lần 2 (`r16f`, 16:34Z): stopper/watchdog/cguard `*_r16f`, ROOM_OK 36 GB.
+- **Prepare-only io-i-v1.3 a (`r16f`, log `m56_asel2_i13prep2_20261116T163425Z`, xong 16:47Z):** I02-S2 (Town13) PREPARED, cổng L
+  `GAP_OK` 7,787 vs 7,800 (trước kẹp: 27,36); I04 (Town06) PREPARED, `GAP_OK` 13,014 vs 13,182 (trước kẹp: 46,42). Builder
+  revision nhận cả hai. Cùng I01-S1, luật đặt NPC theo arc qua cổng L ở cả 3 cảnh I từng bị kẹp. Không compile/A/B, không P5. A/B
+  của I vẫn chờ recipe thời điểm đổi làn của B (G3).
+- Dọn D lần 2 (người dùng: D ≥ 80 GB, chuyển lên Drive không nén). `offload-plan-20261116.py` chọn theo đúng luật đọc của
+  `asel2-release.latest_pair`: giữ pair mới nhất và PASS mới nhất mỗi cảnh, pair hôm nay, thư mục A/B mà pair giữ lại trỏ tới, A/B
+  của cảnh chưa có pair. Chuyển 110 thư mục (33,2 GB: pair lặp, A/B cũ/rỗng, release run 1) và `elig` của release run 2 (11,5 GB,
+  tính lại được; giữ `release-report.json`) lên `G:\My Drive\m56-offload-20261116\` (cùng đường dẫn tương đối), không nén.
+  `offload-to-drive-20261116.ps1`: robocopy → kiểm số file + byte trên G: → xóa ở D; mỗi đợt ~6 GB chờ cache DriveFS (ổ C) < 3 GB
+  và C ≥ 15 GB. Manifest `outputs/m56_offload_20261116_MANIFEST.jsonl`. `m56_offline_v1` giữ (test_cli/test_staging đọc).
