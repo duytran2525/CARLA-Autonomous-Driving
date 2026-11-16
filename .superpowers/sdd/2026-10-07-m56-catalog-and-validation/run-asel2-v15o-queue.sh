@@ -7,9 +7,11 @@
 export PATH=/usr/bin:$PATH
 cd "$(dirname "$0")"
 R=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs
-S=m56-full-suite-13-20261116.run.json  # 16/11: suite 12 PYTEST_TESTS_FAILED (4 v15 fixture tests), suite 13 = after f140093
+# 16/11 10:30 local: suite 13 was killed by a Start-menu shutdown at 27% (no checkpoint). User [chat] 16/11: "full suite chỉ
+# chạy lần cuối thôi, trước hết phải tìm đủ các cảnh" -> the gate is the focused run of every test file v15 touched.
+S=m56-v15-focus-20261116.run.json
 until [ -f $S ] && grep -q '"end_utc"' $S; do sleep 60; done
-grep -q '"verdict_chain": "CHAIN_PASSED"' $S || { echo "NOT RUN: suite 13 not CHAIN_PASSED"; grep -E '"(status|summary)"' $S; echo V15O_END; exit 4; }
+grep -q '"verdict_chain": "CHAIN_PASSED"' $S || { echo "NOT RUN: v15 focused tests not passed"; grep -E '"(status|summary)"' $S; echo V15O_END; exit 4; }
 while [ -f $R/m56_asel2_HOLD ]; do sleep 60; done
 echo "start $(date -u +%FT%TZ)"
 export M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v15 M56_SPAWN_TILT=1 \

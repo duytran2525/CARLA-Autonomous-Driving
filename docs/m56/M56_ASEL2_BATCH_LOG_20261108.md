@@ -837,3 +837,23 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - **Ổ C còn 0 GB** (pagefile.sys 31 GB; Temp nhỏ). Claude không xóa gì. Claude tạo `outputs/m56_asel2_HOLD`: mọi hàng đợi native
   dừng cho tới khi ổ C có chỗ trống, vì một episode chết vì thiếu RAM/đĩa là một A/B đã tốn mà không chạy lại được. Suite 13 chạy
   được vì nó chạy lại được và basetemp nằm trên ổ D.
+
+## 16/11 sáng: máy tắt 01:28, bỏ full suite, chạy tiếp tìm cảnh
+
+- 01:28 (giờ máy) có lệnh tắt máy từ Start menu (System 1074). Suite 13 chết ở 27% (0 failed tới đó), không có checkpoint/run.json
+  nên không resume được. Hàng đợi `m56_asel2_v15o3` và `m56_asel2_i13prep` chết lúc tắt máy (`fork ... 0xC000026B` = lỗi logoff),
+  chưa chạy bước native nào, không tốn P5.
+- Dọn ổ C (không đụng M56): `npm cache clean --force` + `go clean -cache` = 5,6 GB. C còn 21,7 GB, pagefile 16,6 GB (Windows tự quản).
+  Việc thật vẫn là chuyển pagefile sang E (cần người dùng, khởi động lại).
+- Người dùng [chat] 16/11: "khoan đã chạy full suite tiếp, full suite chỉ chạy lần cuối thôi, trước hết phải tìm đủ các cảnh".
+  Không chạy suite 14. Claude quyết dưới ủy quyền của Duy: cổng của hàng đợi O đổi từ suite 13 sang lượt test tập trung
+  `m56-v15-focus-20261116` (mọi file test mà v15 đã sửa: test_v15_dlc_floor, test_io_complete, test_lateral_contract,
+  test_catalog, test_f01_normative_response, test_v2_native_hooks, test_evidence). Cây m56/ và tests/m56 của m56-v1 trùng
+  feat/m56-v15 (diff rỗng). Lần chạy đầu hỏng vì Claude đưa đường dẫn tuyệt đối (assert của runner); file lỗi đổi tên
+  `*.launcherr-abs-path.txt`, chạy lại cùng nhãn.
+- HOLD nhả (đổi tên `m56_asel2_HOLD.released_20261116T031833Z`). Bù lại: `asel2-cguard.py` (nhãn `m56_cguard_r16a`) mỗi 60 s ghi
+  C trống / pagefile / commit vào `outputs/m56_cguard_*.jsonl`; nếu C < 10 GB hoặc commit còn < 4 GB thì ghi file STOP graceful,
+  stopper `m56_asel2_stopper_r16a` dừng ở điểm an toàn (không bao giờ trong cửa sổ A/B). Watchdog `m56_asel2_watchdog_r16a`.
+- Hàng đợi: `m56_asel2_v15o4` (O05-S1, O06, O07-S2 Town12; O04-S3, O08-S3 Town13; mỗi cảnh một A/B) -> `m56_asel2_i13prep2`
+  (prepare I01-S1, không A/B). Cảnh I khác vẫn giữ chờ recipe thời điểm đổi làn của B.
+- Trước lần tắt máy sau: tạo `outputs/m56_asel2_STOP` (graceful) và `<label>.STOP` cho runner test, chờ `M56_SAFE_TO_SHUTDOWN.txt`.

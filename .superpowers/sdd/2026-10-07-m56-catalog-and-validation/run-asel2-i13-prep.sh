@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # 2026-11-15 night: io-i-v1.3 a first native use, PREPARE ONLY (no revision with the prep, no compile, no A/B; P5 untouched).
-# Waits for the O queue (V15O_END in m56_asel2_v15o3.stdout.txt) and no CARLA, then prepares I01-S1 with
+# Waits for the O queue (V15O_END in m56_asel2_v15o4.stdout.txt) and no CARLA, then prepares I01-S1 with
 # native-io-prepare-i13.py (NPC start by arc) and prints: SCENE event, gate L (addendum L), npc_cut, NPC start road.
 export PATH=/usr/bin:$PATH
 cd "$(dirname "$0")"
 A='D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs'
-until grep -q V15O_END $A/m56_asel2_v15o3.stdout.txt 2>/dev/null; do sleep 60; done
-grep -q 'NOT RUN' $A/m56_asel2_v15o3.stdout.txt && { echo "NOT RUN: O queue did not run (suite 13)"; echo I13P_END; exit 4; }
+until grep -q V15O_END $A/m56_asel2_v15o4.stdout.txt 2>/dev/null; do sleep 60; done
+grep -q 'NOT RUN' $A/m56_asel2_v15o4.stdout.txt && { echo "NOT RUN: O queue did not run (suite 13)"; echo I13P_END; exit 4; }
 while [ -f $A/m56_asel2_HOLD ]; do sleep 60; done
 export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_CODE=D:/AI/CARLA-Funny-Moments.worktrees/m56-v15 \
        M56_IO_BOX_ANCHOR=midpoint M56_ASEL2_IO=1 M56_SPAWN_TILT=1 \
