@@ -909,3 +909,8 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
     Trước đó 528 khung EGO_TARGET = True. EGO chạy sát mép làn đích, chạm dải bất định.
   - B không gặp hai trường hợp này nên VALID. Không đổi verdict: P5 O06 đã dùng. Nếu muốn nới hai luật này thì đó là luật sau số
     (nguyên tắc 6), phải công bố và báo song song. Chưa sửa gì.
+- 14:35–15:00Z dọn D (yêu cầu người dùng): 67 thư mục `outputs/m56_v6_pair_*` (trước 16/11, không doc/script/output nào tham chiếu; chấm cặp
+  offline, tính lại được từ thư mục A/B vẫn còn) nén tar.zst (33,25 GB → 0,91 GB, kiểm số entry = số file từng thư mục), upload lên
+  Google Drive `My Drive/m56-archive/pairs-20261116` (67/67 khớp kích thước byte qua Drive API), rồi xóa trên D và bản tạm trên E.
+  Manifest (sha256, md5, số file, byte gốc): `outputs/m56_v6_pair_ARCHIVED_20261116_MANIFEST.json`. Script `archive-pairs-20261116.ps1`.
+  D trống 15,2 → 44,8 GB. Còn 80 thư mục pair được tham chiếu (45 GB) giữ nguyên.

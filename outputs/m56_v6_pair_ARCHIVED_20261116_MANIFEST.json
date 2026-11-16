@@ -1,0 +1,605 @@
+[
+  {
+    "dir": "m56_v6_pair_20261026T070552Z",
+    "files": 4505,
+    "src_bytes": 375341075.0,
+    "archive": "m56_v6_pair_20261026T070552Z.tar.zst",
+    "archive_bytes": 14458597,
+    "sha256": "9fcf3cc4c83670ae91b93c6e3e3be1331ae849c88d9d994a1d5f4a5c96953eaf",
+    "md5": "ecba9c37211c634baa66a2c7d343dd57"
+  },
+  {
+    "dir": "m56_v6_pair_20261026T104056Z",
+    "files": 4969,
+    "src_bytes": 337158486.0,
+    "archive": "m56_v6_pair_20261026T104056Z.tar.zst",
+    "archive_bytes": 14652218,
+    "sha256": "897ba3171da6dd0da7f236fe553a93df66839e19535b9199c38b3c633a179bc5",
+    "md5": "35a31fc209a6e04ce612f64490f39ee7"
+  },
+  {
+    "dir": "m56_v6_pair_20261026T115608Z",
+    "files": 6369,
+    "src_bytes": 424960202.0,
+    "archive": "m56_v6_pair_20261026T115608Z.tar.zst",
+    "archive_bytes": 16043996,
+    "sha256": "835eed43868de54c02f0a82198bef292648cf867223fc410eee21d8cf6d172e3",
+    "md5": "bc2262735d6d3e22dbbb6245b85c1b15"
+  },
+  {
+    "dir": "m56_v6_pair_20261026T135120Z",
+    "files": 4069,
+    "src_bytes": 313641454.0,
+    "archive": "m56_v6_pair_20261026T135120Z.tar.zst",
+    "archive_bytes": 13776027,
+    "sha256": "b691d3a58b8d35ecc430ae9f54577eb9843342b0980a10a1234eb2d9e34aee7f",
+    "md5": "399cdf865762f19562879bf38567859b"
+  },
+  {
+    "dir": "m56_v6_pair_20261026T191056Z",
+    "files": 13,
+    "src_bytes": 583718176.0,
+    "archive": "m56_v6_pair_20261026T191056Z.tar.zst",
+    "archive_bytes": 3489590,
+    "sha256": "d6e9772160eb0d49a8b169ba9a5414b0142d29d92eb43eedacfb959edd2d5cc7",
+    "md5": "f6649d95f98552ca84484f4aefe43c5a"
+  },
+  {
+    "dir": "m56_v6_pair_20261026T194452Z",
+    "files": 9170,
+    "src_bytes": 1416613865.0,
+    "archive": "m56_v6_pair_20261026T194452Z.tar.zst",
+    "archive_bytes": 20788885,
+    "sha256": "dbee2ce6f6456258cf9dc4bb5384c79e77dc1a9a0d5eb2c47d92b98e03f88260",
+    "md5": "72c272ea67ad8450866c28b2d5561561"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T092319Z",
+    "files": 3266,
+    "src_bytes": 123904547.0,
+    "archive": "m56_v6_pair_20261107T092319Z.tar.zst",
+    "archive_bytes": 7080351,
+    "sha256": "990f0bafa4385d33f3c7a08f8b11fbd7f60fcfc2c8cfd31456be7eed9167488d",
+    "md5": "7f6fd26a3977a21bb2ac58c7c51cbde5"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T092905Z",
+    "files": 0,
+    "src_bytes": null,
+    "archive": "m56_v6_pair_20261107T092905Z.tar.zst",
+    "archive_bytes": 122,
+    "sha256": "e296094ff9590bc36eed123962e140140b7fca99c67c1200e5edb1160c85b733",
+    "md5": "da94392c550c97d37e2bfbfaef5f519d"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T092956Z",
+    "files": 6368,
+    "src_bytes": 424958303.0,
+    "archive": "m56_v6_pair_20261107T092956Z.tar.zst",
+    "archive_bytes": 16043955,
+    "sha256": "0da151b00c12a25c48513dd7edcbade615262c58158708bc5b0fabce4d86ac3b",
+    "md5": "f65b78b574c71bf461b15afee76a31a2"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T145204Z",
+    "files": 0,
+    "src_bytes": null,
+    "archive": "m56_v6_pair_20261107T145204Z.tar.zst",
+    "archive_bytes": 121,
+    "sha256": "7d5927c34483242f2e466b46c53779eb05c26c7d14b4e9fc982e1f38846baee7",
+    "md5": "9e57075ff0540ab57d4c5d1f4cd9d216"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T145207Z",
+    "files": 0,
+    "src_bytes": null,
+    "archive": "m56_v6_pair_20261107T145207Z.tar.zst",
+    "archive_bytes": 122,
+    "sha256": "6ab278b3c7205f1651eec79aa3bd748655d2e84d31886e52601a9b383c58db93",
+    "md5": "419340dc11dd903ff70aaaf8c94ab8a3"
+  },
+  {
+    "dir": "m56_v6_pair_20261107T164704Z",
+    "files": 6106,
+    "src_bytes": 1167823327.0,
+    "archive": "m56_v6_pair_20261107T164704Z.tar.zst",
+    "archive_bytes": 18207952,
+    "sha256": "5e9784752d93e6b2f815970c07e0662c8f595fbdeb5c2f83f55d213a8edc59ca",
+    "md5": "8eb9686b708addd03da2e3812df74f41"
+  },
+  {
+    "dir": "m56_v6_pair_20261108T014720Z",
+    "files": 4361,
+    "src_bytes": 367384681.0,
+    "archive": "m56_v6_pair_20261108T014720Z.tar.zst",
+    "archive_bytes": 14404955,
+    "sha256": "de2ae0b6825f3161aba79884bb23dd121696d1dbebc1bf580ed6725d07aac277",
+    "md5": "41f83596d7a1a065d8003927c2b25254"
+  },
+  {
+    "dir": "m56_v6_pair_20261108T021805Z",
+    "files": 4117,
+    "src_bytes": 330413361.0,
+    "archive": "m56_v6_pair_20261108T021805Z.tar.zst",
+    "archive_bytes": 13912170,
+    "sha256": "e975e4bf1966844348c04187d4bfa0bbbaa70ba103c28a72ee4b5f4eb1c8a882",
+    "md5": "7435b7305983c8a0024b1c44749ae3bc"
+  },
+  {
+    "dir": "m56_v6_pair_20261108T022240Z",
+    "files": 4117,
+    "src_bytes": 330413361.0,
+    "archive": "m56_v6_pair_20261108T022240Z.tar.zst",
+    "archive_bytes": 13914016,
+    "sha256": "655234a4934d53f5645704e7eb3831eb1679199e3c6d9e8e3ec3da8bf420cb77",
+    "md5": "b8f3d897a68216d9a47334d006409abe"
+  },
+  {
+    "dir": "m56_v6_pair_20261108T024031Z",
+    "files": 5245,
+    "src_bytes": 473888935.0,
+    "archive": "m56_v6_pair_20261108T024031Z.tar.zst",
+    "archive_bytes": 15295960,
+    "sha256": "164d5eab6043528cf81ea735000dad06c9b70d27da10fb5c9e1b6ded2c28532d",
+    "md5": "77a43388c70c1a6697dfc65a58febfb4"
+  },
+  {
+    "dir": "m56_v6_pair_20261108T024851Z",
+    "files": 5245,
+    "src_bytes": 473888935.0,
+    "archive": "m56_v6_pair_20261108T024851Z.tar.zst",
+    "archive_bytes": 15296692,
+    "sha256": "43ca17b101ce72922faf1c91c3093dab1889c46d6f3aa730cd0ed24958a6a5aa",
+    "md5": "6139e99b79ba9d9b095cc24620021bec"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T112138Z",
+    "files": 2525,
+    "src_bytes": 216848741.0,
+    "archive": "m56_v6_pair_20261109T112138Z.tar.zst",
+    "archive_bytes": 12498581,
+    "sha256": "2eb7c04819a3fdee77e177e3b3a97cdc2b9f8f3c0615ede09d3b486a64de9541",
+    "md5": "2887ac303ebfd915ee464d053c32f1fd"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T112628Z",
+    "files": 2525,
+    "src_bytes": 216848741.0,
+    "archive": "m56_v6_pair_20261109T112628Z.tar.zst",
+    "archive_bytes": 12499096,
+    "sha256": "2875d8cdd1112b0245e2f6174118b72173142282cd3187d6cf2bd3f240ea2b85",
+    "md5": "08ecea0c931aba0daac6ba8cce66dbfe"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T113440Z",
+    "files": 8641,
+    "src_bytes": 802356615.0,
+    "archive": "m56_v6_pair_20261109T113440Z.tar.zst",
+    "archive_bytes": 18638386,
+    "sha256": "3f1487007792b04a25d14415d17607735e43e4547d294d97c73cc745a647d0a9",
+    "md5": "6d7a0c63a891f9cd983239ec92e42b66"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T115414Z",
+    "files": 8641,
+    "src_bytes": 802356615.0,
+    "archive": "m56_v6_pair_20261109T115414Z.tar.zst",
+    "archive_bytes": 18638832,
+    "sha256": "5b2e56636be13625126a3b13ab6497e512b1be11b816bd6ac353bde7a63c0ca8",
+    "md5": "de72ff90530d606c409753cab85932cf"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T121033Z",
+    "files": 6149,
+    "src_bytes": 441718221.0,
+    "archive": "m56_v6_pair_20261109T121033Z.tar.zst",
+    "archive_bytes": 15999549,
+    "sha256": "e0edad6c3fdc0a17deca159c4c1f10c3c0c81d877b1ddf0661bba4fd78091f66",
+    "md5": "a50dedb970eafa22eca33aa187249b76"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T121745Z",
+    "files": 6149,
+    "src_bytes": 441718221.0,
+    "archive": "m56_v6_pair_20261109T121745Z.tar.zst",
+    "archive_bytes": 15999475,
+    "sha256": "fd0b5e9443dafa348fa6f6a08ed2f9107913d28c01e689b578e752c9e66b1942",
+    "md5": "ab847bc4f148ab792345d85e2a0e2a5e"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T122653Z",
+    "files": 5389,
+    "src_bytes": 365964643.0,
+    "archive": "m56_v6_pair_20261109T122653Z.tar.zst",
+    "archive_bytes": 15331374,
+    "sha256": "f4f821a6d95bf01f4958628d9211569b99e5caa2e0e269404d50a33aa6347219",
+    "md5": "bdd8d66300516558987914a5151c5434"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T123536Z",
+    "files": 5389,
+    "src_bytes": 365964643.0,
+    "archive": "m56_v6_pair_20261109T123536Z.tar.zst",
+    "archive_bytes": 15331150,
+    "sha256": "2688465b2712c20199f25fcbe826b9ad73b434903771bfd9271108565c1577db",
+    "md5": "6f29319e081a5a51ea5be52aed39ea38"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T124410Z",
+    "files": 2525,
+    "src_bytes": 216848687.0,
+    "archive": "m56_v6_pair_20261109T124410Z.tar.zst",
+    "archive_bytes": 12474119,
+    "sha256": "191ac6a80472c67e3bb0cc5416ab0f951305a0075029cc426747df3e3575e277",
+    "md5": "83e91a8b502c4a61148cf31785e8958c"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T124844Z",
+    "files": 8641,
+    "src_bytes": 802356561.0,
+    "archive": "m56_v6_pair_20261109T124844Z.tar.zst",
+    "archive_bytes": 18632457,
+    "sha256": "5ad26e54ef3521555e3e34e94439716d61adfd50e19f1345b0735b495661c946",
+    "md5": "b6e769c964f5ef7e84c15105b001fa8b"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T130702Z",
+    "files": 6149,
+    "src_bytes": 441718167.0,
+    "archive": "m56_v6_pair_20261109T130702Z.tar.zst",
+    "archive_bytes": 15988335,
+    "sha256": "e79a54bac8a300bf20b85f9516a9fa4ef14d44199b007e72c9d3e299338f3ebe",
+    "md5": "4e27410a35be0544264f6916c2c0c1e7"
+  },
+  {
+    "dir": "m56_v6_pair_20261109T131922Z",
+    "files": 5389,
+    "src_bytes": 365965175.0,
+    "archive": "m56_v6_pair_20261109T131922Z.tar.zst",
+    "archive_bytes": 15315922,
+    "sha256": "955e84ced0025fbcbcf5ee4399ea0adaf8b9458cff8a18a19d0ef163f8ad78c3",
+    "md5": "c84b48fbfd1485a9b31898e33c518225"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T150603Z",
+    "files": 8882,
+    "src_bytes": 1014762296.0,
+    "archive": "m56_v6_pair_20261112T150603Z.tar.zst",
+    "archive_bytes": 20309652,
+    "sha256": "fa0ebc89a2a6a70607dd55249d858c669c790fd4ba0959606ad9649bb2ee27a8",
+    "md5": "2d8e9e8c38921ef119521278b928a933"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T160622Z",
+    "files": 7144,
+    "src_bytes": 1223617348.0,
+    "archive": "m56_v6_pair_20261112T160622Z.tar.zst",
+    "archive_bytes": 16564348,
+    "sha256": "c6e834471b6807cae9b888f4f94fab899cd4cd959d417d71814e44b659daef8a",
+    "md5": "fe57244372bed10de14027a4a0708608"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T171050Z",
+    "files": 9518,
+    "src_bytes": 1036852697.0,
+    "archive": "m56_v6_pair_20261112T171050Z.tar.zst",
+    "archive_bytes": 21047107,
+    "sha256": "23cf0a3b9a0ec0376a2f80d0d7401bbf2d704247e0aa56082971879073517bbe",
+    "md5": "7eee4ba53bf5521a33829ed2ed3780ac"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T205756Z",
+    "files": 3617,
+    "src_bytes": 266120208.0,
+    "archive": "m56_v6_pair_20261112T205756Z.tar.zst",
+    "archive_bytes": 13447048,
+    "sha256": "8273632b5074eba1e942ae2e420326f7211febd0794ec91c7241f4eda2996395",
+    "md5": "5b54ef263420662e23ba8d9bff53a1e2"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T210118Z",
+    "files": 3617,
+    "src_bytes": 266120272.0,
+    "archive": "m56_v6_pair_20261112T210118Z.tar.zst",
+    "archive_bytes": 13448222,
+    "sha256": "9ff2fda289708e76e9b588cc3852ec45927115f822adc150b7c5469c3809702b",
+    "md5": "be3be1ab32252867acd1b9b11014274e"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T210448Z",
+    "files": 9113,
+    "src_bytes": 590629309.0,
+    "archive": "m56_v6_pair_20261112T210448Z.tar.zst",
+    "archive_bytes": 22180136,
+    "sha256": "bc60fad4d7ed7197345289bb9ea746af8b04ba95747ad9bf192b650217dd3a0d",
+    "md5": "95700ea2297438407a5c5ed279924885"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T211509Z",
+    "files": 9113,
+    "src_bytes": 590629363.0,
+    "archive": "m56_v6_pair_20261112T211509Z.tar.zst",
+    "archive_bytes": 22182557,
+    "sha256": "afbf07bd4e8f55bbeae071ef313e276ac5195bc741e3eed4034b7db6afd40a3f",
+    "md5": "ba6bc310028de4c016d0894367b73a23"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T213301Z",
+    "files": 5885,
+    "src_bytes": 654914819.0,
+    "archive": "m56_v6_pair_20261112T213301Z.tar.zst",
+    "archive_bytes": 16999463,
+    "sha256": "4afcacdc3e515e85cc42f32d86de859eea6464542489dba9989b8425917b6e2a",
+    "md5": "fd24edde32550e83d9e1e3bd3e51e321"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T214151Z",
+    "files": 5885,
+    "src_bytes": 654914602.0,
+    "archive": "m56_v6_pair_20261112T214151Z.tar.zst",
+    "archive_bytes": 16991209,
+    "sha256": "2ac0158e8fa8f9c5c2c388c423a8273e1fab11c203152bcdeb1fbf7043470ed7",
+    "md5": "505b09c45ace81f099112158db441db2"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T215755Z",
+    "files": 4541,
+    "src_bytes": 374886275.0,
+    "archive": "m56_v6_pair_20261112T215755Z.tar.zst",
+    "archive_bytes": 14214578,
+    "sha256": "6ef90884ff0c864b16ce057644cd89b2c041b746964e3bae85bacc139d8294dd",
+    "md5": "49d138b71102d64e0a8acc54362b1cba"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T220317Z",
+    "files": 4541,
+    "src_bytes": 374886333.0,
+    "archive": "m56_v6_pair_20261112T220317Z.tar.zst",
+    "archive_bytes": 14215637,
+    "sha256": "c30b0c72510e49f5b030851c8e629b1e42a02f42704074c9ecc546a3ece7ac73",
+    "md5": "f838179371eb740012e88f41f1990c28"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T220757Z",
+    "files": 4541,
+    "src_bytes": 374886333.0,
+    "archive": "m56_v6_pair_20261112T220757Z.tar.zst",
+    "archive_bytes": 14215806,
+    "sha256": "b0a232c2f6deaafa8f19e2f9c1c38a90dbf4920bbd2c311a7a97081ed4b5dc0c",
+    "md5": "3216b512ec208ae50a4d3f98371586d8"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T221243Z",
+    "files": 8373,
+    "src_bytes": 754697680.0,
+    "archive": "m56_v6_pair_20261112T221243Z.tar.zst",
+    "archive_bytes": 18018815,
+    "sha256": "5b60fea0d64e09d5df759b3c3eb74c656d738a4c826298a24d437f818b2987b3",
+    "md5": "ad5c1482d86b63da46c2ec92bdeda01f"
+  },
+  {
+    "dir": "m56_v6_pair_20261112T222312Z",
+    "files": 8373,
+    "src_bytes": 754697738.0,
+    "archive": "m56_v6_pair_20261112T222312Z.tar.zst",
+    "archive_bytes": 18019164,
+    "sha256": "96d58e07914e13150b6ba5f3c94efaeefd29b17efce9bd79e17dcb2c6d137b07",
+    "md5": "818cdfa69c9fa4f1ae5a7ae8e61757ba"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T135745Z",
+    "files": 4605,
+    "src_bytes": 407419006.0,
+    "archive": "m56_v6_pair_20261113T135745Z.tar.zst",
+    "archive_bytes": 14667751,
+    "sha256": "45e5d001d3be3e2fcd8b88254b84b43185cb3369031a93c4015e4f46db51d7a4",
+    "md5": "3a1f5f8b86fb54e6c3f4ff9ccbcbba88"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T140854Z",
+    "files": 4605,
+    "src_bytes": 407418467.0,
+    "archive": "m56_v6_pair_20261113T140854Z.tar.zst",
+    "archive_bytes": 14664848,
+    "sha256": "f217a13136329bc68147441ea894991b83932acf98bf956488eae08429313eb1",
+    "md5": "d126c4e48d4210c1eafdf1940c08e121"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T141653Z",
+    "files": 4605,
+    "src_bytes": 407418467.0,
+    "archive": "m56_v6_pair_20261113T141653Z.tar.zst",
+    "archive_bytes": 14663805,
+    "sha256": "9ac8a0a7ff5634a44ceaaef8fbc8c1c9101aae9575cfa8ad31e5bf61e0caa7d9",
+    "md5": "1ba47423a387541544e0786b580359a8"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T142500Z",
+    "files": 3693,
+    "src_bytes": 280234688.0,
+    "archive": "m56_v6_pair_20261113T142500Z.tar.zst",
+    "archive_bytes": 13555927,
+    "sha256": "cc17ad894863b6322db408731cab12aaf621f65d6f63039ba901d673a3944876",
+    "md5": "b5e72ec45b660deb854161b3e80b06c3"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T143203Z",
+    "files": 3693,
+    "src_bytes": 280234150.0,
+    "archive": "m56_v6_pair_20261113T143203Z.tar.zst",
+    "archive_bytes": 13565498,
+    "sha256": "eb83560ea3e5c2a5bc7fa15a5925f0cc6d8e44b463ff3d26181a851114aff001",
+    "md5": "2252c12aa3a032283d135f06b7604db2"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T143639Z",
+    "files": 3693,
+    "src_bytes": 280234214.0,
+    "archive": "m56_v6_pair_20261113T143639Z.tar.zst",
+    "archive_bytes": 13565101,
+    "sha256": "7372c7b1227133d010dcd20bbb45482b9b9558f2578fda3c0bcb3b65571b56ed",
+    "md5": "2bca8281c987edd2a60658fba4fcee1c"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T144151Z",
+    "files": 5857,
+    "src_bytes": 400692193.0,
+    "archive": "m56_v6_pair_20261113T144151Z.tar.zst",
+    "archive_bytes": 17235523,
+    "sha256": "143b010798913c4ac7b5de7978bbd9fce67a7683eede4ee0c7bb271e1ed50ae2",
+    "md5": "58e212e8428512e0b3ca6ccc9a3bc85f"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T145148Z",
+    "files": 5857,
+    "src_bytes": 400691658.0,
+    "archive": "m56_v6_pair_20261113T145148Z.tar.zst",
+    "archive_bytes": 17226156,
+    "sha256": "207c31dc22461a3106dead85c4f72ef324cd6b1b0a4834cf774e12a02d5f9c6f",
+    "md5": "561eba2a696513427281866cfb621802"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T150136Z",
+    "files": 5857,
+    "src_bytes": 400691722.0,
+    "archive": "m56_v6_pair_20261113T150136Z.tar.zst",
+    "archive_bytes": 17225689,
+    "sha256": "cb65cc06071203ce6d8d40e1dcc359f38d49121b3c61ca2438c8cdaca6876309",
+    "md5": "a208395be0138dfaa5c06b43164141d4"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T151148Z",
+    "files": 10465,
+    "src_bytes": 2133662759.0,
+    "archive": "m56_v6_pair_20261113T151148Z.tar.zst",
+    "archive_bytes": 21502910,
+    "sha256": "c9ce38f4aafa364627362e325a63265443fe4d271af4be2f2e0b6d4de923da56",
+    "md5": "544bd58970aa45eaaad9bb08aa86dd47"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T154732Z",
+    "files": 10465,
+    "src_bytes": 2133662813.0,
+    "archive": "m56_v6_pair_20261113T154732Z.tar.zst",
+    "archive_bytes": 21499872,
+    "sha256": "17a45efa774919d37d3a4a6fb11b1cb32dd3c6e87a04198131456e76a947f62a",
+    "md5": "6023d69cc5ae7068da0bf98fa70d0e8a"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T161917Z",
+    "files": 10465,
+    "src_bytes": 2133662877.0,
+    "archive": "m56_v6_pair_20261113T161917Z.tar.zst",
+    "archive_bytes": 21473499,
+    "sha256": "e9b410f5b03a36b4a2cc714cdee19b3dcbc217bdd439fcebd4341f53a2d164a3",
+    "md5": "9c777195e05da05617b2bac66f459afe"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T180221Z",
+    "files": 0,
+    "src_bytes": null,
+    "archive": "m56_v6_pair_20261113T180221Z.tar.zst",
+    "archive_bytes": 124,
+    "sha256": "795786e90622484c6e1bedd388a221d3f2136ea8e58a86566e699d96d5c2fc5c",
+    "md5": "81fe3f6a1bade4c84c3c2930db4ca548"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T180223Z",
+    "files": 0,
+    "src_bytes": null,
+    "archive": "m56_v6_pair_20261113T180223Z.tar.zst",
+    "archive_bytes": 124,
+    "sha256": "d169067a8536445bd1ea89a8cfaeff099016b1432734971cc4d7da5e965232a3",
+    "md5": "f2f89baa0c8142093f9144470b92c64a"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T181053Z",
+    "files": 5768,
+    "src_bytes": 574895216.0,
+    "archive": "m56_v6_pair_20261113T181053Z.tar.zst",
+    "archive_bytes": 15718660,
+    "sha256": "210f2b7a7634252192f76d831197ba677ed734d9187019843f233f826f69a5e2",
+    "md5": "d339bcb2c2cc89847ebd03fafc3be4e8"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T182957Z",
+    "files": 5721,
+    "src_bytes": 686002873.0,
+    "archive": "m56_v6_pair_20261113T182957Z.tar.zst",
+    "archive_bytes": 16147226,
+    "sha256": "53a2ce1ac4815be6717a8b847bc8648fb1657203a08661e3489efad114c4ff47",
+    "md5": "06ca1ccbd33712852a1269cd2f9dc5f4"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T184935Z",
+    "files": 5930,
+    "src_bytes": 517653111.0,
+    "archive": "m56_v6_pair_20261113T184935Z.tar.zst",
+    "archive_bytes": 15969036,
+    "sha256": "72a3214117486ec192ad2179a5a6610dc7eff12c6859dbf657a7c715d651afba",
+    "md5": "3b86330e63affc506e631ffa43ee3e0f"
+  },
+  {
+    "dir": "m56_v6_pair_20261113T190946Z",
+    "files": 5625,
+    "src_bytes": 932873379.0,
+    "archive": "m56_v6_pair_20261113T190946Z.tar.zst",
+    "archive_bytes": 17491280,
+    "sha256": "99856924356216c4ef39ae4a36071b520b76714588d903e17cb16f2ceabcd38c",
+    "md5": "a8db126a83754ffed49135a8c9019721"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T094531Z",
+    "files": 3385,
+    "src_bytes": 244457556.0,
+    "archive": "m56_v6_pair_20261115T094531Z.tar.zst",
+    "archive_bytes": 13321465,
+    "sha256": "0f0923f19acfc34f72a0714caec3cd8095d1a840b4c2d956fca5084bdd9429a4",
+    "md5": "fd62e011ebe60eea89ba6afe7fa9a2e3"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T094823Z",
+    "files": 3385,
+    "src_bytes": 244457020.0,
+    "archive": "m56_v6_pair_20261115T094823Z.tar.zst",
+    "archive_bytes": 13298666,
+    "sha256": "09b403e969a2661918f8b88b486544d8ea5d7ff6f534787e85c527d9f0c1bfba",
+    "md5": "a8a7e79ea797bd59f140c29ae88d2006"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T095041Z",
+    "files": 3385,
+    "src_bytes": 244457084.0,
+    "archive": "m56_v6_pair_20261115T095041Z.tar.zst",
+    "archive_bytes": 13299623,
+    "sha256": "50e99e20967e5269ffe2d394aecd70ffb411ec5645fe1346fcfbb9df2e8ee395",
+    "md5": "2508d22e9891d5fb0c39734a507a0aae"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T095305Z",
+    "files": 5389,
+    "src_bytes": 344258950.0,
+    "archive": "m56_v6_pair_20261115T095305Z.tar.zst",
+    "archive_bytes": 15158136,
+    "sha256": "12d04e844fd5873435880efc209d926da444332403bc1a4a01a4abef85a9460c",
+    "md5": "16b848c6777b97a39e49ce315f996e6d"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T095726Z",
+    "files": 5389,
+    "src_bytes": 344258434.0,
+    "archive": "m56_v6_pair_20261115T095726Z.tar.zst",
+    "archive_bytes": 15156590,
+    "sha256": "ce92d636df42a3cdc714c367ab13358e04cc238972556038fef9b733d64be214",
+    "md5": "cb29e7f1ee70f6bd294fc8765f6f0a24"
+  },
+  {
+    "dir": "m56_v6_pair_20261115T100100Z",
+    "files": 5389,
+    "src_bytes": 344258434.0,
+    "archive": "m56_v6_pair_20261115T100100Z.tar.zst",
+    "archive_bytes": 15157298,
+    "sha256": "04f44938e1a1eb5084b8cc279670db9493a5161780e6b9baf6d3a6cb89f6423f",
+    "md5": "b33a9dffb76c2ad8bcf97df28c78c480"
+  }
+]
