@@ -1,4 +1,4 @@
-"""Certified on-plane observations are not already beyond the physical fence."""
+"""Certified on-plane observations are not already beyond the physical fence; v17: nor do they lose the crossing."""
 from dataclasses import replace
 from fractions import Fraction as F
 from itertools import product
@@ -36,8 +36,10 @@ def test_certified_plane_touch_does_not_lose_next_actual_io_crossing(tmp_path,en
         frames.append(replace(f,integrity=fields))
     events=detect_events(tuple(frames),fixture)
     event=next((e for e in events if e.name==endpoint),None)
-    if defect!='none':
+    if defect=='touch_only':
         assert event is None,tuple((e.name,e.frame) for e in events)
     else:
+        # v17 addendum O: the on-plane sample at 141 is inside the band when u > 0; the crossing still fires at the
+        # first certified-beyond frame and its witness spans the chain from the last certified-before frame (140).
         assert event is not None and event.frame==142,tuple((e.name,e.frame) for e in events)
-        assert {r.frame for r in event.witness_refs}=={141,142}
+        assert {r.frame for r in event.witness_refs}==({141,142} if defect=='none' else {140,141,142})

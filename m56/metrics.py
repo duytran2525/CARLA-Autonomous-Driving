@@ -2170,10 +2170,14 @@ def _detect_io(frames, fixture):
     if (state is not None and state['fixture'] is fixture and state['first'] is frames[0]
             and state['n']<=len(frames) and all(a is b for a,b in zip(state['frames'],frames))):
         result=list(state['result']);seen=set(state['seen']);derived=list(state['derived']);start=state['n']-1
+        armed=dict(state.get('armed',{}))
+    else:
+        armed={}
     for previous,current in zip(frames[start:],frames[start+1:]):
         prior_refs=_frame_refs(previous);refs=_frame_refs(current)
         proof=_continuous_proof(previous,current,binding)
         if not prior_refs or not refs or proof is None:
+            armed.clear()  # v17: a crossing may only span an unbroken chain of certified frame pairs
             continue
         old={a.role:a for a in previous.actors};new={a.role:a for a in current.actors}
         if len(old)!=len(previous.actors) or len(new)!=len(current.actors):
@@ -2182,23 +2186,42 @@ def _detect_io(frames, fixture):
             if role not in old or role not in new or old[role].id!=new[role].id:
                 return False
             if old[role].route_valid is not True or new[role].route_valid is not True:
-                return False
+                armed.pop((role,id(section),new[role].id),None)
+                return ()
             before=world_vertices(old[role].body,old[role].pose)
             after=world_vertices(new[role].body,new[role].pose)
             if not _section_corridor(before,section) or not _section_corridor(after,section):
-                return False
+                armed.pop((role,id(section),new[role].id),None)
+                return ()
             a=_section_margin(before,section);b=_section_margin(after,section)
             if a is None or b is None:
-                return False
+                armed.pop((role,id(section),new[role].id),None)
+                return ()
             # Whole-source -> actual intrusion uses front/max, X uses rear/min.
             extreme=min if whole else max
             # Certified touching is still not beyond the fence. Requiring a
             # strictly negative predecessor loses a real crossing after an exact
             # on-plane sample; the new lower bound must remain strictly beyond.
-            return extreme(a)+proof.uncertainty<=0 and extreme(b)-proof.uncertainty>0
-        if 'TRIGGER' not in seen and crossing('NPC' if category=='I' else 'EGO',boundary,False):
+            # v17 (addendum O): a sample inside the +-uncertainty band of the plane certifies neither side, so the
+            # pairwise rule lost the crossing (I02-S2 A: rear at -0.26 mm, u = 1 mm). Once certified before, the
+            # crossing fires on the first later certified-beyond sample of the same actor over an unbroken chain.
+            # The event's witness is the whole chain from the certified-before frame (one pair when no band sample).
+            key=(role,id(section),new[role].id)
+            if extreme(a)+proof.uncertainty<=0:
+                armed[key]=()
+            elif extreme(a)-proof.uncertainty>0:
+                armed.pop(key,None)
+            if key not in armed:
+                return ()
+            chain=armed[key]+prior_refs+refs+proof.raw_refs
+            if extreme(b)-proof.uncertainty>0:
+                del armed[key]
+                return chain
+            armed[key]=chain
+            return ()
+        if 'TRIGGER' not in seen and (chain:=crossing('NPC' if category=='I' else 'EGO',boundary,False)):
             seen.add('TRIGGER')
-            result.append(EventRecord('TRIGGER',current.frame,current.simtime,prior_refs+refs+proof.raw_refs))
+            result.append(EventRecord('TRIGGER',current.frame,current.simtime,chain))
         if 'TRIGGER' in seen:
             if _lane_change_path(current,fixture):
                 path=decode_record('CapabilityProof',encode_record(current.integrity['lane_change_path']))
@@ -2210,12 +2233,12 @@ def _detect_io(frames, fixture):
                                           refs+path.raw_refs))
         return_start=fixture.sections.get('O_RETURN_START') if category=='O' else None
         if ('TRIGGER' in seen and 'RETURN_MARKER' not in seen and return_start is not None
-                and crossing('EGO',return_start,False)):
+                and (chain:=crossing('EGO',return_start,False))):
             seen.add('RETURN_MARKER')
-            result.append(EventRecord('RETURN_MARKER',current.frame,current.simtime,prior_refs+refs+proof.raw_refs))
-        if 'TRIGGER' in seen and 'X_END' not in seen and crossing('EGO',end,True):
+            result.append(EventRecord('RETURN_MARKER',current.frame,current.simtime,chain))
+        if 'TRIGGER' in seen and 'X_END' not in seen and (chain:=crossing('EGO',end,True)):
             seen.add('X_END')
-            result.append(EventRecord('X_END',current.frame,current.simtime,prior_refs+refs+proof.raw_refs))
+            result.append(EventRecord('X_END',current.frame,current.simtime,chain))
         clear=False
         if 'TRIGGER' in seen:
             if category=='I' and 'NPC' in new and new['NPC'].route_valid is True:
@@ -2239,7 +2262,7 @@ def _detect_io(frames, fixture):
     if len(_CL_CACHE)>256:
         _CL_CACHE.clear()
     _CL_CACHE[ckey]={'fixture':fixture,'first':frames[0],'frames':tuple(frames),'n':len(frames),'result':tuple(result),
-                     'seen':frozenset(seen),'derived':tuple(derived)}
+                     'seen':frozenset(seen),'derived':tuple(derived),'armed':dict(armed)}
     predicate='NPC_SOURCE_CLEAR' if category=='I' else 'EGO_RETURN_CLEAR'
     confirmed=confirm_hold(tuple(derived),predicate,Fraction(1,4))
     if confirmed is not None:
