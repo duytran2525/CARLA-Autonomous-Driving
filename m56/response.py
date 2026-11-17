@@ -479,7 +479,7 @@ def step_response(frame: FrameRecord, state: ScriptState, response: FrozenRespon
                 raise ValueError('REFERENCE_SWITCH_GUARD_MISSING')
             if arc<switch['marker_arc_m']:
                 raise ValueError('REFERENCE_SWITCH_BEFORE_MARKER')
-    offset=desired_offset(arc,reference)
+    offset=commanded_offset(arc,reference,response,phase)
     if response.actor_role=='EGO' and offset!=0:
         if (category,response.action_id)==('I','B'):
             if not {'TRIGGER','SOURCE_CLEAR_CONFIRMED','LANE_CHANGE_PATH_CLEAR'}.issubset(events):
@@ -1637,6 +1637,21 @@ def _switch_real_v5(old, new, marker, old_offset):
     x,y,yaw=_at_arc(old,marker);nx,ny,_=_at_arc(new,marker);o=float(old_offset);r=radians(yaw)
     if dist((x-sin(r)*o,y+cos(r)*o),(nx,ny))>.05:
         raise ValueError('REFERENCE_SWITCH_DISCONTINUOUS')
+
+
+def commanded_offset(arc, reference, response, cause):
+    """v16 (addendum N, post-number, session user [chat] 2026-11-17): an I-category EGO action B holds the profile's start
+    offset until its frozen program has passed the SOURCE_CLEAR_CONFIRMED transition (the CHANGE phase, which already requires
+    TRIGGER + LANE_CHANGE_PATH_CLEAR). The lane change then follows the frozen arc profile unchanged; a late event therefore
+    enters the profile mid-way (a reference step, disclosed). Every other response: desired_offset unchanged (v15)."""
+    offset=desired_offset(arc,reference)
+    if response.actor_role!='EGO' or response.phases.get('category')!='I' or response.action_id!='B':
+        return offset
+    program=_program(response);names=(program['initial'],*(t['cause'] for t in program['transitions']))
+    gate=next((i+1 for i,t in enumerate(program['transitions']) if t['after_event']=='SOURCE_CLEAR_CONFIRMED'),None)
+    if gate is None or cause not in names or names.index(cause)>=gate:
+        return offset
+    return reference.profile['segments'][0]['start_offset_m']
 
 
 def desired_offset(arc: Number, response: FrozenResponse) -> Number:

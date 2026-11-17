@@ -1184,7 +1184,7 @@ def _offset_integrity(evidence,fixture):
     the actor's asserted arc. Original source/plan authentication is independent.
     Target-plan switches/rebases are unsupported until their producer is bound.
     """
-    from .response import desired_offset,_reference_response,_program
+    from .response import desired_offset,commanded_offset,_reference_response,_program
     from .metrics import _metric_station
     invalid=[];uncertain=[]
     frames={(f.boot,f.world,f.frame):f for f in evidence.raw}
@@ -1236,7 +1236,7 @@ def _offset_integrity(evidence,fixture):
                            for s in response.phases['reference_switches']):
                         invalid.append('OFFSET_REFERENCE_SWITCH_INVALID');continue
                 if (not isinstance(command.offset,Fraction)
-                        or command.offset!=desired_offset(arc,reference)):
+                        or command.offset!=commanded_offset(arc,reference,response,command.cause)):
                     invalid.append('OFFSET_PROGRAM_MISMATCH')
     return tuple(dict.fromkeys(invalid)),tuple(dict.fromkeys(uncertain))
 
