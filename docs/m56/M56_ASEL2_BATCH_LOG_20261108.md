@@ -957,3 +957,24 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   cùng recipe PREPARED). Không compile/A/B, không P5. Không tự prepare lại (tránh chọn lần may), chờ người dùng.
 - **I02-S2 (addendum N):** PREPARED, probe 3 qua G1 6,95 s / G3 2,0 s / G5 SOURCE_CLEAR_CONFIRMED − TRIGGER = 3,3 s ≤ 3,5 → A/B một lần
   (P5 dưới version mới đã dùng). Kết quả pair ghi sau.
+- **I02-S2 kết quả (A/B `m56_io_ab_Town13_20261117T072227Z`, P5 đã tiêu):** pair dưới m56-v16 `BLOCKED_WITNESS` và dưới m56-v15
+  `BLOCKED_WITNESS`. B (đổi làn theo sự kiện) VALID; A `X_END_MISSING`. Chẩn đoán (`asel2-xend-diag.py`): A đi qua X thật
+  (arc 136,3 → 157,7, DESTINATION_CONFIRMED). Đuôi xe ở −0,26 mm tại frame 2863, trong dải ±u (u = 1 mm), nên luật crossing
+  theo cặp frame bỏ mất sự kiện. → **addendum O / product m56-v17** (`9282d62`, sau khi thấy số, đã công bố). Chấm lại offline
+  dưới v17 (`m56_v6_pair_20261117T082600Z`): **PASS**, A và B đều COMPLETE/VALID. v_mean_E A 4,41 / B 7,21 m/s; e_lat_peak
+  A 0,004 / B 2,97 m. Báo song song: v16 và v15 BLOCKED_WITNESS (luật cũ).
+- **Người dùng [chat] 17/11:** "tối ưu upload hết dữ liệu không cần thiết ở D và E lên G, sửa lại I01-S1 rồi prepare lại, I04 bạn
+  tự quyết". I01-S1: nguyên nhân là vòng tốc độ EGO dao động giới hạn, kéo dài tới khoảng 12 s (ngày 16/11 chỉ khoảng 6 s); cửa
+  sổ 2 s cố định ngay trước điểm quyết định. → addendum P (io-i-v1.3 b, `native-io-prepare-i14.py`): một lần prepare lại với
+  chạy đà ×3/2 (64 → 96 m). I04: Claude quyết dưới ủy quyền của Duy là chạy lại chính I04 dưới version mới (PASS cũ đã hạ theo
+  addendum L). Doc `PREREG_M56_IO_I_ADDENDUM_O_P_20261117.md` (`7fd7436`). Batch `r17c` (`run-asel2-io-i17.sh`,
+  I01-S1 + I04, product v17, pair dưới v17/v16/v15). Guard r16f đã chết từ khoảng 03:05Z (PID bị dùng lại); đã bật guard r17c
+  trước batch.
+- **Sự cố tooling:** self-test đầu tiên của `native-io-prepare-i14.py` chạy vào `M.main()`, CARLA khởi động ngoài cguard
+  và chết ngay ở BODY_BBOX_ZERO (không có cảnh nào, không P5). Đã sửa: self-test chạy trước mọi import. Thư mục rác đã xóa.
+- **Offload đợt 3:** `offload-d-to-e-20261117c.py` chuyển 124 mục D → E: mọi `m56_v2_ab/io_ab/f_ab` cũ và mọi `m56_v6_pair`
+  cũ (mọi `pair-result.json` GIỮ trên D cho `latest_pair`), `m56_offline_v1/diagnostics`, và `pytest_receipts` thành
+  một file .tar (có 184 symlink). Không chuyển `m56_v2_prepare_*` (builder revision đọc các thư mục 25/10). Đo inode: không có
+  hard link (89,6 GB logic = 89,6 GB thật). Uploader viết lại chạy theo lô 3 GB, thử lại khi DB DriveFS bị khóa (bản trước
+  chết lúc 15:14 vì `WinError 33`). Cổng xóa vẫn là pending == 0 và mọi mục của lô khớp số file và byte trên cloud. Release
+  `--full` hoặc chấm lại cảnh cũ: phải tải về trước (`robocopy "G:\My Drive\m56-offload-20261116\<rel>" outputs\<rel> /E`).
