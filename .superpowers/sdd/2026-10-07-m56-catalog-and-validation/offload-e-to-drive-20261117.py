@@ -94,7 +94,10 @@ def sweep(snap, src, rel):
     for k, size in local.items():
         c = cf.get(k)
         if c is not None and c[1] and c[0] == size:
-            (src / k if k else src).unlink(); gone += 1
+            try:
+                (src / k if k else src).unlink(); gone += 1
+            except OSError:  # open by a reader (Windows): retried next poll
+                pass
     return gone, len(local) - gone
 
 
