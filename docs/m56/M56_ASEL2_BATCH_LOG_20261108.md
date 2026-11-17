@@ -944,3 +944,16 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   tính lại được; giữ `release-report.json`) lên `G:\My Drive\m56-offload-20261116\` (cùng đường dẫn tương đối), không nén.
   `offload-to-drive-20261116.ps1`: robocopy → kiểm số file + byte trên G: → xóa ở D; mỗi đợt ~6 GB chờ cache DriveFS (ổ C) < 3 GB
   và C ≥ 15 GB. Manifest `outputs/m56_offload_20261116_MANIFEST.jsonl`. `m56_offline_v1` giữ (test_cli/test_staging đọc).
+- **17/11 dọn D/E (yêu cầu người dùng: chỉ giữ trên cloud):** upload ~0,25 MB/s nên phần còn lại (130 mục, 34,9 GB) chuyển D → `E:\m56-offload-20261116`
+  trước (kiểm số file + byte, log `outputs/m56_offload_20261117_E.jsonl`). Hard link giữa các bundle nên D chỉ trống thêm ~23 GB →
+  đợt 2 chuyển thêm `m56_offline_v1/{pytest_receipts,source_checkpoints,diagnostics}` và các `m56_v2_ab_Town04–06_*` còn lại sang E,
+  để junction ở D (`offload-junction-20261117.ps1`, log `..._junction.jsonl`). `offload-e-to-drive-20261117.py --delete-junctions`
+  (detached `m56_offload_cloud_20261117b`): mỗi mục chép E → `G:\My Drive\m56-offload-20261116\<rel>`, chờ DB của DriveFS báo 0
+  thao tác chờ và cloud khớp số file + byte, rồi xóa bản E (và junction). Log `outputs/m56_offload_20261117_cloud.jsonl`.
+  - **Người dùng [chat] 17/11: "xóa hẳn luôn cả nhóm junction".** Hệ quả: các thư mục A/B cũ của cảnh PASS (Town04–06, tháng 10–11)
+    và lịch sử `m56_offline_v1` chỉ còn trên Drive. Trước release `--full` hoặc mọi chẩn đoán đọc chúng phải tải về đúng đường dẫn
+    (`robocopy "G:\My Drive\m56-offload-20261116\<rel>" outputs\<rel> /E`). `m56_offline_v1/inputs` (test đọc) giữ trên D.
+- **I01-S1 (addendum N, `r17b`):** prepare `BLOCKED_FIXTURE READINESS_NOT_STEADY` (5 probe 1 đều READINESS_NOT_REACHED; hôm qua
+  cùng recipe PREPARED). Không compile/A/B, không P5. Không tự prepare lại (tránh chọn lần may), chờ người dùng.
+- **I02-S2 (addendum N):** PREPARED, probe 3 qua G1 6,95 s / G3 2,0 s / G5 SOURCE_CLEAR_CONFIRMED − TRIGGER = 3,3 s ≤ 3,5 → A/B một lần
+  (P5 dưới version mới đã dùng). Kết quả pair ghi sau.

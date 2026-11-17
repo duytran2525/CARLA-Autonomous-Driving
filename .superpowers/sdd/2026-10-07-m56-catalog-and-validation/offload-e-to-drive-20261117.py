@@ -76,11 +76,28 @@ def items():
 
 done = set()
 if LOG.exists():
-    done = {json.loads(l)['rel'] for l in LOG.read_text(encoding='utf-8').splitlines() if '"DELETED_E"' in l or '"KEPT_JUNCTION"' in l}
-for rel, junction in items():
+    done = {json.loads(l)['rel'] for l in LOG.read_text(encoding='utf-8').splitlines()
+            if '"DELETED_E"' in l or ('"KEPT_JUNCTION"' in l and not DEL_J)}
+
+
+def todo():
+    # re-read each pass: the junction mover appends items while this runs; two idle passes 10 min apart end the run
+    return [(r, j) for r, j in items() if r not in done and (E / r).exists()]
+
+
+def run():
+  idle = 0
+  while idle < 2:
+    batch = todo()
+    if not batch:
+        idle += 1; time.sleep(600 if idle < 2 else 0); continue
+    idle = 0
+    for rel, junction in batch:
+        process(rel, junction)
+
+
+def process(rel, junction):
     src = E / rel
-    if rel in done or not src.exists():
-        continue
     n, b = local(src)
     while shutil.disk_usage('C:/').free / 2**30 < MIN_C_GB:
         say(event='WAIT_C', rel=rel, c_free_gb=round(shutil.disk_usage('C:/').free / 2**30, 1)); time.sleep(POLL_S)
@@ -98,11 +115,15 @@ for rel, junction in items():
         say(event='WAIT_UPLOAD', rel=rel, pending=pending, cloud=[cn, cb], e=[n, b]); time.sleep(POLL_S)
     if junction and not DEL_J:
         say(event='KEPT_JUNCTION', rel=rel, files=n, bytes=b, note='in cloud; E copy kept (code reads it via the D junction)')
-        continue
-    shutil.rmtree(src)
+        done.add(rel); return
     if junction:
         j = OUT / rel
         if j.is_junction():
-            j.rmdir()
-    say(event='DELETED_E', rel=rel, files=n, bytes=b, cloud_verified=True)
+            j.rmdir()  # removes the link only, before the target goes
+    shutil.rmtree(src)
+    done.add(rel)
+    say(event='DELETED_E', rel=rel, files=n, bytes=b, cloud_verified=True, junction_removed=junction)
+
+
+run()
 say(event='CLOUD_END', e_left_gb=round(sum(f.stat().st_size for f in E.rglob('*') if f.is_file()) / 2**30, 2) if E.exists() else 0)
