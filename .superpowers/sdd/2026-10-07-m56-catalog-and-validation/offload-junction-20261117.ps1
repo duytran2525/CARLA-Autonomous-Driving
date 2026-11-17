@@ -9,6 +9,8 @@ foreach ($rel in $Rel) {
     $src = Join-Path $O $rel; $dst = Join-Path $E $rel
     $it = Get-Item $src -Force -EA SilentlyContinue
     if ($null -eq $it -or $it.LinkType) { "SKIP $rel"; continue }
+    # robocopy follows inner symlinks (pytest_receipts has 184): the copy would not match the source, so keep such items on D
+    if (@(gci $src -Recurse -Force -Attributes ReparsePoint -EA SilentlyContinue).Count) { "SKIP_REPARSE $rel"; continue }
     $f = @(gci $src -Recurse -Force -File); $n = $f.Count; $b = [int64]($f | Measure Length -Sum).Sum
     robocopy $src $dst /E /COPY:DT /R:2 /W:5 /NFL /NDL /NP /NJH /NJS | Out-Null
     if ($LASTEXITCODE -ge 8) { "FAIL robocopy $rel rc=$LASTEXITCODE"; exit 2 }
