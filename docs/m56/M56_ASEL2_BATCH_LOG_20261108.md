@@ -978,3 +978,26 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   hard link (89,6 GB logic = 89,6 GB thật). Uploader viết lại chạy theo lô 3 GB, thử lại khi DB DriveFS bị khóa (bản trước
   chết lúc 15:14 vì `WinError 33`). Cổng xóa vẫn là pending == 0 và mọi mục của lô khớp số file và byte trên cloud. Release
   `--full` hoặc chấm lại cảnh cũ: phải tải về trước (`robocopy "G:\My Drive\m56-offload-20261116\<rel>" outputs\<rel> /E`).
+
+## 17/11 chiều (2): kết quả r17c (I01-S1, I04 dưới product v17); uploader xóa từng file
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent. Batch `m56_asel2_io_20261117T085656Z` (`ASEL2_IO_END`).
+
+- **I04 (io-i-v1.3 a/b + v17 + G5): PASS** dưới cả m56-v17 (`m56_v6_pair_20261117T095132Z`), m56-v16 (`…102227Z`) và
+  m56-v15 (`…104856Z`); ba bản cho cùng kết quả. Prepare PREPARED; probe 3 đạt (t_clear − TRIGGER = 1,45 s ≤ 2,3 s;
+  event_clear − TRIGGER = 2,3 s). A/B `m56_io_ab_Town06_20261117T093031Z` (đã tiêu P5 cho version này). A và B đều
+  CONFIRMED/COMPLETE/VALID, d09_binds true. v_mean_E: A 6,968, B 11,387 m/s. e_lat_peak: A 0,0004, B 3,240 m. comparisons
+  0,3881 | 0,99987. Báo cạnh PASS cũ của I04 (đã bị hạ ngày 15/11 theo addendum L).
+- **I01-S1: prepare PREPARED ngay lần đầu** (chạy đà 64 m; retry của addendum P không cần bắn; `io_i13b_first` = null).
+  **Probe 3 không đạt: `SOURCE_CLEAR_LATE`, `SOURCE_CLEAR_EVENT_LATE`** (stop `TRIGGER_PLUS_2_3_S`, t_clear = null) →
+  `BLOCKED_FIXTURE`, không A/B, không tiêu P5. Chẩn đoán (trace probe 3): NPC 18 km/h (4,71 m/s) có đổi làn; offset lệnh
+  là 1,46 m lúc TRIGGER và đạt 3,25 m (= |separation|) lúc +2,25 s. Nhưng xe bám trễ đường lệnh và còn lệch hướng khoảng 8°
+  (yaw −171,7°), nên tới +2,3 s một góc thân xe vẫn còn trong làn nguồn. Muốn sửa phải đổi recipe/hình học (NPC bắt đầu đổi
+  làn sớm hơn so với mốc TRIGGER, hoặc quãng đổi làn ngắn hơn ở tốc độ thấp), không đổi ngưỡng 2,3 s. Cần addendum Q viết
+  trước khi chạy. Chưa làm.
+- **Uploader (người dùng [chat] 17/11: "upload xong file nào thì xóa luôn file đó"):** `offload-e-to-drive-20261117.py`
+  viết lại. Một luồng chép E → G (tối đa 3 GB đang chờ); vòng chính mỗi 60 s đọc bản sao DB DriveFS và xóa TỪNG file trên E
+  khi file đó trên G đã có id cloud (DriveFS giữ id `local-…` tới khi upload xong; đo: `local_stable_ids` ⇔ id `local-%`,
+  0 ngoại lệ cả hai chiều) và cùng kích thước. Mục nào hết file thì ghi `DELETED_E` (gỡ junction nếu có). Bản sao DB bị
+  "malformed" thì bỏ qua lần đó (bản trước sẽ chết). Chạy lại vẫn an toàn: kiểm G là tập cha của phần còn lại trên E.
+  Chạy detached `m56_offload_cloud_20261117d` (đã dừng bản theo lô 20261117c).

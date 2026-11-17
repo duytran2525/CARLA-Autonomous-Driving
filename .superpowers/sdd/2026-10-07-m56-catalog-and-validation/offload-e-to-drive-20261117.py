@@ -1,13 +1,13 @@
 """2026-11-17 (user: after E:, upload to Drive and delete from the machine, keep only the cloud copy; the junction group too;
-then "toi uu upload"). Items = outputs/m56_offload_20261117_E.jsonl (moved D -> E; a dir, or a .tar file) +
-outputs/m56_offload_20261117_junction.jsonl (D keeps a junction to E: deleted only with --delete-junctions).
-Batches of ~BATCH_GB: wait C: >= MIN_C_GB -> robocopy each item E -> G:\\My Drive\\m56-offload-20261116\\<rel> -> verify G
--> poll the DriveFS metadata DB (read-only copy, retried while DriveFS locks it) until it has NO pending operations and
-shows every batch item in the cloud with the same file count + bytes -> delete the batch's E copies (and junctions).
-Batching keeps DriveFS's queue full (the one-item loop idled up to a poll per item) while the delete gate stays global
-pending == 0. Rerun is safe (done items skipped). Log: outputs/m56_offload_20261117_cloud.jsonl.
-python -I offload-e-to-drive-20261117.py [--delete-junctions] | --selftest"""
-import json, shutil, sqlite3, subprocess, sys, tempfile, time
+"toi uu upload"; then "upload xong file nao thi xoa luon file do"). Items = outputs/m56_offload_20261117_E.jsonl (moved
+D -> E; a dir, or a .tar file) + outputs/m56_offload_20261117_junction.jsonl (D junction -> E, removed with the item).
+A copier thread robocopies items E -> G:\\My Drive\\m56-offload-20261116\\<rel> (verify: every E file is on G with its size)
+while at most INFLIGHT_GB of copied items still wait on E. Every POLL_S the main loop reads a fresh read-only copy of the
+DriveFS metadata DB and deletes EACH E file whose G item has a cloud id (DriveFS keeps id 'local-...' until the upload
+is done; local_stable_ids holds exactly those) and the same size. An item whose E files are all gone is logged
+DELETED_E (and its D junction removed). Rerun is safe (done items skipped, half-swept items re-verified as a subset).
+Log: outputs/m56_offload_20261117_cloud.jsonl. python -I offload-e-to-drive-20261117.py | --selftest"""
+import json, os, shutil, sqlite3, subprocess, sys, tempfile, threading, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,8 +15,8 @@ OUT = Path(__file__).resolve().parents[3] / 'outputs'
 E, G, TOP = Path('E:/m56-offload-20261116'), Path('G:/My Drive/m56-offload-20261116'), 'm56-offload-20261116'
 DB = Path.home() / 'AppData/Local/Google/DriveFS/110182317752861355392'
 LOG = OUT / 'm56_offload_20261117_cloud.jsonl'
-MIN_C_GB, POLL_S, BATCH_GB = 12, 120, 3
-DEL_J = '--delete-junctions' in sys.argv
+MIN_C_GB, POLL_S, INFLIGHT_GB = 12, 60, 3
+LOCK = threading.Lock()
 
 
 def now():
@@ -24,21 +24,23 @@ def now():
 
 
 def say(**k):
-    k['utc'] = now(); print(json.dumps(k), flush=True)
-    with LOG.open('a', encoding='utf-8') as f:
-        f.write(json.dumps(k) + '\n')
+    k['utc'] = now()
+    with LOCK:
+        print(json.dumps(k), flush=True)
+        with LOG.open('a', encoding='utf-8') as f:
+            f.write(json.dumps(k) + '\n')
 
 
-def local(p):
+def files_of(p):
+    """{relative posix path: size} of the files under p ('' for p itself when p is a file)."""
     if p.is_file():
-        return 1, p.stat().st_size
-    fs = [f for f in p.rglob('*') if f.is_file()]
-    return len(fs), sum(f.stat().st_size for f in fs)
+        return {'': p.stat().st_size}
+    return {f.relative_to(p).as_posix(): f.stat().st_size for f in p.rglob('*') if f.is_file()}
 
 
 def snapshot():
-    """(pending, meta, kids) from a fresh read-only copy of the DriveFS metadata DB; DriveFS may lock a byte range of the
-    file for a moment, so each copy is retried."""
+    """(pending, meta, kids) from a fresh read-only copy of the DriveFS DB, or None when DriveFS held a lock or the copy
+    caught the DB mid-write (malformed); the next poll retries. meta[s] = (title, is_folder, size, uploaded)."""
     tmp = Path(tempfile.mkdtemp())
     try:
         for n in ('metadata_sqlite_db', 'metadata_sqlite_db-wal', 'metadata_sqlite_db-shm'):
@@ -52,34 +54,48 @@ def snapshot():
             else:
                 return None
         db = sqlite3.connect(tmp / 'metadata_sqlite_db')
-        pending = db.execute('select count(*) from operations').fetchone()[0] + db.execute('select count(*) from local_stable_ids').fetchone()[0]
-        meta = {s: (t, d, z) for s, t, d, z, bad in db.execute(
-            'select stable_id, local_title, is_folder, file_size, (trashed or is_tombstone) from items') if not bad}
-        kids = {}
-        for c, p in db.execute('select item_stable_id, parent_stable_id from stable_parents'):
-            if c in meta:
-                kids.setdefault(p, {})[meta[c][0]] = c
-        db.close()
+        try:
+            pending = db.execute('select count(*) from local_stable_ids').fetchone()[0]
+            meta = {s: (t, d, z, not str(i).startswith('local-')) for s, i, t, d, z, bad in db.execute(
+                'select stable_id, id, local_title, is_folder, file_size, (trashed or is_tombstone) from items') if not bad}
+            kids = {}
+            for c, p in db.execute('select item_stable_id, parent_stable_id from stable_parents'):
+                if c in meta:
+                    kids.setdefault(p, {})[meta[c][0]] = c
+        except sqlite3.DatabaseError:
+            return None
+        finally:
+            db.close()
         return pending, meta, kids
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def cloud(snap, rel):
-    """(files, bytes) under TOP/rel in the snapshot (a file item counts itself)."""
+def cloud_files(snap, rel):
+    """{relative posix path: (size, uploaded)} of the file items under TOP/rel ('' when rel is a file item)."""
     _, meta, kids = snap
     top = [s for s, m in meta.items() if m[0] == TOP and m[1]]
     s = top[0] if len(top) == 1 else None
     for part in Path(rel).parts:
         s = None if s is None else kids.get(s, {}).get(part)
-    nf = nb = 0; stack = [] if s is None else [s]
+    out, stack = {}, [] if s is None else [(s, '')]
     while stack:
-        x = stack.pop()
+        x, path = stack.pop()
         if meta[x][1]:
-            stack.extend(kids.get(x, {}).values())
+            stack.extend((c, f'{path}/{t}' if path else t) for t, c in kids.get(x, {}).items())
         else:
-            nf += 1; nb += meta[x][2] or 0
-    return nf, nb
+            out[path] = (meta[x][2] or 0, meta[x][3])
+    return out
+
+
+def sweep(snap, src, rel):
+    """Delete each file under src (the E copy of rel) that is uploaded with the same size; returns (deleted, left)."""
+    cf, gone, local = cloud_files(snap, rel), 0, files_of(src)
+    for k, size in local.items():
+        c = cf.get(k)
+        if c is not None and c[1] and c[0] == size:
+            (src / k if k else src).unlink(); gone += 1
+    return gone, len(local) - gone
 
 
 def items():
@@ -96,8 +112,7 @@ def items():
 def done_set():
     if not LOG.exists():
         return set()
-    return {json.loads(l)['rel'].replace('\\', '/') for l in LOG.read_text(encoding='utf-8').splitlines()
-            if '"DELETED_E"' in l or ('"KEPT_JUNCTION"' in l and not DEL_J)}
+    return {json.loads(l)['rel'].replace('\\', '/') for l in LOG.read_text(encoding='utf-8').splitlines() if '"DELETED_E"' in l}
 
 
 def copy(rel):
@@ -108,57 +123,82 @@ def copy(rel):
         args = ['robocopy', str(src), str(dst), '/E']
     rc = subprocess.run(args + ['/COPY:DT', '/R:3', '/W:10', '/NFL', '/NDL', '/NP', '/NJH', '/NJS'], stdout=subprocess.DEVNULL).returncode
     if rc >= 8:
-        say(event='FAIL_ROBOCOPY', rel=rel, rc=rc); sys.exit(2)
-    n, b = local(src)
-    if local(dst) != (n, b):
-        say(event='FAIL_G_VERIFY', rel=rel, g=list(local(dst)), e=[n, b]); sys.exit(3)
-    return n, b
+        say(event='FAIL_ROBOCOPY', rel=rel, rc=rc); os._exit(2)
+    e, g = files_of(src), files_of(dst)
+    bad = [k for k, z in e.items() if g.get(k) != z]
+    if bad:
+        say(event='FAIL_G_VERIFY', rel=rel, missing_or_size=len(bad), first=bad[0]); os._exit(3)
+    return len(e), sum(e.values())
 
 
-def remove(rel, junction, n, b):
-    if junction and not DEL_J:
-        say(event='KEPT_JUNCTION', rel=rel, files=n, bytes=b, note='in cloud; E copy kept (code reads it via the D junction)')
-        return
-    if junction:
-        j = OUT / rel
-        if j.is_junction():
-            j.rmdir()  # removes the link only, before the target goes
-    src = E / rel
-    src.unlink() if src.is_file() else shutil.rmtree(src)
-    say(event='DELETED_E', rel=rel, files=n, bytes=b, cloud_verified=True, junction_removed=junction)
-
-
-def run():
+def copier(live, state):
     idle = 0
     while idle < 2:
         done = done_set()
-        todo = [(r, j) for r, j in items() if r not in done and (E / r).exists()]
+        with LOCK:
+            busy = set(live)
+        todo = [(r, j) for r, j in items() if r not in done and r not in busy and (E / r).exists()]
         if not todo:
             idle += 1; time.sleep(600 if idle < 2 else 0); continue
-        idle = 0; batch = []; size = 0
+        idle = 0
         for rel, junction in todo:
-            if batch and size >= BATCH_GB * 2**30:
-                break
-            while shutil.disk_usage('C:/').free / 2**30 < MIN_C_GB:
-                say(event='WAIT_C', rel=rel, c_free_gb=round(shutil.disk_usage('C:/').free / 2**30, 1)); time.sleep(POLL_S)
-            n, b = copy(rel); batch.append((rel, junction, n, b)); size += b
-        say(event='BATCH_COPIED', items=len(batch), gb=round(size / 2**30, 2))
-        while True:
-            snap = snapshot()
-            if snap is not None:
-                bad = [(r, cloud(snap, r), [n, b]) for r, _, n, b in batch if cloud(snap, r) != (n, b)]
-                if snap[0] == 0 and not bad:
+            while True:
+                with LOCK:
+                    inflight = sum(b for _, _, b in live.values())
+                if inflight < INFLIGHT_GB * 2**30 and shutil.disk_usage('C:/').free / 2**30 >= MIN_C_GB:
                     break
-                say(event='WAIT_UPLOAD', pending=snap[0], items_short=len(bad), first=None if not bad else [bad[0][0], list(bad[0][1]), bad[0][2]])
-            time.sleep(POLL_S)
-        for rel, junction, n, b in batch:
-            remove(rel, junction, n, b)
+                time.sleep(POLL_S)
+            n, b = copy(rel)
+            say(event='COPIED', rel=rel, files=n, bytes=b)
+            with LOCK:
+                live[rel] = (junction, n, b)
+    state['copier_done'] = True
+
+
+def run():
+    live, state, polls = {}, {'copier_done': False}, 0
+    threading.Thread(target=copier, args=(live, state), daemon=True).start()
+    while True:
+        time.sleep(POLL_S)
+        snap = snapshot()
+        if snap is not None:
+            with LOCK:
+                todo = list(live.items())
+            for rel, (junction, n, b) in todo:
+                gone, left = sweep(snap, E / rel, rel)
+                if left:
+                    if gone:
+                        say(event='DELETED_FILES', rel=rel, files=gone, left=left)
+                    continue
+                if junction and (OUT / rel).is_junction():
+                    (OUT / rel).rmdir()  # the link only
+                if (E / rel).exists():
+                    shutil.rmtree(E / rel)  # empty dirs remain
+                say(event='DELETED_E', rel=rel, files=n, bytes=b, cloud_verified=True, junction_removed=junction)
+                with LOCK:
+                    del live[rel]
+            polls += 1
+            if polls % 10 == 0:
+                say(event='WAIT_UPLOAD', pending=snap[0], items_live=len(todo))
+        with LOCK:
+            if state['copier_done'] and not live:
+                return
 
 
 def selftest():
-    snap = (0, {'t': (TOP, 1, None), 'a': ('a', 1, None), 'f': ('x.bin', 0, 5), 'g': ('y.tar', 0, 7)},
-            {'root': {TOP: 't'}, 't': {'a': 'a', 'y.tar': 'g'}, 'a': {'x.bin': 'f'}})
-    assert cloud(snap, 'a') == (1, 5) and cloud(snap, 'y.tar') == (1, 7) and cloud(snap, 'missing') == (0, 0)
+    snap = (0, {'t': (TOP, 1, None, True), 'a': ('a', 1, None, True), 'f': ('x.bin', 0, 5, True), 'h': ('z.bin', 0, 3, False),
+                'g': ('y.tar', 0, 7, True)},
+            {'root': {TOP: 't'}, 't': {'a': 'a', 'y.tar': 'g'}, 'a': {'x.bin': 'f', 'z.bin': 'h'}})
+    assert cloud_files(snap, 'a') == {'x.bin': (5, True), 'z.bin': (3, False)} and cloud_files(snap, 'y.tar') == {'': (7, True)}
+    assert cloud_files(snap, 'missing') == {}
+    d = Path(tempfile.mkdtemp())
+    try:
+        (d / 'a').mkdir(); (d / 'a/x.bin').write_bytes(b'12345'); (d / 'a/z.bin').write_bytes(b'123'); (d / 'y.tar').write_bytes(b'1234567')
+        assert sweep(snap, d / 'a', 'a') == (1, 1) and not (d / 'a/x.bin').exists() and (d / 'a/z.bin').exists()
+        snap[1]['h'] = ('z.bin', 0, 3, True)
+        assert sweep(snap, d / 'a', 'a') == (1, 0) and sweep(snap, d / 'y.tar', 'y.tar') == (1, 0)
+    finally:
+        shutil.rmtree(d)
     print('SELFTEST_OK')
 
 
