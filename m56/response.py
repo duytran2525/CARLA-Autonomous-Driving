@@ -29,7 +29,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     from .model import ReviewRecord
     binding=policies.event_specs.get('stock_binding')
     keys={'response_hash','response_record_hash','route_hash','actor_id','source_refs','plan','client_version','server_version','review'}
-    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal','ego_longitudinal'}:
+    if not isinstance(binding,Mapping) or not keys.issubset(binding) or set(binding)-keys-{'phase_plans','fixture_ref','npc_longitudinal','ego_longitudinal','npc_planner'}:
         raise ValueError('STOCK_BINDING_MISSING')
     packet={k:v for k,v in binding.items() if k!='review'};review=binding['review']
     if (response.route is None or binding['response_hash']!=response.hash or binding['response_record_hash']!=_digest(response)
@@ -65,6 +65,7 @@ def create_stock_driver(actor: object, response: FrozenResponse, policies: Polic
     opt={'dt':.05,'lateral_control_dict':{'K_P':1.95,'K_I':.05,'K_D':.2,'dt':.05},
          'longitudinal_control_dict':_longitudinal(binding,ego),
          'max_throttle':.75,'max_brake':.3,'max_steering':.8,'follow_speed_limits':False}
+    opt.update(_planner(binding,ego))
     if ego:
         opt.update(ignore_traffic_lights=True,ignore_stop_signs=True,ignore_vehicles=True)
     config={'backend':'BasicAgent' if ego else 'LocalPlanner','opt_dict':opt,'actor_id':binding['actor_id'],
@@ -91,6 +92,20 @@ def _longitudinal(binding,ego):
             or gains['dt']!=Number(1,20) or not gains['K_P']>0 or gains['K_I']<0 or gains['K_D']<0):
         raise ValueError('STOCK_BINDING_INVALID')
     return {k:float(v) for k,v in gains.items()}
+
+
+def _planner(binding,ego):
+    """v18 addendum R (PREREG_M56_M_ADDENDUM_R_NPC_LOOKAHEAD_20261117, post-number): an NPC may carry a reviewed
+    'npc_planner' {base_min_distance, distance_ratio} for the stock LocalPlanner (stock 3 + 0.5 v[km/h] cuts M turns by
+    1.1-1.6 m). OLD RULE: absent key = stock lookahead; the EGO never carries it."""
+    planner=binding.get('npc_planner')
+    if planner is None:
+        return {}
+    if (ego or not isinstance(planner,Mapping) or set(planner)!={'base_min_distance','distance_ratio'}
+            or any(isinstance(v,bool) or not isinstance(v,Number) for v in planner.values())
+            or not planner['base_min_distance']>0 or planner['distance_ratio']<0):
+        raise ValueError('STOCK_BINDING_INVALID')
+    return {k:float(v) for k,v in planner.items()}
 
 
 def _f32(limit):

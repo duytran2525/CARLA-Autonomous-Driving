@@ -209,6 +209,33 @@ def test_v5_npc_longitudinal_gains_come_from_the_reviewed_binding(stock_case):
         s.create(s.actor, npc, with_gains(npc, 'ego_longitudinal'))
 
 
+def test_v18_npc_planner_lookahead_comes_from_the_reviewed_binding(stock_case):
+    """v18 addendum R: an NPC may carry 'npc_planner' (LocalPlanner lookahead); absent = stock; the EGO never."""
+    from fractions import Fraction as F
+    from tests.m56.response_cases import response_case
+    from m56.catalog import _digest
+    s = stock_case
+
+    def with_planner(response, planner):
+        policy = s.policy_for(response, {})
+        binding = {k: v for k, v in policy.event_specs['stock_binding'].items() if k != 'review'}
+        binding['npc_planner'] = planner
+        review = replace(policy.event_specs['stock_binding']['review'], object_hash=_digest(binding))
+        return replace(policy, event_specs={'stock_binding': {**binding, 'review': review}})
+    npc = response_case(role='NPC', action='NPC_COMMON', events=()).response
+    s.create(s.actor, npc, s.policy_for(npc, {}))
+    assert 'base_min_distance' not in s.captured[-1][1]['opt_dict']
+    s.create(s.actor, npc, with_planner(npc, {'base_min_distance': F(3), 'distance_ratio': F(0)}))
+    opt = s.captured[-1][1]['opt_dict']
+    assert (opt['base_min_distance'], opt['distance_ratio']) == (3., 0.)
+    for bad in ({'base_min_distance': F(0), 'distance_ratio': F(0)}, {'base_min_distance': F(3)},
+                {'base_min_distance': F(3), 'distance_ratio': F(-1)}):
+        with pytest.raises(ValueError, match='STOCK_BINDING_INVALID'):
+            s.create(s.actor, npc, with_planner(npc, bad))
+    with pytest.raises(ValueError, match='STOCK_BINDING_INVALID'):
+        s.create(s.actor, s.c.response, with_planner(s.c.response, {'base_min_distance': F(3), 'distance_ratio': F(0)}))
+
+
 @pytest.mark.parametrize('speed,expected', [(1.0, 0.), (1.39, 0.), (1.4, .3), (2.0, .3), (None, .3)])
 def test_v6_low_speed_brake_becomes_coast_only_with_a_moving_target(stock_case, require, speed, expected):
     # v6 e (prereg PREREG_M56_V6_20261026): below 1.4 m/s a CARLA brake collapses the speed in one tick (yield probe).
