@@ -41,7 +41,8 @@ def files_of(p):
 def snapshot():
     """(pending, meta, kids) from a fresh read-only copy of the DriveFS DB, or None when DriveFS held a lock or the copy
     caught the DB mid-write (malformed); the next poll retries. meta[s] = (title, is_folder, size, uploaded)."""
-    tmp = Path(tempfile.mkdtemp())
+    tmp = Path(tempfile.gettempdir()) / 'm56-drivefs-snapshot'  # fixed path: a killed run's copy (0.5 GB) is reused, not left
+    shutil.rmtree(tmp, ignore_errors=True); tmp.mkdir()
     try:
         for n in ('metadata_sqlite_db', 'metadata_sqlite_db-wal', 'metadata_sqlite_db-shm'):
             for i in range(30):

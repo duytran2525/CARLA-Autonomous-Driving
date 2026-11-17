@@ -143,7 +143,9 @@ def stream_to(world, x, y, z):
 def load(client, town):
     client.set_timeout(600.)  # A-SEL2 technical fix 3: Town12/13 load_world takes 110-160 s (> the 60 s RPC timeout)
     world = client.load_world(town)
-    client.set_timeout(60.)
+    # technical fix 4 (17/11): Town13 streaming after the spectator move blocked an RPC > 60 s under RAM pressure (r17q/r/s,
+    # 4 prepare SCENE_ERROR, no episode); a ceiling only, no behaviour change when the server answers in time.
+    client.set_timeout(300. if town in ('Town12', 'Town13') else 60.)
     for _ in range(3):
         world.wait_for_tick(30)
     if NO_RENDER:
