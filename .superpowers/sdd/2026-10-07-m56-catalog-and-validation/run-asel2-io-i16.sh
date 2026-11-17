@@ -10,6 +10,7 @@
 # addendum N copy (17/11): prepare = native-io-prepare-i13.py (io-i-v1.3 a), A/B = native-io-ab-i16.py (probe 3 + G5), product m56-v16,
 # pair under m56-v16 and m56-v15 (old rule); commit headroom wait (room) before every CARLA start.
 # usage: bash run-asel2-io-i16.sh "Town12:M56-P-I01-S1,... Town13:..."
+export PATH=/usr/bin:$PATH
 cd "$(dirname "$0")"
 export M56_NO_RENDER=1 M56_RECIPE=v6 M56_SPECTATOR=1 M56_CODE=${M56_CODE:-D:/AI/CARLA-Funny-Moments.worktrees/m56-v16} \
        M56_IO_BOX_ANCHOR=midpoint M56_ASEL2_IO=1 M56_SPAWN_TILT=${M56_SPAWN_TILT:-1} \
