@@ -57,6 +57,12 @@ class F05Kit(Kit):
             return record
         if ego.id != self.ego_id or (self.rows and record.frame != self.rows[-1].frame + 1):
             self._reset(ego.id)  # a new episode (new spawn) or a gap: never mix histories
+            # runtime.run_episode keeps the first observation as its boundary and never appends it to its frames; the
+            # history must be exactly those frames (r18c: the boundary row added one TRIGGER witness -> CREEP_ORIGIN_UNBOUND)
+            self.boundary = record.frame
+            return record
+        if record.frame == getattr(self, 'boundary', None):
+            return record
         if self.action is None and ego.commands:
             self.action = 'B' if ego.commands[0].response_hash == self.b.hash else 'OTHER'
         if self.action == 'OTHER':  # A: no creep guard, keep no history

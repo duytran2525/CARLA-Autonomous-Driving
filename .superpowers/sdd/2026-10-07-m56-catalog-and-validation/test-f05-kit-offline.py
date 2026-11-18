@@ -43,6 +43,9 @@ def main():
     store = open_run(tmp / 'run', 'f05kit', 'writer-f05kit')
     backend = FakeBackend(store)
     kit = F05Kit(aref, fixture, (box(-1e4, -1e4, 1e4, 1e4), aref), aref, 'F05-offline')
+    # the runner's boundary observation (frame before the first appended frame) reaches seal_frame but not the runner frames
+    boundary = replace(frames[0], frame=frames[0].frame - 1, simtime=frames[0].simtime - F(1, 20))
+    assert kit.seal_frame(backend, boundary) is boundary
     sealed = [kit.seal_frame(backend, f) for f in frames]
     have = sum('creep_history_ref' in f.integrity for f in sealed)
     events = detect_events(tuple(sealed), fixture)
