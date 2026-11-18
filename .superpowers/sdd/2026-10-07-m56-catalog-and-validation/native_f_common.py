@@ -48,7 +48,15 @@ def f_responses(c, routes):
 def f_npc(mech, vN, route, policy_hash):
     """F01 NPC_COMMON (response.py _f_script_contract): SETTLE 0 -> NOMINAL vN after CAPTURE_START + release ->
     F01_BRAKE 0 at F01_BRAKE_MARKER -> NPC_RESTART vN at NPC_F01_STOP_HOLD_CONFIRMED."""
-    assert mech in ('F01', 'F02'), mech
+    assert mech in ('F01', 'F02', 'F05'), mech
+    if mech == 'F05':  # addendum U tooling: queue hold, release 3 s after TRIGGER at vN = 2 (response.py F05 contract)
+        assert vN == 2, vN
+        phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'NPC_QUEUE_HOLD',
+                                               'transitions': ({'cause': 'NPC_QUEUE_FORWARD', 'after_event': 'TRIGGER',
+                                                                'delay_s': F(3), 'requires': ()},)},
+                  'f_script': {'mechanism': 'F05', 'policy_hash': policy_hash}}
+        return hashed(FrozenResponse('NPC', 'NPC_COMMON', route, {'NPC_QUEUE_HOLD': F(0), 'NPC_QUEUE_FORWARD': F(2)},
+                                     ZERO, phases, ''))
     nominal = {'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()}
     if mech == 'F02':  # constant NPC from behind: SETTLE 0 -> NOMINAL vN, nothing else
         phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
@@ -90,6 +98,10 @@ def f_geometry(prep, routes, plain):
         front = q6(plain(prep['nominal_front_t0_m']))
         sm['F02_END'] = ('EGO', front + 60)
         extra['nominal_front_t0_m'] = front
+    if 'F05_END' in sm:  # metrics _detect_f05: F05_END - nominal_front_t0_m == 10 exactly; queue gap = exact settled gap
+        front = q6(plain(prep['nominal_front_t0_m']))
+        sm['F05_END'] = ('EGO', front + 10)
+        extra.update(nominal_front_t0_m=front, queue_gap_m=plain(prep['queue_gap_m']))
 
     def section(key, role, station):
         """Plane across the lane at a route station. Every route_station is in the EGO station frame: an EGO-route
@@ -122,5 +134,7 @@ def f_geometry(prep, routes, plain):
 
 # metrics.py _F_CONTRACTS (names, units, estimators, windows), copied; the offline check asserts equality
 PAIRS = {'F01': (('a_peak_025', 'g_front_min_m'), ('m/s^2', 'm'), ('peak_decel_025', 'min_front_gap'), (('TRIGGER', 'F01_N_CLEAR'),) * 2),
-         'F02': (('v_mean_E', 'g_rear_min_m'), ('m/s', 'm'), ('mean_speed', 'min_rear_gap'), (('TRIGGER', 'F02_END'),) * 2)}
-END_SECTION = {'F01': 'F01_END', 'F02': 'F02_END'}
+         'F02': (('v_mean_E', 'g_rear_min_m'), ('m/s', 'm'), ('mean_speed', 'min_rear_gap'), (('TRIGGER', 'F02_END'),) * 2),
+         'F05': (('d_pre_move_m', 't_queue_exit_s'), ('m', 's'), ('forward_distance', 'elapsed'),
+                 (('TRIGGER', 'N_MOVE'), ('N_MOVE', 'F05_END')))}
+END_SECTION = {'F01': 'F01_END', 'F02': 'F02_END', 'F05': 'F05_END'}

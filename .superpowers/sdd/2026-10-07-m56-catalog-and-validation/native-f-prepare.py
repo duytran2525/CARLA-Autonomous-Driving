@@ -72,7 +72,8 @@ class IO:
         s = [float(x) for x in s if not hasattr(x, 'reasons')]
         return min(s) if s else None
 INPUTS = {'F01': {'vE': F(4), 'vN_char': F(17, 5), 'd0': F(57, 5)},   # PREREG F part 1 section 1
-          'F02': {'vE': F(4), 'vN_char': F(5), 'd0': F(20)}}         # + F02_RECIPE_NOTES_20261109
+          'F02': {'vE': F(4), 'vN_char': F(5), 'd0': F(20)},         # + F02_RECIPE_NOTES_20261109
+          'F05': {'vE': F(2), 'vN_char': F(2), 'd0': F(4)}}          # PREREG F part 1: queue, release 3 s, both 2 m/s
 G0, TAIL_M = 40., 30.
 ZERO = {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': F(0), 'length_m': F(1), 'start_offset_m': F(0), 'end_offset_m': F(0)},)}
 
@@ -97,6 +98,141 @@ def candidates_f(ids):
     return out
 
 
+CREEP_TRIALS_S = (F(4, 5), F(6, 5), F(8, 5), F(2))  # F05 addendum U: creep start -> STOP target, one probe each
+SETTLE_HOLD_FRAMES = 40  # F05: exact constant queue gap over the last 2 s of the settle probe
+
+
+def staged_response(role, action, route, targets, rows):
+    """Probe-only staged program (F05 creep calibration): SETTLE first, rows after CAPTURE_START; never catalog."""
+    r = FrozenResponse(role, action, route, targets, ZERO,
+                       {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'SETTLE',
+                                                     'transitions': rows},
+                        'annex': 'F05 preparation probe, never catalog'}, '')
+    return replace(r, hash=_digest({k: getattr(r, k) for k in ('actor_role', 'action_id', 'route', 'targets', 'profile', 'phases')}))
+
+
+def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont, note, L):
+    """F05 (PREREG F part 1 section 2 + addendum U 20261118): queue d0 = 4 m at rest. (1) settle probes: both actors at
+    target 0; the queue gap must be EXACTLY constant over the last 2 s (metrics._detect_f05 compares gap == queue_gap_m);
+    two probes must give the identical value (sealed F01/F02 A/B settles are bit-identical, also across sessions);
+    (2) four creep probes (EGO 0.5 m/s, then target 0 after CREEP_TRIALS_S) on the same poses: per trial the stop distance
+    from the deciding observation to rest and the peak speed -> the CREEP_STOP_BOUND calibration (compile)."""
+    from native_v2_common import RELEASE
+    from m56.metrics import _route_observation, _route_ref
+    inp = out['inputs']; out['recipe_rev'] = 'f-v1.2-f05u'
+
+    def routes_for(k):
+        nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
+        return ({'EGO': directed(rows['EGO'], arc['EGO'], identity.map, c.town, note, cont, arc['EGO'][-1] - 5),
+                 'NPC': directed(nr, na, identity.map, c.town, note, cont, na[-1] - 5)},
+                {'EGO': (rows['EGO'], arc['EGO']), 'NPC': (nr, na)})
+
+    def k_at(station):
+        return next(i for i, a in enumerate(arc['NPC']) if float(a) >= station)
+
+    def gap_of(f, routes):
+        return _route_observation(f, {'directed_route': routes['EGO']}, _route_ref(routes['EGO']), 'min_front_gap')
+
+    def settle(label, k):
+        routes, prow = routes_for(k)
+        poses = {'EGO': IO.pose_on(world, rows['EGO'], 0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+        resp = (nominal_response('EGO', 'A', F(0), routes['EGO']), nominal_response('NPC', 'NPC_COMMON', F(0), routes['NPC']))
+        fr = P.probe(client, proc, start, world, identity, c.id, routes, prow, poses, resp, label, None, None, None)
+        if not fr:
+            return {'reason': f'{label.upper()}_NO_FRAMES:' + ','.join(P.LAST_REASONS)}
+        gaps = [gap_of(f, routes) for f in fr]
+        still = [all(_speed(a.velocity) <= F(1, 10) for a in f.actors) for f in fr]
+        last = gaps[-1]; run = 0
+        for g, s in zip(reversed(gaps), reversed(still)):
+            if g != last or not s:
+                break
+            run += 1
+        res = {'routes': routes, 'prow': prow, 'poses': poses, 'frames': fr, 'gap': last, 'constant_frames': run,
+               'constant_from_s': float(fr[len(fr) - run].simtime - fr[0].simtime) if run else None}
+        if last is None or run < SETTLE_HOLD_FRAMES:
+            res['reason'] = 'F05_QUEUE_GAP_NOT_CONSTANT'
+        return res
+
+    k = k_at(L + float(inp['d0']))
+    s1 = settle('settle1', k)
+    if s1.get('reason') is None and abs(float(s1['gap']) - float(inp['d0'])) > .3:  # same band rule as F01/F02 (0.3 m)
+        out['settle1_gap_m'] = float(s1['gap'])
+        k = k_at(float(arc['NPC'][k]) + float(inp['d0']) - float(s1['gap'])); s1 = settle('settle1b', k)
+    out['settle1'] = {x: (str(s1[x]) if x == 'gap' else s1.get(x)) for x in ('gap', 'constant_frames', 'constant_from_s', 'reason')}
+    if s1.get('reason'):
+        out.update(status='BLOCKED_FIXTURE', reason=s1['reason']); return P.finish(c, out)
+    if abs(float(s1['gap']) - float(inp['d0'])) > .3:
+        out.update(status='BLOCKED_FIXTURE', reason='D0_OUTSIDE_BAND', d0_band_m=.3); return P.finish(c, out)
+    s2 = settle('settle2', k)
+    out['settle2'] = {x: (str(s2[x]) if x == 'gap' else s2.get(x)) for x in ('gap', 'constant_frames', 'constant_from_s', 'reason')}
+    if s2.get('reason') or s2['gap'] != s1['gap']:
+        out.update(status='BLOCKED_FIXTURE', reason=s2.get('reason') or 'F05_QUEUE_GAP_NOT_REPRODUCIBLE'); return P.finish(c, out)
+    routes, prow, poses, fr = s1['routes'], s1['prow'], s1['poses'], s1['frames']
+    zero = {'EGO': F(0), 'NPC': F(0)}
+    rdy = P.first_ready(fr, routes, zero, boundary_t2=float(fr[0].simtime) - .05)
+    if rdy is None:
+        out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_REACHED_IN_SETTLE'); return P.finish(c, out)
+    frr, markers = rdy
+    act = {a.role: a for a in fr[-1].actors}
+    front = P.front_station(act['EGO'], routes['EGO'])
+    # creep calibration (addendum U): EGO CREEP 1/2 after release, STOP 0 after release + T; NPC stays at 0
+    trials = []
+    for t in CREEP_TRIALS_S:
+        rows_e = ({'cause': 'CREEP', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()},
+                  {'cause': 'STOP', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE + t, 'requires': ()})
+        ego_r = staged_response('EGO', 'A', routes['EGO'], {'SETTLE': F(0), 'CREEP': F(1, 2), 'STOP': F(0)}, rows_e)
+        label = f'creep-{float(t):.1f}'
+        cf = P.probe(client, proc, start, world, identity, c.id, routes, prow, poses,
+                     (ego_r, nominal_response('NPC', 'NPC_COMMON', F(0), routes['NPC'])), label, None, None, None)
+        trial = {'T_s': str(t), 'frames': len(cf or ())}
+        ego = [next(a for a in f.actors if a.role == 'EGO') for f in (cf or ())]
+        cause = [a.commands[0].cause if a.commands else None for a in ego]
+        st = [_metric_station((a.pose.x, a.pose.y, a.pose.z), routes['EGO']) for a in ego]
+        if 'CREEP' not in cause or 'STOP' not in cause or any(s is None for s in st):
+            trial['reason'] = 'CREEP_PROBE_INCOMPLETE:' + ','.join(P.LAST_REASONS); trials.append(trial); continue
+        i0, i1 = cause.index('CREEP'), cause.index('STOP')
+        k_dec = i1 - 1  # the observation the STOP target was computed from (same latency as the product's bound event)
+        rest = next((j for j in range(i1, len(ego) - 10) if all(_speed(ego[x].velocity) <= F(1, 10) for x in range(j, j + 10))), None)
+        if rest is None:
+            trial['reason'] = 'CREEP_PROBE_NO_REST'; trials.append(trial); continue
+        speeds = [float(_speed(a.velocity)) for a in ego[i0:rest + 10]]
+        trial.update(progress_at_decision_m=float(st[k_dec] - st[i0 - 1]), stop_distance_m=float(st[rest + 9] - st[k_dec]),
+                     speed_at_decision_mps=float(_speed(ego[k_dec].velocity)), peak_speed_mps=max(speeds),
+                     progress_total_m=float(st[rest + 9] - st[i0 - 1]))
+        trials.append(trial)
+    out['creep_trials'] = trials
+    good = [t for t in trials if 'reason' not in t]
+    if len(good) != len(CREEP_TRIALS_S):
+        out.update(status='BLOCKED_FIXTURE', reason='F05_CREEP_CALIBRATION_INCOMPLETE'); return P.finish(c, out)
+    unc = F(1, 100)
+    bound = F(math.ceil(max(t['stop_distance_m'] for t in good) * 100), 100) + F(5, 100)
+    vmax = max(F(1, 2), F(math.ceil(max(t['peak_speed_mps'] for t in good) * 100), 100) + F(1, 10))
+    boundary = 1 - bound - unc - F(1, 100)
+    out['creep_calibration'] = {'method': 'bounded-forward-creep-stop-v1', 'uncertainty': str(unc),
+                                'stopping_distance_bound_m': str(bound), 'maximum_forward_speed_mps': str(vmax),
+                                'stopping_boundary_m': str(boundary),
+                                'rule': 'bound = ceil_0.01(max stop distance) + 0.05; vmax = ceil_0.01(max peak) + 0.10; '
+                                        'boundary = 1 - bound - uncertainty - 0.01 (addendum U)'}
+    if not F(1, 5) < boundary < 1:
+        out.update(status='BLOCKED_FIXTURE', reason='F05_CREEP_BOUND_TOO_WIDE'); return P.finish(c, out)
+    dest = front + 16.  # F05_END = front + 10 (exact, geometry); DESTINATION 6 m beyond (DESTINATION_ROOM >= 5)
+    if dest + 30. > float(routes['EGO'].arc[-1]):
+        out.update(status='BLOCKED_FIXTURE', reason='F_WINDOW_TOO_SHORT', need_ego_m=dest + 30.,
+                   have_ego_m=float(routes['EGO'].arc[-1])); return P.finish(c, out)
+    npc_rows = prow['NPC'][0]
+    cont2 = write_ref(P.root / c.id / 'routes-f.json', {'EGO': rows['EGO'], 'NPC': npc_rows}, 'NATIVE_ROUTE')
+    out.update(status='PREPARED', reason=None, targets=zero, markers=markers, T_r=float(frr.simtime) - float(fr[0].simtime),
+               d0_realised_m=float(s1['gap']), queue_gap_m=encode_record(s1['gap']), lead_route_start_index=k,
+               routes_f=str(cont2.uri), routes_f_sha256=cont2.sha256, poses={kk: encode_record(v) for kk, v in poses.items()},
+               grounds={'EGO': IO.grounds.get(id(rows['EGO'])), 'NPC': IO.grounds.get(id(npc_rows))},
+               sections_m={'F05_END': {'route': 'EGO', 'station': front + 10.}, 'DESTINATION': {'route': 'EGO', 'station': dest}},
+               nominal_front_t0_m=front,
+               # the runtime-observed bodies (first observation; same spawn pose -> identical across sessions, sealed F02
+               # probe vs A/B 18/11); CREEP_STOP_BOUND binds this body hash, never the bare prepare bbox
+               observed_bodies={a.role: encode_record(a.body) for a in fr[0].actors})
+    return P.finish(c, out)
+
+
 def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     mech = (c.environment.get('mechanism') or c.slot).replace('-ALT1', '')
     assert mech in INPUTS, f'F_MECHANISM_NOT_IN_PART1:{mech}'
@@ -118,6 +254,8 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     arc = {k: arcs(v) for k, v in rows.items()}
     cont = write_ref(P.root / c.id / 'routes-f-probe1.json', rows, 'NATIVE_ROUTE')
     note = f'{road}/{lane}'
+    if mech == 'F05':  # addendum U (20261118): standing queue, own branch; F01/F02 below unchanged
+        return prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont, note, L)
     # F01: the NPC leads (its route is cut at its start). F02 (F02 recipe notes 1): the EGO leads; both share the whole
     # lane route (the rear-gap metric projects the NPC onto the EGO route) and the EGO spawns at its start station.
     lead, follow = ('NPC', 'EGO') if mech == 'F01' else ('EGO', 'NPC')

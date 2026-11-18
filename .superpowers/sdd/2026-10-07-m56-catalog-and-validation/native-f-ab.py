@@ -17,8 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from native_v2_common import (NO_RENDER, WORK, WS, body_record, certificates, drivable_union, driving_boxes, load, now,
                               own_server, ownership, policy_maker, reviewer, sha, stream_to, up, write_ref)
 from native_f_common import END_SECTION, f_geometry, f_npc, f_routes
-KIND = {'F01': 'same-lane-lead-brake', 'F02': 'same-lane-rear-closing'}
+KIND = {'F01': 'same-lane-lead-brake', 'F02': 'same-lane-rear-closing', 'F05': 'same-lane-queue-start'}
 from native_v2_kit import Kit, q
+from native_f05_kit import F05Kit
 from m56 import runtime
 from m56.catalog import _digest
 from m56.evidence import open_run
@@ -137,6 +138,8 @@ def compile_scene(c, identity, boot, wid, sd, drivable_pair, scene=None):
     mark, mark_name = ((sec['F01_BRAKE_START'].route_station, 'F01_BRAKE_START') if mech == 'F01'
                        else (geo['topology_extra']['nominal_front_t0_m'], 'nominal EGO front at TRIGGER'))
     need = F(math.ceil((float(prep['markers']['EGO']) - ego_front) * 10000), 10000)  # readiness distance, rounded up
+    if mech == 'F05':  # addendum U: standing queue, no run-in; required = readiness station tolerance 0.1 m, ref F05_END
+        mark, mark_name, need = sec['F05_END'].route_station, 'F05_END (standing queue)', F(1, 10)
     room = q(float(mark) - ego_front)
     end_name = END_SECTION[mech]
     caps = (cap('BODY_FIT', {'minimum_road_edge_m': q(edge), 'minimum_body_separation_m': q(fp['EGO'].distance(fp['NPC']))},
@@ -152,12 +155,50 @@ def compile_scene(c, identity, boot, wid, sd, drivable_pair, scene=None):
                 'drivable_ref': dref, **geo['topology_extra']}
     packet = {'region': geo['region'], 'topology': topology, 'proof': (prep_ref, cont, dref), 'G': None,
               'sections': sec, 'responses': (*c.responses, npc), 'pair': geo['pair']}
-    queries = QueryBundle(boot, wid, mp, routes, {'EGO': body, 'NPC': body}, poses, grounds,
-                          {'compilation': encode_record(packet)}, caps, (*certs['EGO'], *certs['NPC']), (prep_ref, cont, dref))
-    envelope = {'candidate': c, 'queries': queries, 'policy': policies}
-    queries = replace(queries, physics={**queries.physics, 'fixture_review': encode_record(review(
-        envelope, 'FIXTURE_COMPILE', (prep_ref, cont, dref), ('F materialization of the frozen candidate; not independent',)))})
-    return compile_fixture(c, queries, policies), (drivable, dref), rows, raw_prep
+    def build(caps):
+        queries = QueryBundle(boot, wid, mp, routes, {'EGO': body, 'NPC': body}, poses, grounds,
+                              {'compilation': encode_record(packet)}, caps, (*certs['EGO'], *certs['NPC']), (prep_ref, cont, dref))
+        envelope = {'candidate': c, 'queries': queries, 'policy': policies}
+        queries = replace(queries, physics={**queries.physics, 'fixture_review': encode_record(review(
+            envelope, 'FIXTURE_COMPILE', (prep_ref, cont, dref), ('F materialization of the frozen candidate; not independent',)))})
+        return compile_fixture(c, queries, policies)
+    fixture = build(caps)
+    if mech == 'F05' and isinstance(fixture, CompiledFixture):  # addendum U: two passes, the stop proof binds pass-1 hashes
+        from m56.response import _reverse_recipe_hash
+        proof = creep_stop_bound(raw_prep, prep, fixture, sd, prep_ref)
+        second = build((*caps, proof))
+        assert isinstance(second, CompiledFixture) and _reverse_recipe_hash(second) == _reverse_recipe_hash(fixture), 'F05_RECIPE_HASH_MOVED'
+        log(event='CREEP_BOUND', scene=c.id, limits={k: str(v) for k, v in proof.limits.items()}, uncertainty=str(proof.uncertainty))
+        fixture = second
+    return fixture, (drivable, dref), rows, raw_prep
+
+
+def creep_stop_bound(raw_prep, prep, fixture, sd, prep_ref):
+    """F05 CREEP_STOP_BOUND (bounded-forward-creep-stop-v1, response._creep_stop_proof): the prepare's four creep
+    probes on the frozen poses (calibration numbers in prepare.json creep_calibration); body = the runtime-observed EGO body
+    of the settle probe (bit-identical across sessions); the raw source is exactly _payload(limits)."""
+    from m56.evidence import _payload
+    from m56.response import _reverse_recipe_hash, _reverse_body_hash
+    cal = prep['creep_calibration']
+    b = next(r for r in fixture.responses if r.actor_role == 'EGO' and r.action_id == 'B')
+    body = decode_record('BodyRecord', raw_prep['observed_bodies']['EGO'])
+    stock = {'lateral': {'K_P': F(39, 20), 'K_I': F(1, 20), 'K_D': F(1, 5)},
+             'longitudinal': {'K_P': F(1), 'K_I': F(1, 20), 'K_D': F(0)}, 'dt_s': F(1, 20),
+             'max_throttle': F(3, 4), 'max_brake': F(3, 10), 'max_steering': F(4, 5)}
+    limits = {'actor_role': 'EGO', 'response_hash': b.hash, 'route_hash': _digest(b.route), 'body_hash': _reverse_body_hash(body),
+              'fixture_recipe_hash': _reverse_recipe_hash(fixture), 'stock_config_hash': _digest(stock),
+              'target_mps': F(1, 2), 'terminal_brake': F(3, 10), 'hard_limit_m': F(1),
+              'stopping_boundary_m': F(cal['stopping_boundary_m']), 'stopping_distance_bound_m': F(cal['stopping_distance_bound_m']),
+              'maximum_forward_speed_mps': F(cal['maximum_forward_speed_mps'])}
+    data = _payload(limits); path = sd / 'creep-stop-bound.json'
+    with open(path, 'xb') as f:
+        f.write(data)
+    raw = SourceRef(str(path), sha(path), len(data), '1', 'claude-g4', 'NATIVE_CALIBRATION')
+    packet = dict(kind='CREEP_STOP_BOUND', method='bounded-forward-creep-stop-v1', raw_refs=(raw,),
+                  uncertainty=F(cal['uncertainty']), limits=limits, status='CORROBORATED')
+    why = ('stop distance / peak speed of 4 native creep probes on the frozen poses + margins (addendum U); a measured '
+           'bound, not a certificate; Claude review under Duy delegation, not independent')
+    return CapabilityProof(**packet, review=review(packet, 'CAPABILITY:CREEP_STOP_BOUND', (raw, prep_ref), (why,)))
 
 
 def run_scene(c, client, proc, start, world, m, identity):
@@ -187,7 +228,7 @@ def run_scene(c, client, proc, start, world, m, identity):
     backend = runtime.bind_owned(ctx)
     qual_path = WORK / 'outputs/m56_native_g4_probe_20261023T135210Z/g4-probe.json'
     qual = SourceRef(str(qual_path), sha(qual_path), qual_path.stat().st_size, '1', 'native', 'NATIVE_QUALIFICATION')
-    kit = Kit(authority, fixture, drivable, qual, c.id)
+    kit = (F05Kit if fixture.domain.topology.get('mechanism') == 'F05' else Kit)(authority, fixture, drivable, qual, c.id)
     source = write_ref(sd / 'plan-source.json', {'rule': 'route lane waypoints (road/lane/s) every 2 m'}, 'G4_STOCK_SOURCE')
 
     def geometry_review(p):
