@@ -120,6 +120,8 @@ SPECTATOR = os.environ.get('M56_SPECTATOR', '') == '1'
 # A-SEL2 addendum 6 (Duy 2026-11-08): spawn every actor with the CARLA waypoint pitch/roll at its spawn point (consumer v11
 # compares the first observation with this frozen pose). Unset keeps pitch = roll = 0.
 SPAWN_TILT = os.environ.get('M56_SPAWN_TILT', '') == '1'
+# addendum R/S (2026-11-18): M56_NPC_PLANNER=1 gives the NPC stock binding npc_planner {2 m, 0} (needs product m56-v18).
+NPC_PLANNER = os.environ.get('M56_NPC_PLANNER', '') == '1'
 
 
 def spawn_tilt(m, x, y, z):
@@ -354,6 +356,8 @@ def policy_maker(fixture, rows_by_role, review, source, npc_gains=None, ego_gain
             binding['npc_longitudinal'] = npc_gains_binding(npc_gains)
         if role == 'EGO' and npc_gains_binding(ego_gains) is not None:  # v5 erratum 2: same grid, EGO's own key
             binding['ego_longitudinal'] = npc_gains_binding(ego_gains)
+        if role == 'NPC' and NPC_PLANNER:  # addendum R/S (18/11, product >= m56-v18): fixed 2 m LocalPlanner lookahead
+            binding['npc_planner'] = {'base_min_distance': F(2), 'distance_ratio': F(0)}
         r = review(binding, 'STOCK_FORWARD_BINDING', (source,))
         return PolicyBundle('m56-v2', 'f' * 64, {}, {'stock_binding': {**binding, 'review': r}}, {}, (source,))
     return policy_for

@@ -60,6 +60,8 @@ def move(rel, mode):
     src, dst = OUT / rel, E / rel
     if src.is_symlink() or src.is_junction() or not src.is_dir():
         return
+    if mode == 'pair' and all(f == KEEP for _, _, fn in os.walk(src) for f in fn):
+        return  # offloaded by an earlier run: only the kept pair-result.json files remain on D
     n, b = tree(src)
     rc = subprocess.run(['robocopy', str(src), str(dst), '/E', '/COPY:DT', '/R:2', '/W:5', '/NFL', '/NDL', '/NP', '/NJH', '/NJS'],
                         stdout=subprocess.DEVNULL).returncode
@@ -103,6 +105,8 @@ def receipts_tar():
 
 
 def selftest():
+    global TODAY
+    TODAY = '20261117'  # the selection is date-relative; the expected list below was written on 17/11
     p = plan(['m56_v2_ab_Town04_20261025T123841Z', 'm56_io_ab_Town13_20261117T072227Z', 'm56_v6_pair_20261116T110910Z',
               'm56_v6_pair_20261117T074252Z', 'm56_v2_prepare_Town12_20261116T141740Z', 'm56_offline_v1', 'm56_asel2_io_20261117T065652Z'])
     assert p == [('m56_v2_ab_Town04_20261025T123841Z', 'dir'),
