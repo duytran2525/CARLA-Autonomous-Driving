@@ -205,7 +205,7 @@ def test_reverse_stop_history_cannot_borrow_foreign_or_uncorrelated_packets(requ
     from tests.m56.reverse_cases import reverse_case
     c=reverse_case(tmp_path/'sources');frames=list(c.frames);old=frames[0]
     if fault=='actor_alias':old=replace(old,actors=(replace(old.actors[0],id=99),old.actors[1]))
-    elif fault=='past_yaw':old=replace(old,actors=(replace(old.actors[0],pose=replace(old.actors[0].pose,yaw=1.)),old.actors[1]))
+    elif fault=='past_yaw':old=replace(old,actors=(replace(old.actors[0],pose=replace(old.actors[0].pose,yaw=2.)),old.actors[1]))  # v14 admits |yaw| <= 1 deg; 2 deg stays a fault
     elif fault=='missing_observation':old=replace(old,integrity={})
     else:old=replace(old,actors=(replace(old.actors[0],pose=replace(old.actors[0].pose,x=4.0001)),old.actors[1]))
     if fault in ('actor_alias','past_yaw'):
