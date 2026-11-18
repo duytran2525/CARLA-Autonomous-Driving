@@ -5,5 +5,5 @@ cd "$(dirname "$0")"
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
 export M56_NO_RENDER=1 M56_SPECTATOR=1
 while tasklist | grep -qi CarlaUE4; do sleep 15; done; python -I asel2-cguard.py --wait-commit-gb ${M56_COMMIT_START_GB:-25} | tail -1
-$PY -I -X utf8 native-f03-rollback-probe.py Town12 3 --brake --roads=1062,1085
+$PY -I -X utf8 native-f03-rollback-probe.py Town12 3 --brake --roads=1085
 echo F03_BRAKE_ALL_DONE

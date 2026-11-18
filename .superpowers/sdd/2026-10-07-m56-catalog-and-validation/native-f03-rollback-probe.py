@@ -92,7 +92,7 @@ with own_server(log) as (client, proc, start):
             log(event='F03_ROLLBACK', town=TOWN, road=c['road'], lane=c['lane'], mode=mode,
                 pitch=round(v.get_transform().rotation.pitch, 2), speed_reached_tick=reached, max_back=round(max(back), 3),
                 trigger_tick=trig, mean_back_2s_after_trigger=None if mean2 is None else round(mean2, 3),
-                ok=trig is not None, series=[round(back[i], 2) for i in (5, 20, 40, 80, 120, 199)])
+                ok=trig is not None, series=[round(back[i], 2) for i in (5, 20, 40, 80, 120, 199) if i < len(back)])
             v.destroy(); world.tick(120.)
     st.synchronous_mode, st.fixed_delta_seconds = False, None; world.apply_settings(st)
 print('F03_ROLLBACK_END')
