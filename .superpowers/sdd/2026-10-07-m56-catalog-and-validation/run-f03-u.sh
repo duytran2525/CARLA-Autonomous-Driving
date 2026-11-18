@@ -30,6 +30,10 @@ REVF=$R/c0-partial-v5-frozen-revision.json
 [ -f "$REVF" ] || { echo "F03 NOT RUN: revision not frozen"; cut -c1-300 $LOG/revision.log; echo F03U_STAGE1_END; exit 4; }
 OK=$(python -I -c "import json,sys;d=json.load(open(sys.argv[1],encoding='utf-8'));c=[c for c in d['candidates'] if c['id']==sys.argv[2]];print(int(bool(c) and (c[0]['environment'].get('runtime_recipe_v2') or {}).get('status')=='PREPARED'))" $REVF $S)
 [ "$OK" = 1 ] || { echo "F03: not PREPARED"; echo F03U_STAGE1_END; exit 0; }
+probea "$REVF" "$P"
+}
+probea() {
+REVF=$1; P=$2
 room
 $PY -I -X utf8 native-f-ab.py $REVF Town12 $S --probe-a > $LOG/probea.log 2>&1
 grep -a '"event": "\(FIXTURE\|ADMISSION\|PROBE_A\|SCENE_ERROR\|REVERSE_BOUND\)"\|^DONE\|^Traceback' $LOG/probea.log | cut -c1-800
@@ -52,4 +56,4 @@ if [ -n "$D" ] && [ -d "$D/$S/run" ]; then
 fi
 echo F03U_END
 }
-if [ "$1" = ab ]; then stage2 "$2" "$3"; else stage1; fi
+if [ "$1" = ab ]; then stage2 "$2" "$3"; elif [ "$1" = probea ]; then probea "$2" "$3"; else stage1; fi

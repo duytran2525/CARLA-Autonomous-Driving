@@ -144,6 +144,7 @@ def compile_scene(c, identity, boot, wid, sd, drivable_pair, scene=None):
     ego, sec = routes['EGO'], geo['sections']
     # run-in reference (EGO station frame): F01 the brake-start section; F02 the nominal EGO front at TRIGGER
     mark, mark_name = ((sec['F01_BRAKE_START'].route_station, 'F01_BRAKE_START') if mech == 'F01'
+                       else (None, None) if mech == 'F03'  # set below (addendum A2)
                        else (geo['topology_extra']['nominal_front_t0_m'], 'nominal EGO front at TRIGGER'))
     need = F(math.ceil((float(prep['markers']['EGO']) - ego_front) * 10000), 10000)  # readiness distance, rounded up
     if mech == 'F05':  # addendum U: standing queue, no run-in; required = readiness station tolerance 0.1 m, ref F05_END
