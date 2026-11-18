@@ -1091,3 +1091,35 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - Một A/B F05 mới cần quyết định của Duy / người có thẩm quyền: phiên bản mới, hoặc successor B3.
   - Tooling đã sẵn sàng: `bash run-f05-u.sh ab <REVF> <prereg>`.
 - **F03 probe v2** (lùi khi đang chạy) đang chạy với nhãn `m56_f03_rollback_r18d`.
+
+### 18/11 (4): Đính chính F03 + probe hợp lệ đầu tiên, sửa test `past_yaw`
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
+- **Đính chính mục 18/11 (2):** dòng "grade probe r7 cho 0/6 site lùi được" không phải bằng chứng về capability.
+  - r7 có `M56_SPECTATOR=1` nhưng chỉ thử thả từ đứng yên sau khi giữ phanh. Probe không kiểm tra xe có đang được mô phỏng hay không.
+  - r18d (probe v2) thiếu `M56_SPECTATOR`. Với cờ này tắt, `stream_to` không làm gì, nên xe ngủ: ga 0,4 trong 6 s không làm xe nhúc nhích ở cả 18 lần chạy. Kết quả r18d vô hiệu.
+- **r18e** (`m56_f03_rollback_r18e`, có spectator) là probe hợp lệ đầu tiên. Trên làn hướng lên dốc:
+
+| Site | Thả khi đang chạy, số N | Thả khi đang chạy, số tự động | Từ đứng yên, không phanh |
+|---|---|---|---|
+| Town12 1062/−1 (3,7°) | lùi, trung bình 2 s **0,946 m/s** | giữ yên (lùi tối đa 0,10) | không chuyển động |
+| Town12 1085/1 (3,4°) | **0,854 m/s** | giữ yên (0,08) | không chuyển động |
+| Town11 285/−1 (3,3°) | **1,471 m/s** | giữ yên | 2,27 m/s (ngoài khoảng) |
+
+- **Diễn giải:** xe chỉ lùi khi đang chạy và về số N.
+  - Đây là đọc số của probe, chưa phải luật.
+  - Ba giá trị in đậm nằm trong khoảng vN_char [0,65; 1,54] của PREREG F phần 1.
+  - Hướng route: 1062 và 1085 thẳng trục (lệch 0,13° và 0,12°), đạt điều kiện căn trục v14 cho EGO B lùi. Town11 285 lệch trục 7–44°, bị loại.
+- **Hệ quả với product:** contract NPC F03 hiện tại (`NPC_HOLD` → `UNPOWERED`, giữ số đọc lại) là thả từ đứng yên, số tự động. Natively F03 vì vậy không thể xảy ra.
+  - Đây là một nhận định, không phải số đo trên cảnh.
+  - Cần đổi product: thêm pha tiến trước khi thả, và về số N khi `UNPOWERED`.
+  - `_detect_f03` không đòi NPC đứng yên trước TRIGGER.
+  - Chưa quyết thiết kế F03 phần 2. Đang chạy probe kiểm 2 (`m56_f03_brake_r18f`): thả số N, rồi phanh 0,3 ở TRIGGER + 2 s. Probe này cho biết NPC có dừng không và tổng quãng lùi so với d0 = 5,2 m.
+- **Test** `test_reverse_stop_history_cannot_borrow_foreign_or_uncorrelated_packets[past_yaw]` (v18 `8d52959`):
+  - Test này fail trên v18 và trên v14, pass trên v17.
+  - Nguyên nhân: v14 phần 1 chấp nhận lệch yaw ≤ 1°, nên lỗi giả lập yaw = 1,0° không còn là lỗi.
+  - Đã đổi lỗi thành 2°. Ở 1,5° và 2°, guard vẫn chặn (`REVERSE_HISTORY_OBSERVATION_UNBOUND`).
+  - `test_reverse_response.py`: 75 passed.
+  - Lần chạy F trên v18 (13:43, 2:52:40) cho 569 passed, 1 failed; failure đó chính là test này.
+- **Offline kit F05** sau bản sửa boundary (`m56_f05kit_offline_r18d`): PASS.

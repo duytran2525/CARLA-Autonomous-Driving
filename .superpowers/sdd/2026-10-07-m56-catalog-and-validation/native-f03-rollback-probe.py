@@ -19,12 +19,18 @@ from native_v2_common import own_server, load, stream_to  # noqa: E402
 
 log = lambda **k: print(json.dumps(k, default=str), flush=True)
 TOWN = sys.argv[1]; N = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+# r18f (advisor check 2): --brake = only mode motion-neutral, then the product F03 law: brake 0.3 from TRIGGER + 2 s
+# (+1 tick); records rollback distance release -> rest and whether it stops (vs d0 = 5.2 m); --roads a,b keeps sites
+BRAKE = '--brake' in sys.argv
+ROADS = next((set(int(x) for x in a.split('=')[1].split(',')) for a in sys.argv if a.startswith('--roads=')), None)
 s = importlib.util.spec_from_file_location('gen', here / 'fill20-generate.py'); gen = importlib.util.module_from_spec(s); s.loader.exec_module(gen)
 import xodr_routes as xr  # noqa: E402
 gen.ROOT = xr.xodr_path(TOWN).parent
 gen.USED_JUNCTIONS[TOWN] = set(); gen.USED_ANCHORS[TOWN] = []
 _, _, r3 = gen.scan(TOWN)
 r3 = sorted(r3, key=lambda c: -(c['grade_run'][1] - c['grade_run'][0]))[:N]
+if ROADS is not None:
+    r3 = [c for c in r3 if c['road'] in ROADS]
 
 
 def trigger(back):
@@ -48,7 +54,7 @@ with own_server(log) as (client, proc, start):
             log(event='NO_WAYPOINT', road=c['road'], lane=c['lane']); continue
         loc = w.transform.location
         stream_to(world, loc.x, loc.y, loc.z)
-        for mode in ('motion-auto', 'motion-neutral', 'free'):
+        for mode in (('motion-neutral',) if BRAKE else ('motion-auto', 'motion-neutral', 'free')):
             tr = w.transform; tr.location.z += .3
             v = world.try_spawn_actor(bp, tr)
             if v is None:
@@ -64,11 +70,24 @@ with own_server(log) as (client, proc, start):
                         reached = t; break
             release = (carla.VehicleControl(throttle=0., brake=0., hand_brake=False, manual_gear_shift=True, gear=0)
                        if mode == 'motion-neutral' else carla.VehicleControl(throttle=0., brake=0., hand_brake=False))
-            back = []
-            for _ in range(200):
-                v.apply_control(release); world.tick(120.)
+            back = []; p0 = v.get_location(); brake_at = None; rest = None
+            for t in range(400 if BRAKE else 200):
+                if BRAKE and brake_at is None and trigger(back) is not None:
+                    brake_at = trigger(back) + 41  # TRIGGER + 2 s + one tick (metrics._detect_f03 due)
+                ctl = release
+                if BRAKE and brake_at is not None and t >= brake_at:
+                    ctl = carla.VehicleControl(throttle=0., brake=.3, hand_brake=False, manual_gear_shift=True, gear=0)
+                v.apply_control(ctl); world.tick(120.)
                 back.append(-fwd())
+                if BRAKE and brake_at is not None and t > brake_at and rest is None and all(abs(b) <= .1 for b in back[-10:]):
+                    rest = t
+                    break
             trig = trigger(back)
+            if BRAKE:
+                p1 = v.get_location()
+                log(event='F03_ROLLBACK_BRAKE', town=TOWN, road=c['road'], lane=c['lane'], trigger_tick=trig,
+                    brake_tick=brake_at, rest_tick=rest, stopped=rest is not None, peak_back=round(max(back), 3),
+                    displacement_m=round(p0.distance(p1), 3), back_at_brake=None if brake_at is None else round(back[min(brake_at, len(back) - 1)], 3))
             mean2 = sum(back[trig:trig + 40]) / len(back[trig:trig + 40]) if trig is not None else None
             log(event='F03_ROLLBACK', town=TOWN, road=c['road'], lane=c['lane'], mode=mode,
                 pitch=round(v.get_transform().rotation.pitch, 2), speed_reached_tick=reached, max_back=round(max(back), 3),
