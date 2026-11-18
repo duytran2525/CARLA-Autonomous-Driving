@@ -54,7 +54,27 @@ Hai lỗi thiết kế lộ ra khi bắt đầu viết tooling F03, trước khi
 - Gate `native-f03-replay.py`:
   - `detect_events` cho TRIGGER và NPC_STOP_CONFIRMED, không có WITNESS_UNKNOWN;
   - thứ tự phase của NPC đúng;
-  - kernel B (`reverse_intent`) trả REVERSE trong 2 s sau TRIGGER.
+  - kernel B (`reverse_intent`) trả REVERSE trong 2 s sau TRIGGER;
+  - evaluator của product trên probe-A: physical không FAILED, không COLLISION_OBSERVED, có DESTINATION_CONFIRMED;
+  - khoảng TRIGGER → NPC_STOP_CONFIRMED đo được ≥ `stop_confirmed_s` của trial đã chọn + 1/20 s (A4).
   - Không đạt thì không chạy A/B; ghi lại đúng như đo.
 - Kết quả của probe-A (verdict, khoảng hở) **không được** đổi bất kỳ tham số nào. Nó chỉ là cổng chạy / không chạy.
 - Calibration REVERSE_STOP_BOUND dùng probe API trực tiếp, sao đúng luật kernel v2, trên pose EGO đã đóng băng (không có NPC). Quyết định STOPPING dùng vmax tạm 1,5 m/s; biên cuối dùng vmax đo được.
+
+## A4. Biên dừng lùi của EGO B phải vừa cửa sổ (viết trước mọi số của trial lùi)
+
+**Vấn đề:** evaluator F03 B (metrics, nhánh F03/F06) đòi lần lùi cuối của EGO và một lần dừng giữ 0,5 s (`_observed_stop`) **nằm trong** cửa sổ TRIGGER → NPC_STOP_CONFIRMED. Nếu không, kết quả là `RESERVATION_STOP_NOT_CONFIRMED`. Theo r18f, cửa sổ đó khoảng 2,05 + 0,9 + 0,5 ≈ 69/20 s. Biên `2 − bound − 0,02` (khoảng 1,7 m) ở 0,5–0,8 m/s rất có thể không vừa.
+
+**Luật:**
+- Bốn trial lùi với biên b ∈ {1/2, 4/5, 6/5, 8/5} m (thay cho {4/5, 6/5, 8/5, 2}). Mỗi trial ghi `stop_confirmed_s`: thời gian từ tick REVERSE đầu tiên tới khi dừng xác nhận 0,5 s (11 khung ≤ 0,1 m/s).
+- `bound` và `vmax` như cũ: lấy trên cả bốn trial, cộng lề.
+- `stopping_boundary_m` là b lớn nhất thỏa cả hai điều kiện:
+  - b + bound + 0,01 ≤ 2 − 0,01;
+  - `stop_confirmed_s(b)` + 1/20 ≤ 69/20 − 1/2.
+- Không có b nào thỏa thì `BLOCKED_FIXTURE F03_REVERSE_TOO_SLOW_FOR_WINDOW`.
+- Cặp metric chỉ cần Δ ≥ 0,20, nên một biên nhỏ là đủ.
+- Gate probe-A (A3) kiểm lại cửa sổ thật trên episode native.
+
+## A1 (bổ sung, m56-v19 `4021c9d`)
+
+Code NPC F03 của v18 ghi đè mọi lệnh stock bằng phanh 0,3 hoặc trôi. Với biến thể mới, ghi đè này sẽ biến NPC_APPROACH và NPC_CLEAR thành lệnh giữ phanh. Giờ ghi đè chỉ áp cho các phase có target 0. Mọi phase của F03 v18 đều có target 0, nên luật cũ giữ nguyên từng byte. Test `test_stock_phases_are_not_brake_holds`; 56 passed.

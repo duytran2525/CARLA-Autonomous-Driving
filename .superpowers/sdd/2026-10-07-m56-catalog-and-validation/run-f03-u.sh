@@ -35,7 +35,7 @@ $PY -I -X utf8 native-f-ab.py $REVF Town12 $S --probe-a > $LOG/probea.log 2>&1
 grep -a '"event": "\(FIXTURE\|ADMISSION\|PROBE_A\|SCENE_ERROR\|REVERSE_BOUND\)"\|^DONE\|^Traceback' $LOG/probea.log | cut -c1-800
 D=$(done_path $LOG/probea.log)
 [ -n "$D" ] && [ -d "$D/$S/probe-a" ] || { echo "F03: probe-A not run"; echo F03U_STAGE1_END; exit 0; }
-$PY -I -X utf8 native-f03-replay.py $D/$S > $LOG/replay.log 2>&1; tail -c 2500 $LOG/replay.log
+$PY -I -X utf8 native-f03-replay.py $D/$S $P/$S/prepare.json > $LOG/replay.log 2>&1; tail -c 2500 $LOG/replay.log
 echo "REVF $REVF"; echo F03U_STAGE1_END; exit 0
 }
 stage2() {

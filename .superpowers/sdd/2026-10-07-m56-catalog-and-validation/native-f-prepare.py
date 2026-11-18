@@ -245,7 +245,8 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
 F03_RELEASE_S = F(81, 20)  # PREREG F part 2: UNPOWERED after CAPTURE_START + d2 (d1 21/20 + 3)
 F03_WINDOW = (1237.5, 1505.)  # road 1062 s: 10 m before the r18f probe spawn (s0 + 0.3 run = 1247.5) .. grade run end - 5
 F03_EGO_STATION = 8.  # EGO route station at spawn: room for the reverse region (rear - 3 m) on the route
-REVERSE_TRIALS_M = (F(4, 5), F(6, 5), F(8, 5), F(2))  # stopping-boundary trials (as F05 CREEP_TRIALS_S), one probe each
+REVERSE_TRIALS_M = (F(1, 2), F(4, 5), F(6, 5), F(8, 5))  # stopping-boundary trials (addendum A4), one probe each
+F03_NPC_INTERVAL_S, F03_TIME_MARGIN_S = F(69, 20), F(1, 2)  # A4: r18f TRIGGER -> NPC stop confirmed ~ 2.05 + 0.9 + 0.5 s
 REVERSE_V2 = {'hold_throttle': .29, 'gain': .2, 'target': .5, 'throttle_cap': .4, 'brake_cap': .3}  # response REVERSE_LAWS v2
 
 
@@ -281,11 +282,12 @@ def reverse_probe(world, pose, route, boundary, label):
                 brk = min(REVERSE_V2['brake_cap'], max(0., .5 * (sp - .5)))
                 ctl = carla.VehicleControl(throttle=thr, steer=0., brake=brk, reverse=True, manual_gear_shift=True, gear=-1)
             v.apply_control(ctl); world.tick(120.)
-            if stopping_at is not None and len(rows) >= 10 and all(r[1] <= .1 for r in rows[-10:]):
+            if stopping_at is not None and len(rows) >= 11 and all(r[1] <= .1 for r in rows[-11:]):  # _observed_stop 0.5 s
                 return {'label': label, 'boundary_m': str(boundary), 'decision_tick': stopping_at,
                         'retreat_at_decision_m': float(s0 - rows[stopping_at][0]), 'speed_at_decision_mps': rows[stopping_at][1],
                         'stop_distance_m': rows[stopping_at][0] - rows[-1][0], 'peak_speed_mps': peak,
-                        'retreat_total_m': float(s0) - rows[-1][0], 'ticks': t + 1}
+                        'retreat_total_m': float(s0) - rows[-1][0], 'ticks': t + 1,
+                        'stop_confirmed_s': (t + 1) * .05}  # from the first REVERSE tick to the confirmed 0.5 s stop
         return {'label': label, 'reason': 'NO_REST' if stopping_at is not None else 'BOUNDARY_NOT_REACHED', 'retreat_m': retreat}
     finally:
         v.destroy(); world.tick(120.)
@@ -395,12 +397,20 @@ def prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane):
     unc = F(1, 100)
     bound = F(math.ceil(max(t['stop_distance_m'] for t in good) * 100), 100) + F(5, 100)
     vmax = max(F(1, 2), F(math.ceil(max(t['peak_speed_mps'] for t in good) * 100), 100) + F(1, 10))
-    boundary = 2 - bound - unc - F(1, 100)
-    out['reverse_calibration'] = {'method': 'bounded-reverse-stop-v2', 'uncertainty': str(unc),
+    # addendum A4 (before any reverse number): the EGO B reverse must stop and hold 0.5 s inside TRIGGER -> NPC_STOP_CONFIRMED
+    # (metrics F03 B: last retreat + _observed_stop in the window). boundary = the largest trial boundary b with
+    # b + bound + uncertainty <= 2 - 0.01 and stop_confirmed_s(b) + 1/20 (issue latency) <= 69/20 - 1/2; none -> blocked.
+    fit = [t for t in good if F(t['boundary_m']) + bound + unc <= 2 - F(1, 100)
+           and F(t['stop_confirmed_s']).limit_denominator(1000) + F(1, 20) <= F03_NPC_INTERVAL_S - F03_TIME_MARGIN_S]
+    if not fit:
+        out.update(status='BLOCKED_FIXTURE', reason='F03_REVERSE_TOO_SLOW_FOR_WINDOW'); return P.finish(c, out)
+    chosen = max(fit, key=lambda t: F(t['boundary_m']))
+    boundary = F(chosen['boundary_m'])
+    out['reverse_calibration'] = {'chosen_trial': chosen['label'], 'stop_confirmed_s': str(F(chosen['stop_confirmed_s']).limit_denominator(1000)),'method': 'bounded-reverse-stop-v2', 'uncertainty': str(unc),
                                   'stopping_distance_bound_m': str(bound), 'maximum_reverse_speed_mps': str(vmax),
                                   'stopping_boundary_m': str(boundary),
                                   'rule': 'bound = ceil_0.01(max stop distance) + 0.05; vmax = max(0.5, ceil_0.01(max peak) + 0.10); '
-                                          'boundary = 2 - bound - uncertainty - 0.01 (as F05 addendum U 4.3, hard 2 m)'}
+                                          'boundary = largest trial b fitting 2 m and the NPC window (addendum A4)'}
     if not F(1, 5) < boundary < 2:
         out.update(status='BLOCKED_FIXTURE', reason='F03_REVERSE_BOUND_TOO_WIDE'); return P.finish(c, out)
     dest = ego_front_ready + 6.  # addendum A2: exit = EGO front at ready; DESTINATION 6 m beyond (DESTINATION_ROOM >= 5)
