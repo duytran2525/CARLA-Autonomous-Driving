@@ -663,7 +663,9 @@ class OwnedCarlaBackend(ReadOnlyCarlaBackend):
                       'uncertainty': Fraction(1, 1000), 'limits': limits, 'status': 'CORROBORATED'}
             integrity['continuous_geometry'] = CapabilityProof(**packet, review=self.geometry_review(packet))
         self.previous_actors = frames
-        return FrameRecord(self.ownership.boot, str(self.world.id), frame_id, simtime, dt, frames, (), integrity)
+        record = FrameRecord(self.ownership.boot, str(self.world.id), frame_id, simtime, dt, frames, (), integrity)
+        seal = getattr(kit, 'seal_frame', None)  # v18 F05 (addendum U): kit adds creep refs to the finished record
+        return seal(self, record) if seal is not None else record
 
     def _actor_frames(self, actors):
         from m56.metrics import _metric_station

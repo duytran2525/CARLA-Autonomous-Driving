@@ -457,6 +457,27 @@ def reverse_jitter_report(frames,fixture):
     return tuple(out)
 
 
+def _creep_stop_within(progress,uncertainty):
+    """v18 addendum U (PREREG_M56_F05_ADDENDUM_U_20261118, before any F05 number): a physical creep stops somewhere inside
+    the 1 m reservation, never exactly at 1 m, and the native CONTINUOUS_GEOMETRY uncertainty is 1/1000, never 0; the stop
+    hold counts once progress + uncertainty <= 1 (the stopping bound already fired). OLD RULE: _creep_stop_old_rule."""
+    return progress+uncertainty<=1
+
+
+def _creep_stop_old_rule(progress,uncertainty):
+    return progress==1 and uncertainty==0
+
+
+def _creep_reach(progress,frame,by_name):
+    """v18 addendum U: the creep 'reached' its marker at the observed EGO_CREEP_STOPPING_BOUND event (the reviewed stop
+    bound fired; the stop hold from there to the release is then required), inside the 1 m reservation. Without that
+    event -> the OLD RULE progress == 1."""
+    bound=by_name.get('EGO_CREEP_STOPPING_BOUND')
+    if bound is None:
+        return progress==1
+    return frame.frame>=bound.frame and progress<=1
+
+
 def _f_queue_action(frames,fixture,events,response):
     by_name={e.name:e for e in events};trigger=by_name.get('TRIGGER');move=by_name.get('N_MOVE')
     if trigger is None:
@@ -499,7 +520,7 @@ def _f_queue_action(frames,fixture,events,response):
             progress=max(stations['EGO'])-initial_e
             if progress>1:
                 failed.append('CREEP_RESERVATION_EXCEEDED')
-            if progress==1 and reach is None:
+            if reach is None and _creep_reach(progress,f,by_name):  # v18 addendum U; OLD RULE progress==1
                 reach=f
     if response.action_id=='B' and release is not None:
         hold=tuple(f for f,_,s in records if reach is not None and reach.frame<=f.frame<=release.frame)
@@ -2002,7 +2023,7 @@ def _f05_creep_events(frames,fixture,events):
                     +proof.limits['maximum_forward_speed_mps']*frame.dt>=proof.limits['stopping_boundary_m']):
                 result.append(EventRecord('EGO_CREEP_STOPPING_BOUND',frame.frame,frame.simtime,
                     _frame_refs(frame)));stopping=True
-            if (stopping and not stopped and progress==1 and continuous.uncertainty==0
+            if (stopping and not stopped and _creep_stop_within(progress,continuous.uncertainty)  # v18 addendum U
                     and _stationary_interval(frames[i-1],frame,fixture,'EGO')):
                 hold.append(frame)
                 if frame.simtime-hold[0].simtime>=Fraction(1,2):
