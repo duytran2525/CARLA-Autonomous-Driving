@@ -1062,3 +1062,32 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - **Claude Code dừng vì thiếu RAM:** waiter test/mover, waiter stage 1, và lần chạy offline kit check đầu.
   - Kiểm tay: mover xong (D còn 126 GB trống).
   - Offline kit check chạy lại detached (`m56_f05kit_offline_r18b`).
+
+### 18/11 (3): F05 A/B duy nhất (P5) dưới v18 + addendum T/U
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
+- **Prepare r18c** (`m56_v2_prepare_Town12_20261118T091935Z`): PREPARED.
+  - d0 thực hiện 4,091 m. Gap settle không đổi qua 311 khung, hai lần settle cho cùng một giá trị.
+  - Calibration bò (4 probe):
+    - đỉnh tốc độ 1,31 m/s;
+    - quãng dừng 0,153 / 0,049 / 0,026 / 0,005 m.
+  - Giá trị đặt cho CREEP_STOP_BOUND: bound 0,21 m, vmax 1,42 m/s, boundary 0,77 m, uncertainty 0,01.
+  - Hai lần chạy prepare trước bị chặn, đã sửa rồi chạy lại (prepare chạy lại được):
+    - r18a: actor ngủ, bbox = 0;
+    - r18b: thân EGO ở trạm 0 của route nên gap = None.
+- **Compile:** FROZEN, ADMITTED; contract EGO:A, EGO:B, NPC đều OK.
+- **A/B** (`m56_f_ab_Town12_20261118T093346Z`, P5 đã tiêu cho F05 dưới v18):
+  - A: kết thúc sạch.
+  - B: `RESPONSE_BLOCKED` `CREEP_ORIGIN_UNBOUND` ở khung TRIGGER (khung thứ 30). B chưa có số đo nào.
+  - Cặp v18 và v13: `BLOCKED_WITNESS`.
+- **Nguyên nhân (đã kiểm trên dữ liệu niêm):** lỗi tooling, không phải product.
+  - Runner giữ quan sát đầu tiên làm boundary và không đưa vào frames. Kit lại đưa khung đó vào history.
+  - Kết quả: TRIGGER trên history có 31 witness (3004…3034), còn của runner có 30 (3005…3034), nên digest khác nhau.
+  - Bản kiểm offline tổng hợp không có khung boundary nên không bắt được lỗi này.
+- **Sửa** `a032cbf`: kit bỏ quan sát đầu tiên của mỗi episode. Bản kiểm offline nay đưa vào một khung boundary.
+- **Không chạy lại A/B (P5).**
+  - A/B F05 dưới phiên bản này đã tiêu.
+  - Một A/B F05 mới cần quyết định của Duy / người có thẩm quyền: phiên bản mới, hoặc successor B3.
+  - Tooling đã sẵn sàng: `bash run-f05-u.sh ab <REVF> <prereg>`.
+- **F03 probe v2** (lùi khi đang chạy) đang chạy với nhãn `m56_f03_rollback_r18d`.
