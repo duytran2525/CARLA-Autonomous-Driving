@@ -141,7 +141,7 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
 
     def settle(label, k):
         routes, prow = routes_for(k)
-        poses = {'EGO': IO.pose_on(world, rows['EGO'], 0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+        poses = {'EGO': IO.pose_on(world, rows['EGO'], e0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
         resp = (nominal_response('EGO', 'A', F(0), routes['EGO']), nominal_response('NPC', 'NPC_COMMON', F(0), routes['NPC']))
         fr = P.probe(client, proc, start, world, identity, c.id, routes, prow, poses, resp, label, None, None, None)
         if not fr:
@@ -159,7 +159,9 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
             res['reason'] = 'F05_QUEUE_GAP_NOT_CONSTANT'
         return res
 
-    k = k_at(L + float(inp['d0']))
+    # r18b: an EGO at route station 0 has its rear corners before the route start -> min_front_gap None; spawn 5 m in
+    e0 = next(i for i, a in enumerate(arc['EGO']) if float(a) >= 5.)
+    k = k_at(float(arc['EGO'][e0]) + L + float(inp['d0']))
     s1 = settle('settle1', k)
     if s1.get('reason') is None and abs(float(s1['gap']) - float(inp['d0'])) > .3:  # same band rule as F01/F02 (0.3 m)
         out['settle1_gap_m'] = float(s1['gap'])
