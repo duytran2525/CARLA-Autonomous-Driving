@@ -120,6 +120,9 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
     from native_v2_common import RELEASE
     from m56.metrics import _route_observation, _route_ref
     inp = out['inputs']; out['recipe_rev'] = 'f-v1.2-f05u'
+    # large map: stream the queue site first, else the actors are dormant and observe zero bbox extents (r18a settle1)
+    q0 = rows['EGO'][min(len(rows['EGO']) - 1, 40)]
+    stream_to(world, q0['x'], q0['y'], q0['z'])
 
     def routes_for(k):
         nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
@@ -131,7 +134,10 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
         return next(i for i, a in enumerate(arc['NPC']) if float(a) >= station)
 
     def gap_of(f, routes):
-        return _route_observation(f, {'directed_route': routes['EGO']}, _route_ref(routes['EGO']), 'min_front_gap')
+        try:
+            return _route_observation(f, {'directed_route': routes['EGO']}, _route_ref(routes['EGO']), 'min_front_gap')
+        except ValueError:  # e.g. INVALID_BODY_TRANSFORM (dormant zero bbox): recorded as no gap, never a crash
+            return None
 
     def settle(label, k):
         routes, prow = routes_for(k)
