@@ -229,6 +229,9 @@ F_BUILT = ('F01', 'F02')  # PLAN_M56_F_NATIVE_TOOLING; F05/F06 need product cree
 # addendum U (20261118): F05 with product m56-v18 (creep guard rules T/U); env-gated so other revisions stay byte-identical
 if __import__('os').environ.get('M56_ASEL2_F05') == '1':
     F_BUILT += ('F05',)
+# PREREG F part 2 F03 + addendum A (20261118): F03 with product m56-v19; env-gated, other revisions stay byte-identical
+if __import__('os').environ.get('M56_ASEL2_F03') == '1':
+    F_BUILT += ('F03',)
 F_PREREG = WORK / 'docs/m56/PREREG_M56_F_ASEL2_20261109.md'
 # POST-NUMBER addenda (principle 6) that a B3 replacement entry ('replaces') is built under; cited, never sealed as prereg
 F_ADDENDA = {'F01': ('PREREG_M56_F_ASEL2_ADDENDUM_F01V2_20261114.md', 'PREREG_M56_F_ASEL2_ADDENDUM_F01V3_20261114.md')}
@@ -270,6 +273,32 @@ def f05_recipe(c, xodr_hash):
     dest = F(str(round(abs(hi - lo) - 5, 3))); route = replace(route, destination=dest)
     responses = tuple(cr.hashed(replace(x, route=route)) for x in (f05_ego_a()[0], f05_ego_b()[0]))
     return {'EGO': dest, 'NPC': dest}, responses, [], {'EGO': route}
+
+
+def f03_recipe(c, xodr_hash):
+    """Catalog-form F03 (as f05_recipe), programs written out (the revision runs under an older product): EGO A
+    HOLD 0 -> FORWARD 2 after NPC_STOP_CONFIRMED (response._forward_contract F03 A); EGO B HOLD -> REVERSE 1/2 @TRIGGER ->
+    STOPPING @REVERSE_STOPPING_BOUND -> FORWARD_GEAR @REVERSE_STOP_CONFIRMED -> FORWARD 2 @FORWARD_GEAR_CONFIRMED
+    (_ego_reverse_contract); B's reverse.policy_hash is bound to the fixture policy at compile (native-f-ab.py)."""
+    from m56.model import FrozenResponse
+    r = c.actors[0].route_recipe; road, lane = r['road'], r['lanes'][0]
+    secs = cr.xr.roads(c.town)[road].find('lanes').findall('laneSection')
+    lo = float(secs[r['section']].get('s'))
+    hi = float(secs[r['section'] + 1].get('s')) if r['section'] + 1 < len(secs) else cr.xr.length(c.town, road)
+    entry, exit_ = (lo, hi) if lane < 0 else (hi, lo)
+    route, _ = cr.lane_route(c.town, road, lane, entry, exit_, xodr_hash, F(0))
+    dest = F(str(round(abs(hi - lo) - 5, 3))); route = replace(route, destination=dest)
+    zero = {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': F(0), 'length_m': F(1), 'start_offset_m': F(0), 'end_offset_m': F(0)},)}
+    row = lambda cause, event: {'cause': cause, 'after_event': event, 'delay_s': F(0), 'requires': ()}
+    a = FrozenResponse('EGO', 'A', route, {'HOLD': F(0), 'FORWARD': F(2)}, zero,
+                       {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'HOLD',
+                                                     'transitions': (row('FORWARD', 'NPC_STOP_CONFIRMED'),)}}, '')
+    b = FrozenResponse('EGO', 'B', route, {'HOLD': F(0), 'REVERSE': F(1, 2), 'STOPPING': F(0), 'FORWARD_GEAR': F(0), 'FORWARD': F(2)},
+                       zero, {'category': 'F', 'reverse': {'mechanism': 'F03', 'policy_hash': '0' * 64},
+                              'program': {'method': 'ordered-event-program-v1', 'initial': 'HOLD', 'transitions': (
+                                  row('REVERSE', 'TRIGGER'), row('STOPPING', 'REVERSE_STOPPING_BOUND'),
+                                  row('FORWARD_GEAR', 'REVERSE_STOP_CONFIRMED'), row('FORWARD', 'FORWARD_GEAR_CONFIRMED'))}}, '')
+    return {'EGO': dest, 'NPC': dest}, tuple(cr.hashed(x) for x in (a, b)), [], {'EGO': route}
 
 
 def asel2_f(done, decision_ref, xodr, weather):
@@ -332,7 +361,7 @@ def asel2_f(done, decision_ref, xodr, weather):
             'attestation, not an independent selector review'))}
         c = Candidate(*fields, env, bare.refs)
         try:
-            dest, responses, flags, _ = {'F01': cr.f_recipe, 'F05': f05_recipe}.get(slot, f02_recipe)(c, xodr[c.town])
+            dest, responses, flags, _ = {'F01': cr.f_recipe, 'F05': f05_recipe, 'F03': f03_recipe}.get(slot, f02_recipe)(c, xodr[c.town])
         except Exception as ex:  # recorded, never guessed
             report.append({'id': cid, 'status': 'RECIPE_ERROR', 'error': repr(ex)[:500]}); continue
         w = weather[c.town]

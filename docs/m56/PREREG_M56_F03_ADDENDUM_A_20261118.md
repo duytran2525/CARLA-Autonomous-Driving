@@ -34,7 +34,7 @@ Hai lỗi thiết kế lộ ra khi bắt đầu viết tooling F03, trước khi
 **Vấn đề:** phần 2 §3–§4 ghi "readiness lúc đứng yên, như F05". Runner settle 1 s rồi giữ 0,5 s, nên ready sớm nhất là khoảng 1,5 s sau CAPTURE_START. NPC_APPROACH bắt đầu ở 21/20 s, nên NPC không thể đứng yên lúc ready.
 
 **Sửa (chỉ là chữ trong tooling):**
-- Readiness dùng mẫu NOMINAL của F01/F02, cùng mốc 21/20: NPC có target vA = 4/5 và marker trên đường tiến; EGO có target 0 và marker ở chỗ đứng.
+- Readiness dùng mẫu NOMINAL của F01/F02, cùng mốc 21/20. NPC: target là tốc độ trung bình đo được trong 1 s trước lệnh UNPOWERED (luật plateau f-v1.1, làm tròn 1/1000, dải ≤ 0,10 m/s, > 0,5), marker trên đường tiến. EGO: target 0, marker ở chỗ đứng.
 - Ready phải đến trước lệnh UNPOWERED (CAPTURE_START + 81/20). Nếu không, `BLOCKED_FIXTURE`.
 - **d0** theo đúng chữ phần 1: khoảng hở thân xe EGO-front → NPC-rear, đo ở khung của lệnh UNPOWERED đầu tiên. Đích 5,2, dải sai 0,3. Prepare chọn khoảng hở lúc spawn bằng 5,2 trừ quãng tiến đo được trong một probe, rồi kiểm lại bằng probe thứ hai.
 - **DESTINATION:** F03 không có section END. Mốc exit là station mũi EGO lúc ready. DESTINATION ở exit + 6 m (như bản tổng hợp); plan end ≥ DESTINATION + 5.
@@ -45,3 +45,16 @@ Hai lỗi thiết kế lộ ra khi bắt đầu viết tooling F03, trước khi
 - Site Town12 1062/−1, successor 1085/1.
 - EGO B `bounded-reverse-stop-v2`, trần 2 m.
 - P5: một A/B. Pair dưới v19 và dưới v18.
+
+## A3. Probe trước A/B (thay cho "một probe của prepare", §4 phần 2)
+
+- Probe prepare không chạy được kịch bản NPC F03 thật: kịch bản này cần fixture đã compile và kit (ROLLBACK, cửa sổ phát hiện). Vì vậy episode do runner ghi để replay là **một episode A duy nhất trên fixture đã đóng băng** (`native-f-ab.py --probe-a`).
+  - Kit ghi cả các trường của B (`reverse_corridors`, `reverse_history_ref`) để replay kernel B.
+  - Episode này không ghép cặp, không phải A/B, không tính vào P5.
+- Gate `native-f03-replay.py`:
+  - `detect_events` cho TRIGGER và NPC_STOP_CONFIRMED, không có WITNESS_UNKNOWN;
+  - thứ tự phase của NPC đúng;
+  - kernel B (`reverse_intent`) trả REVERSE trong 2 s sau TRIGGER.
+  - Không đạt thì không chạy A/B; ghi lại đúng như đo.
+- Kết quả của probe-A (verdict, khoảng hở) **không được** đổi bất kỳ tham số nào. Nó chỉ là cổng chạy / không chạy.
+- Calibration REVERSE_STOP_BOUND dùng probe API trực tiếp, sao đúng luật kernel v2, trên pose EGO đã đóng băng (không có NPC). Quyết định STOPPING dùng vmax tạm 1,5 m/s; biên cuối dùng vmax đo được.

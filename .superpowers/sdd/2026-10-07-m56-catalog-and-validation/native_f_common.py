@@ -48,7 +48,17 @@ def f_responses(c, routes):
 def f_npc(mech, vN, route, policy_hash):
     """F01 NPC_COMMON (response.py _f_script_contract): SETTLE 0 -> NOMINAL vN after CAPTURE_START + release ->
     F01_BRAKE 0 at F01_BRAKE_MARKER -> NPC_RESTART vN at NPC_F01_STOP_HOLD_CONFIRMED."""
-    assert mech in ('F01', 'F02', 'F05'), mech
+    assert mech in ('F01', 'F02', 'F03', 'F05'), mech
+    if mech == 'F03':  # PREREG F part 2 + addendum A (m56-v19 dbd1a38): neutral-in-motion release, NPC_CLEAR after stop
+        rows = ({'cause': 'NPC_APPROACH', 'after_event': 'CAPTURE_START', 'delay_s': F(21, 20), 'requires': ()},
+                {'cause': 'UNPOWERED', 'after_event': 'CAPTURE_START', 'delay_s': F(81, 20), 'requires': ()},
+                {'cause': 'F03_BRAKE', 'after_event': 'TRIGGER', 'delay_s': F(2), 'requires': ()},
+                {'cause': 'NPC_CLEAR', 'after_event': 'NPC_STOP_CONFIRMED', 'delay_s': F(0), 'requires': ()})
+        phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'NPC_HOLD', 'transitions': rows},
+                  'f_script': {'mechanism': 'F03', 'policy_hash': policy_hash}, 'brake': 'F03_BRAKE',
+                  'release': 'neutral-in-motion'}
+        return hashed(FrozenResponse('NPC', 'NPC_COMMON', route, {'NPC_HOLD': F(0), 'NPC_APPROACH': F(4, 5), 'UNPOWERED': F(0),
+                                                                  'F03_BRAKE': F(0), 'NPC_CLEAR': F(2)}, ZERO, phases, ''))
     if mech == 'F05':  # addendum U tooling: queue hold, release 3 s after TRIGGER at vN = 2 (response.py F05 contract)
         assert vN == 2, vN
         phases = {'category': 'F', 'program': {'method': 'ordered-event-program-v1', 'initial': 'NPC_QUEUE_HOLD',
@@ -128,6 +138,15 @@ def f_geometry(prep, routes, plain):
     spec = (*PAIRS[prep['mechanism']], 'route:' + _digest(ego))
     pair = FrozenMetricPair(*spec, _digest(spec), 'APPROVED_PROPOSAL_NOT_READY')
     region = tuple(region)
+    if prep['mechanism'] == 'F03':  # EGO B reverse region: lane box, rear/front stations from the prepare (EGO frame)
+        rs, fs = (plain(prep['reverse_region_m'][k]) for k in ('rear', 'front'))
+        pr, pf = _point(ego, q6(rs)), _point(ego, q6(fs))
+        lc = (ego.transforms[0].x, ego.transforms[0].y)[lat]
+        zz = [t.z for t in ego.transforms if min(pr[trv], pf[trv]) - 1 <= (t.x, t.y)[trv] <= max(pr[trv], pf[trv]) + 1] or [pr[2], pf[2]]
+        box = []
+        for tv, lv, zv in product(sorted((pr[trv], pf[trv])), (lc - 1.75, lc + 1.75), (min(zz) - 1., max(zz) + 3.)):
+            v = [0., 0., zv]; v[trv] = tv; v[lat] = lv; box.append(tuple(v))
+        extra['reverse_regions'] = {'EGO': tuple(box)}
     return {'region': region, 'sections': sections, 'pair': pair, 'z': (z_lo, z_hi), 'axis': (trv, tsg), 'ends': ends,
             'topology_extra': extra}
 
@@ -136,5 +155,6 @@ def f_geometry(prep, routes, plain):
 PAIRS = {'F01': (('a_peak_025', 'g_front_min_m'), ('m/s^2', 'm'), ('peak_decel_025', 'min_front_gap'), (('TRIGGER', 'F01_N_CLEAR'),) * 2),
          'F02': (('v_mean_E', 'g_rear_min_m'), ('m/s', 'm'), ('mean_speed', 'min_rear_gap'), (('TRIGGER', 'F02_END'),) * 2),
          'F05': (('d_pre_move_m', 't_queue_exit_s'), ('m', 's'), ('forward_distance', 'elapsed'),
-                 (('TRIGGER', 'N_MOVE'), ('N_MOVE', 'F05_END')))}
+                 (('TRIGGER', 'N_MOVE'), ('N_MOVE', 'F05_END'))),
+         'F03': (('d_reverse_m', 'g_front_min_m'), ('m', 'm'), ('reverse_distance', 'min_front_gap'), (('TRIGGER', 'NPC_STOP_CONFIRMED'),) * 2)}
 END_SECTION = {'F01': 'F01_END', 'F02': 'F02_END', 'F05': 'F05_END'}

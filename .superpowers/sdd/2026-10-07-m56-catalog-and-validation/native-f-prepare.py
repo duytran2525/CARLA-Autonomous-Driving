@@ -73,7 +73,8 @@ class IO:
         return min(s) if s else None
 INPUTS = {'F01': {'vE': F(4), 'vN_char': F(17, 5), 'd0': F(57, 5)},   # PREREG F part 1 section 1
           'F02': {'vE': F(4), 'vN_char': F(5), 'd0': F(20)},         # + F02_RECIPE_NOTES_20261109
-          'F05': {'vE': F(2), 'vN_char': F(2), 'd0': F(4)}}          # PREREG F part 1: queue, release 3 s, both 2 m/s
+          'F05': {'vE': F(2), 'vN_char': F(2), 'd0': F(4)},          # PREREG F part 1: queue, release 3 s, both 2 m/s
+          'F03': {'vE': F(0), 'vA': F(4, 5), 'd0': F(26, 5)}}         # PREREG F part 1 d0 + part 2 vA (vN by the grade)
 G0, TAIL_M = 40., 30.
 ZERO = {'method': 'quintic-arc-v1', 'segments': ({'start_arc_m': F(0), 'length_m': F(1), 'start_offset_m': F(0), 'end_offset_m': F(0)},)}
 
@@ -241,6 +242,184 @@ def prepare_f05(c, client, proc, start, world, m, identity, out, rows, arc, cont
     return P.finish(c, out)
 
 
+F03_RELEASE_S = F(81, 20)  # PREREG F part 2: UNPOWERED after CAPTURE_START + d2 (d1 21/20 + 3)
+F03_WINDOW = (1237.5, 1505.)  # road 1062 s: 10 m before the r18f probe spawn (s0 + 0.3 run = 1247.5) .. grade run end - 5
+F03_EGO_STATION = 8.  # EGO route station at spawn: room for the reverse region (rear - 3 m) on the route
+REVERSE_TRIALS_M = (F(4, 5), F(6, 5), F(8, 5), F(2))  # stopping-boundary trials (as F05 CREEP_TRIALS_S), one probe each
+REVERSE_V2 = {'hold_throttle': .29, 'gain': .2, 'target': .5, 'throttle_cap': .4, 'brake_cap': .3}  # response REVERSE_LAWS v2
+
+
+def reverse_probe(world, pose, route, boundary, label):
+    """Direct-API EGO-only probe of the product reverse kernel law v2 (response.reverse_intent; runner can't run the kernel
+    without the compiled fixture): HOLD (brake 0.3, automatic gear) 5 s, then REVERSE manual gear -1, throttle =
+    min(0.4, max(0, 0.29 + 0.2 (0.5 - speed))), brake = min(0.3, max(0, 0.5 (speed - 0.5))); STOPPING (brake 0.3, gear -1)
+    decided on observation n once retreat + 0.01 + 1.5 * dt >= boundary, applied at n + 1 (runner latency). Speed = |v|,
+    station = metric station of the actor location on the EGO route (as the kernel)."""
+    import carla
+    bp = world.get_blueprint_library().find('vehicle.audi.a2')
+    tr = carla.Transform(carla.Location(pose.x, pose.y, pose.z), carla.Rotation(pose.pitch, pose.yaw, pose.roll))
+    v = world.try_spawn_actor(bp, tr)
+    if v is None:
+        return {'label': label, 'reason': 'SPAWN_FAIL'}
+    try:
+        stn = lambda: _metric_station((v.get_location().x, v.get_location().y, v.get_location().z), route)
+        spd = lambda: math.sqrt(sum(c * c for c in (v.get_velocity().x, v.get_velocity().y, v.get_velocity().z)))
+        for _ in range(100):
+            v.apply_control(carla.VehicleControl(throttle=0., steer=0., brake=.3)); world.tick(120.)
+        s0 = stn(); prev = s0; retreat = 0.; stopping_at = None; peak = 0.; rows = []
+        for t in range(400):
+            sp, st = spd(), stn()
+            if st is None:
+                return {'label': label, 'reason': 'OFF_ROUTE', 't': t}
+            retreat += max(0., float(prev - st)); prev = st; peak = max(peak, sp); rows.append((float(st), sp))
+            if stopping_at is None and retreat + .01 + 1.5 * .05 >= float(boundary):
+                stopping_at = t
+            if stopping_at is not None:
+                ctl = carla.VehicleControl(throttle=0., steer=0., brake=.3, reverse=True, manual_gear_shift=True, gear=-1)
+            else:
+                thr = min(REVERSE_V2['throttle_cap'], max(0., REVERSE_V2['hold_throttle'] + REVERSE_V2['gain'] * (REVERSE_V2['target'] - sp)))
+                brk = min(REVERSE_V2['brake_cap'], max(0., .5 * (sp - .5)))
+                ctl = carla.VehicleControl(throttle=thr, steer=0., brake=brk, reverse=True, manual_gear_shift=True, gear=-1)
+            v.apply_control(ctl); world.tick(120.)
+            if stopping_at is not None and len(rows) >= 10 and all(r[1] <= .1 for r in rows[-10:]):
+                return {'label': label, 'boundary_m': str(boundary), 'decision_tick': stopping_at,
+                        'retreat_at_decision_m': float(s0 - rows[stopping_at][0]), 'speed_at_decision_mps': rows[stopping_at][1],
+                        'stop_distance_m': rows[stopping_at][0] - rows[-1][0], 'peak_speed_mps': peak,
+                        'retreat_total_m': float(s0) - rows[-1][0], 'ticks': t + 1}
+        return {'label': label, 'reason': 'NO_REST' if stopping_at is not None else 'BOUNDARY_NOT_REACHED', 'retreat_m': retreat}
+    finally:
+        v.destroy(); world.tick(120.)
+
+
+def prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane):
+    """F03 (PREREG F part 2 + addendum A 20261118). Same lane on the grade (lane faces uphill), EGO behind the NPC.
+    (1) staged runner probes (EGO 0; NPC SETTLE 0 -> NOMINAL 4/5 after CAPTURE_START + 21/20 -> STOP 0 after + 81/20):
+        d0 = min front gap (NPC rear - EGO front, EGO route) at the first observation at/after CAPTURE_START + 81/20 (the
+        product UNPOWERED command), band 0.3 m, one corrective re-probe; readiness targets EGO 0, NPC = mean NPC speed over
+        the 1 s before release (range <= 0.10, > 0.5), first_ready must come before the release;
+    (2) four direct-API reverse probes of the kernel law v2 on the frozen EGO pose -> REVERSE_STOP_BOUND calibration
+        (as F05 addendum U 4.3: bound = ceil_0.01(max stop) + 0.05; vmax = max(0.5, ceil_0.01(max peak) + 0.10);
+        boundary = 2 - bound - uncertainty - 0.01).
+    The real rollback/TRIGGER/brake needs the compiled F03 fixture + kit: the pre-registered A-only probe (native-f-ab.py
+    --probe-a) runs it; this preparation never claims rollback."""
+    from native_v2_common import RELEASE
+    from m56.metrics import _route_observation, _route_ref
+    inp = out['inputs']; out['recipe_rev'] = 'f-v1.3-f03a'
+    out['site'].update(entry_s=F03_WINDOW[0], exit_s=F03_WINDOW[1], window_rule='r18f spawn s - 10 .. grade run end - 5')
+    rows = {'EGO': IO.lane_rows(m, road, lane, *F03_WINDOW)}; rows['NPC'] = list(rows['EGO'])
+    arc = {k: arcs(v) for k, v in rows.items()}
+    cont = write_ref(P.root / c.id / 'routes-f-probe1.json', rows, 'NATIVE_ROUTE')
+    note = f'{road}/{lane}'
+    q0 = rows['EGO'][min(len(rows['EGO']) - 1, 10)]
+    stream_to(world, q0['x'], q0['y'], q0['z'])
+    e0 = next(i for i, a in enumerate(arc['EGO']) if float(a) >= F03_EGO_STATION)
+
+    def routes_for(k):
+        nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
+        return ({'EGO': directed(rows['EGO'], arc['EGO'], identity.map, c.town, note, cont, arc['EGO'][-1] - 5),
+                 'NPC': directed(nr, na, identity.map, c.town, note, cont, na[-1] - 5)},
+                {'EGO': (rows['EGO'], arc['EGO']), 'NPC': (nr, na)})
+
+    def k_at(station):
+        return next(i for i, a in enumerate(arc['NPC']) if float(a) >= station)
+
+    def gap_of(f, routes):
+        try:
+            return _route_observation(f, {'directed_route': routes['EGO']}, _route_ref(routes['EGO']), 'min_front_gap')
+        except ValueError:
+            return None
+
+    def approach(label, k):
+        routes, prow = routes_for(k)
+        poses = {'EGO': IO.pose_on(world, rows['EGO'], e0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+        npc_r = staged_response('NPC', 'NPC_COMMON', routes['NPC'], {'SETTLE': F(0), 'NOMINAL': F(4, 5), 'STOP': F(0)},
+                                ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()},
+                                 {'cause': 'STOP', 'after_event': 'CAPTURE_START', 'delay_s': F03_RELEASE_S, 'requires': ()}))
+        fr = P.probe(client, proc, start, world, identity, c.id, routes, prow, poses,
+                     (nominal_response('EGO', 'A', F(0), routes['EGO']), npc_r), label, None, None, None)
+        if not fr:
+            return {'reason': f'{label.upper()}_NO_FRAMES:' + ','.join(P.LAST_REASONS)}
+        t0 = fr[0].simtime - F(1, 20)  # CAPTURE_START = the runner boundary, one tick before the first frame
+        i_rel = next((i for i, f in enumerate(fr) if f.simtime - t0 >= F03_RELEASE_S), None)
+        if i_rel is None:
+            return {'reason': 'F03_PROBE_ENDS_BEFORE_RELEASE'}
+        gap = gap_of(fr[i_rel], routes)
+        npc = lambda f: next(a for a in f.actors if a.role == 'NPC')
+        w = [float(_speed(npc(f).velocity)) for f in fr if t0 + F03_RELEASE_S - 1 <= f.simtime < t0 + F03_RELEASE_S]
+        return {'routes': routes, 'prow': prow, 'poses': poses, 'frames': fr, 't0': t0, 'i_rel': i_rel,
+                'gap': gap, 'npc_window': w, 'reason': None if gap is not None else 'F03_GAP_UNKNOWN_AT_RELEASE'}
+
+    d0 = float(inp['d0']); BAND = .3
+    k = k_at(float(arc['EGO'][e0]) + L + d0 - 2.)  # first guess: ~2 m of approach before the release
+    a1 = approach('approach1', k)
+    out['approach1'] = {'gap_at_release_m': None if a1.get('gap') is None else float(a1['gap']), 'reason': a1.get('reason')}
+    if a1.get('reason'):
+        out.update(status='BLOCKED_FIXTURE', reason=a1['reason']); return P.finish(c, out)
+    k = k_at(float(arc['NPC'][k]) + d0 - float(a1['gap'])); a2 = approach('approach2', k)
+    if not a2.get('reason') and abs(float(a2['gap']) - d0) > BAND:
+        out['approach2_gap_m'] = float(a2['gap'])
+        k = k_at(float(arc['NPC'][k]) + d0 - float(a2['gap'])); a2 = approach('approach2b', k)
+    out['approach2'] = {'gap_at_release_m': None if a2.get('gap') is None else float(a2['gap']), 'reason': a2.get('reason')}
+    if a2.get('reason'):
+        out.update(status='BLOCKED_FIXTURE', reason=a2['reason']); return P.finish(c, out)
+    if abs(float(a2['gap']) - d0) > BAND:
+        out.update(status='BLOCKED_FIXTURE', reason='D0_OUTSIDE_BAND', d0_band_m=BAND); return P.finish(c, out)
+    w = a2['npc_window']
+    if not w or max(w) - min(w) > .10 or min(w) <= .5:
+        out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_STEADY', npc_window_range=(max(w) - min(w)) if w else None)
+        return P.finish(c, out)
+    routes, prow, poses, fr = a2['routes'], a2['prow'], a2['poses'], a2['frames']
+    targets = {'EGO': F(0), 'NPC': F(round(sum(w) / len(w) * 1000), 1000)}
+    rdy = P.first_ready(fr, routes, targets, boundary_t2=float(a2['t0']))
+    if rdy is None or rdy[0].simtime - a2['t0'] >= F03_RELEASE_S:
+        out.update(status='BLOCKED_FIXTURE', reason='READINESS_NOT_BEFORE_RELEASE',
+                   ready_s=None if rdy is None else float(rdy[0].simtime - a2['t0'])); return P.finish(c, out)
+    frr, markers = rdy
+    act = {a.role: a for a in frr.actors}
+    ego_front_ready = P.front_station(act['EGO'], routes['EGO'])
+    first = {a.role: a for a in fr[0].actors}
+    ego_rear = IO.rear_station(first['EGO'], routes['EGO']); ego_front = P.front_station(first['EGO'], routes['EGO'])
+    npc_rear = IO.rear_station(first['NPC'], routes['EGO'])
+    # (2) reverse calibration on the frozen EGO pose (NPC absent), stopping-boundary trials
+    st = world.get_settings(); sync0, dt0 = st.synchronous_mode, st.fixed_delta_seconds
+    st.synchronous_mode, st.fixed_delta_seconds = True, .05; world.apply_settings(st)
+    try:
+        trials = [reverse_probe(world, poses['EGO'], routes['EGO'], b, f'reverse-{float(b):.1f}') for b in REVERSE_TRIALS_M]
+    finally:
+        st.synchronous_mode, st.fixed_delta_seconds = sync0, dt0; world.apply_settings(st)
+    out['reverse_trials'] = trials
+    log(event='F03_REVERSE_TRIALS', scene=c.id, trials=trials)
+    good = [t for t in trials if 'reason' not in t]
+    if len(good) != len(REVERSE_TRIALS_M):
+        out.update(status='BLOCKED_FIXTURE', reason='F03_REVERSE_CALIBRATION_INCOMPLETE'); return P.finish(c, out)
+    unc = F(1, 100)
+    bound = F(math.ceil(max(t['stop_distance_m'] for t in good) * 100), 100) + F(5, 100)
+    vmax = max(F(1, 2), F(math.ceil(max(t['peak_speed_mps'] for t in good) * 100), 100) + F(1, 10))
+    boundary = 2 - bound - unc - F(1, 100)
+    out['reverse_calibration'] = {'method': 'bounded-reverse-stop-v2', 'uncertainty': str(unc),
+                                  'stopping_distance_bound_m': str(bound), 'maximum_reverse_speed_mps': str(vmax),
+                                  'stopping_boundary_m': str(boundary),
+                                  'rule': 'bound = ceil_0.01(max stop distance) + 0.05; vmax = max(0.5, ceil_0.01(max peak) + 0.10); '
+                                          'boundary = 2 - bound - uncertainty - 0.01 (as F05 addendum U 4.3, hard 2 m)'}
+    if not F(1, 5) < boundary < 2:
+        out.update(status='BLOCKED_FIXTURE', reason='F03_REVERSE_BOUND_TOO_WIDE'); return P.finish(c, out)
+    dest = ego_front_ready + 6.  # addendum A2: exit = EGO front at ready; DESTINATION 6 m beyond (DESTINATION_ROOM >= 5)
+    if dest + 30. > float(routes['EGO'].arc[-1]) or ego_rear - 3. < 0.:
+        out.update(status='BLOCKED_FIXTURE', reason='F_WINDOW_TOO_SHORT'); return P.finish(c, out)
+    npc_rows = prow['NPC'][0]
+    cont2 = write_ref(P.root / c.id / 'routes-f.json', {'EGO': rows['EGO'], 'NPC': npc_rows}, 'NATIVE_ROUTE')
+    out.update(status='PREPARED', reason=None, targets=targets, markers=markers, T_r=float(frr.simtime - a2['t0']),
+               d0_realised_m=float(a2['gap']), d0_band_m=BAND, lead_route_start_index=k,
+               routes_f=str(cont2.uri), routes_f_sha256=cont2.sha256, poses={kk: encode_record(v) for kk, v in poses.items()},
+               grounds={'EGO': IO.grounds.get(id(rows['EGO'])), 'NPC': IO.grounds.get(id(npc_rows))},
+               sections_m={'DESTINATION': {'route': 'EGO', 'station': dest}},
+               ego_front_ready_m=ego_front_ready, npc_rear_spawn_m=npc_rear, ego_front_spawn_m=ego_front,
+               reverse_region_m={'rear': ego_rear - 3., 'front': ego_front + 1.},
+               npc_ready_target_rule='mean NPC speed over the 1 s before CAPTURE_START + 81/20, 1/1000 m/s (f-v1.1 plateau rule, addendum A2)',
+               observed_bodies={a.role: encode_record(a.body) for a in fr[0].actors})
+    return P.finish(c, out)
+
+
 def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     mech = (c.environment.get('mechanism') or c.slot).replace('-ALT1', '')
     assert mech in INPUTS, f'F_MECHANISM_NOT_IN_PART1:{mech}'
@@ -254,6 +433,11 @@ def prepare_f(c, client, proc, start, world, m, identity, body, bbox):
     lo = float(secs[rr['section']].get('s')); hi = float(secs[rr['section'] + 1].get('s')) if rr['section'] + 1 < len(secs) else xr.length(c.town, road)
     entry, exit_ = (lo + 1., hi - 1.) if sg > 0 else (hi - 1., lo + 1.)
     (P.root / c.id).mkdir(parents=False, exist_ok=True)
+    if mech == 'F03':  # PREREG F part 2 + addendum A: grade window, own branch before the whole-section rows
+        out = {'scene': c.id, 'town': c.town, 'category': 'F', 'mechanism': mech, 'recipe': 'f-v1', 'inputs': inp, 'bbox': bbox,
+               'site': {'road': road, 'lane': lane, 'section': rr['section']}, 'map_hash': identity.map,
+               'carla_no_rendering_mode': NO_RENDER, **({'m56_recipe': 'v6'} if V6 else {})}
+        return prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane)
     out = {'scene': c.id, 'town': c.town, 'category': 'F', 'mechanism': mech, 'recipe': 'f-v1', 'inputs': inp, 'bbox': bbox,
            'site': {'road': road, 'lane': lane, 'section': rr['section'], 'entry_s': entry, 'exit_s': exit_},
            'map_hash': identity.map, 'carla_no_rendering_mode': NO_RENDER, **({'m56_recipe': 'v6'} if V6 else {})}

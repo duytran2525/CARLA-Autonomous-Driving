@@ -1,0 +1,823 @@
+{
+ "entries": [
+  {
+   "authority": "Duy [chat] 2026-11-08 A-SEL2 \"Claude soạn recipe F\" (self-stated identity); prereg commit 9677a51",
+   "candidate_id": "M56-P-F01-S2",
+   "category": "F",
+   "descriptors": {
+    "d0": "15.5",
+    "vN_char": "17/5"
+   },
+   "id": "M56-P-F01",
+   "mechanism": "F01",
+   "replacement": "B3 (addendum F01-v3 e46ebf1)",
+   "replaces": "M56-P-F01-S1",
+   "required_m": 145.33333333333331,
+   "review": "CLAUDE_REVIEW_UNDER_DUY_DELEGATION; independent review waived by Duy 2026-10-24",
+   "rule": "first_fit",
+   "selector": "CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT",
+   "site": {
+    "junctions_crossed": [],
+    "lanes": [
+     -3,
+     -4
+    ],
+    "road": 30,
+    "roads": [
+     30
+    ],
+    "rule": "R1",
+    "section": 0,
+    "town": "Town06",
+    "travel": "increasing s"
+   },
+   "site_need_m": "91.4",
+   "skipped": {
+    "B5_AXIS_RUN_SHORT": 1,
+    "SITE_USED": 1,
+    "TOWN_CAP": 2
+   },
+   "slot": "F01",
+   "status": "PROPOSED"
+  },
+  {
+   "authority": "Duy [chat] 2026-11-08 A-SEL2 \"Claude soạn recipe F\" (self-stated identity); prereg commit 9677a51",
+   "category": "F",
+   "descriptors": {
+    "d0": "20",
+    "vN_char": "5"
+   },
+   "id": "M56-P-F02",
+   "mechanism": "F02",
+   "required_m": 140.08333333333331,
+   "review": "CLAUDE_REVIEW_UNDER_DUY_DELEGATION; independent review waived by Duy 2026-10-24",
+   "rule": "first_fit",
+   "selector": "CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT",
+   "site": {
+    "junctions_crossed": [],
+    "lanes": [
+     -1,
+     -2
+    ],
+    "road": 451,
+    "roads": [
+     451,
+     747
+    ],
+    "rule": "F2-3",
+    "section": 0,
+    "town": "Town12",
+    "travel": "increasing s"
+   },
+   "skipped": {
+    "B5_AXIS_RUN_SHORT": 12,
+    "SECTION_SHORT": 17,
+    "SITE_USED": 1
+   },
+   "slot": "F02",
+   "status": "PROPOSED"
+  },
+  {
+   "authority": "Duy [chat] 2026-11-08 A-SEL2 \"Claude soạn recipe F\" (self-stated identity); prereg commit 9677a51",
+   "category": "F",
+   "descriptors": {
+    "d0": "4",
+    "vN_char": "2"
+   },
+   "id": "M56-P-F05",
+   "mechanism": "F05",
+   "required_m": 141.33333333333331,
+   "review": "CLAUDE_REVIEW_UNDER_DUY_DELEGATION; independent review waived by Duy 2026-10-24",
+   "rule": "first_fit",
+   "selector": "CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT",
+   "site": {
+    "junctions_crossed": [],
+    "lanes": [
+     -2,
+     -3
+    ],
+    "road": 164,
+    "roads": [
+     164
+    ],
+    "rule": "R1",
+    "section": 0,
+    "town": "Town12",
+    "travel": "increasing s"
+   },
+   "skipped": {
+    "B5_AXIS_RUN_SHORT": 17,
+    "SECTION_SHORT": 25,
+    "SITE_USED": 2
+   },
+   "slot": "F05",
+   "status": "PROPOSED"
+  },
+  {
+   "authority": "Duy [chat] 2026-11-08 A-SEL2 \"Claude soạn recipe F\" (self-stated identity); prereg commit 9677a51",
+   "category": "F",
+   "descriptors": {
+    "d0": "34/5",
+    "vN_char": "1/2"
+   },
+   "id": "M56-P-F06",
+   "mechanism": "F06",
+   "required_m": 140.0,
+   "review": "CLAUDE_REVIEW_UNDER_DUY_DELEGATION; independent review waived by Duy 2026-10-24",
+   "rule": "first_fit",
+   "selector": "CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT",
+   "site": {
+    "junctions_crossed": [
+     17786
+    ],
+    "lanes": [
+     -2,
+     -3
+    ],
+    "road": 896,
+    "roads": [
+     896,
+     897
+    ],
+    "rule": "F3-1 via junctions [17786]",
+    "section": 0,
+    "town": "Town12",
+    "travel": "increasing s"
+   },
+   "skipped": {
+    "B5_AXIS_RUN_SHORT": 24,
+    "SECTION_SHORT": 35,
+    "SITE_USED": 3
+   },
+   "slot": "F06",
+   "status": "PROPOSED"
+  },
+  {
+   "authority": "Claude under Duy delegation: [chat] 2026-11-18 \"hãy làm luôn f03 native tooling đi\"; PREREG F part 2 F03 (c9ba62a) + addendum A (7c66cb5)",
+   "category": "F",
+   "descriptors": {
+    "d0": "26/5"
+   },
+   "id": "M56-P-F03",
+   "mechanism": "F03",
+   "slot": "F03",
+   "status": "PROPOSED",
+   "review": "CLAUDE_REVIEW_UNDER_DUY_DELEGATION; independent review waived by Duy 2026-10-24",
+   "rule": "first_fit",
+   "selector": "CLAUDE_PREREG_ALGORITHM_NOT_INDEPENDENT",
+   "site": {
+    "junctions_crossed": [],
+    "lanes": [
+     -1
+    ],
+    "road": 1062,
+    "roads": [
+     1062
+    ],
+    "rule": "R3 grade (PREREG F part 2 section 3: uphill lane, axis <= 1 deg, neutral-in-motion vN in [0.65, 1.54])",
+    "section": 0,
+    "town": "Town12",
+    "travel": "increasing s"
+   },
+   "successor_b3": {
+    "road": 1085,
+    "lane": 1
+   }
+  }
+ ],
+ "excluded_roads": [
+  [
+   "Town04",
+   6
+  ],
+  [
+   "Town04",
+   36
+  ],
+  [
+   "Town04",
+   39
+  ],
+  [
+   "Town04",
+   40
+  ],
+  [
+   "Town04",
+   42
+  ],
+  [
+   "Town04",
+   43
+  ],
+  [
+   "Town04",
+   45
+  ],
+  [
+   "Town04",
+   47
+  ],
+  [
+   "Town04",
+   48
+  ],
+  [
+   "Town05",
+   0
+  ],
+  [
+   "Town05",
+   13
+  ],
+  [
+   "Town05",
+   14
+  ],
+  [
+   "Town05",
+   15
+  ],
+  [
+   "Town05",
+   16
+  ],
+  [
+   "Town05",
+   17
+  ],
+  [
+   "Town05",
+   18
+  ],
+  [
+   "Town05",
+   25
+  ],
+  [
+   "Town05",
+   26
+  ],
+  [
+   "Town05",
+   35
+  ],
+  [
+   "Town05",
+   36
+  ],
+  [
+   "Town05",
+   37
+  ],
+  [
+   "Town06",
+   15
+  ],
+  [
+   "Town06",
+   16
+  ],
+  [
+   "Town06",
+   18
+  ],
+  [
+   "Town06",
+   21
+  ],
+  [
+   "Town06",
+   22
+  ],
+  [
+   "Town06",
+   23
+  ],
+  [
+   "Town06",
+   25
+  ],
+  [
+   "Town06",
+   29
+  ],
+  [
+   "Town06",
+   35
+  ],
+  [
+   "Town06",
+   36
+  ],
+  [
+   "Town06",
+   37
+  ],
+  [
+   "Town06",
+   38
+  ],
+  [
+   "Town06",
+   40
+  ],
+  [
+   "Town06",
+   47
+  ],
+  [
+   "Town06",
+   48
+  ],
+  [
+   "Town06",
+   49
+  ],
+  [
+   "Town06",
+   51
+  ],
+  [
+   "Town06",
+   52
+  ],
+  [
+   "Town06",
+   53
+  ],
+  [
+   "Town06",
+   66
+  ],
+  [
+   "Town10HD",
+   13
+  ],
+  [
+   "Town10HD",
+   14
+  ],
+  [
+   "Town10HD",
+   15
+  ],
+  [
+   "Town10HD",
+   18
+  ],
+  [
+   "Town10HD",
+   19
+  ],
+  [
+   "Town10HD",
+   20
+  ],
+  [
+   "Town10HD",
+   21
+  ],
+  [
+   "Town12",
+   135
+  ],
+  [
+   "Town12",
+   136
+  ],
+  [
+   "Town12",
+   137
+  ],
+  [
+   "Town12",
+   138
+  ],
+  [
+   "Town12",
+   139
+  ],
+  [
+   "Town12",
+   140
+  ],
+  [
+   "Town12",
+   143
+  ],
+  [
+   "Town12",
+   244
+  ],
+  [
+   "Town12",
+   252
+  ],
+  [
+   "Town12",
+   260
+  ],
+  [
+   "Town12",
+   263
+  ],
+  [
+   "Town12",
+   303
+  ],
+  [
+   "Town12",
+   304
+  ],
+  [
+   "Town12",
+   321
+  ],
+  [
+   "Town12",
+   323
+  ],
+  [
+   "Town12",
+   325
+  ],
+  [
+   "Town12",
+   388
+  ],
+  [
+   "Town12",
+   390
+  ],
+  [
+   "Town12",
+   446
+  ],
+  [
+   "Town12",
+   447
+  ],
+  [
+   "Town12",
+   474
+  ],
+  [
+   "Town12",
+   656
+  ],
+  [
+   "Town12",
+   657
+  ],
+  [
+   "Town12",
+   658
+  ],
+  [
+   "Town12",
+   660
+  ],
+  [
+   "Town12",
+   682
+  ],
+  [
+   "Town12",
+   683
+  ],
+  [
+   "Town12",
+   685
+  ],
+  [
+   "Town12",
+   713
+  ],
+  [
+   "Town12",
+   720
+  ],
+  [
+   "Town12",
+   721
+  ],
+  [
+   "Town12",
+   723
+  ],
+  [
+   "Town12",
+   820
+  ],
+  [
+   "Town12",
+   927
+  ],
+  [
+   "Town12",
+   944
+  ],
+  [
+   "Town12",
+   945
+  ],
+  [
+   "Town12",
+   946
+  ],
+  [
+   "Town12",
+   947
+  ],
+  [
+   "Town12",
+   948
+  ],
+  [
+   "Town12",
+   1103
+  ],
+  [
+   "Town13",
+   31
+  ],
+  [
+   "Town13",
+   101
+  ],
+  [
+   "Town13",
+   186
+  ],
+  [
+   "Town13",
+   228
+  ],
+  [
+   "Town13",
+   241
+  ],
+  [
+   "Town13",
+   251
+  ],
+  [
+   "Town13",
+   302
+  ],
+  [
+   "Town13",
+   307
+  ],
+  [
+   "Town13",
+   308
+  ],
+  [
+   "Town13",
+   309
+  ],
+  [
+   "Town13",
+   323
+  ],
+  [
+   "Town13",
+   339
+  ],
+  [
+   "Town13",
+   340
+  ],
+  [
+   "Town13",
+   345
+  ],
+  [
+   "Town13",
+   411
+  ],
+  [
+   "Town13",
+   412
+  ],
+  [
+   "Town13",
+   413
+  ],
+  [
+   "Town13",
+   504
+  ],
+  [
+   "Town13",
+   510
+  ],
+  [
+   "Town13",
+   576
+  ],
+  [
+   "Town13",
+   577
+  ],
+  [
+   "Town13",
+   634
+  ],
+  [
+   "Town13",
+   776
+  ],
+  [
+   "Town13",
+   777
+  ],
+  [
+   "Town13",
+   779
+  ],
+  [
+   "Town13",
+   828
+  ],
+  [
+   "Town13",
+   829
+  ],
+  [
+   "Town13",
+   830
+  ],
+  [
+   "Town13",
+   855
+  ],
+  [
+   "Town13",
+   856
+  ],
+  [
+   "Town13",
+   903
+  ],
+  [
+   "Town13",
+   904
+  ],
+  [
+   "Town13",
+   905
+  ],
+  [
+   "Town13",
+   906
+  ],
+  [
+   "Town13",
+   907
+  ],
+  [
+   "Town13",
+   908
+  ],
+  [
+   "Town13",
+   909
+  ],
+  [
+   "Town13",
+   910
+  ],
+  [
+   "Town13",
+   911
+  ],
+  [
+   "Town13",
+   912
+  ],
+  [
+   "Town13",
+   913
+  ],
+  [
+   "Town13",
+   914
+  ],
+  [
+   "Town13",
+   930
+  ],
+  [
+   "Town13",
+   931
+  ],
+  [
+   "Town13",
+   933
+  ],
+  [
+   "Town13",
+   934
+  ],
+  [
+   "Town13",
+   935
+  ],
+  [
+   "Town13",
+   936
+  ],
+  [
+   "Town13",
+   946
+  ],
+  [
+   "Town13",
+   1036
+  ],
+  [
+   "Town13",
+   1120
+  ],
+  [
+   "Town13",
+   1121
+  ],
+  [
+   "Town13",
+   1126
+  ],
+  [
+   "Town13",
+   1216
+  ],
+  [
+   "Town13",
+   1330
+  ],
+  [
+   "Town13",
+   1349
+  ],
+  [
+   "Town13",
+   1393
+  ],
+  [
+   "Town13",
+   1406
+  ],
+  [
+   "Town13",
+   1407
+  ],
+  [
+   "Town13",
+   1408
+  ],
+  [
+   "Town13",
+   1410
+  ],
+  [
+   "Town13",
+   1411
+  ],
+  [
+   "Town13",
+   1432
+  ],
+  [
+   "Town13",
+   1433
+  ]
+ ],
+ "pool_size": 107,
+ "prereg": "D:\\AI\\CARLA-Funny-Moments.worktrees\\m56-v1\\docs\\m56\\PREREG_M56_F_ASEL2_20261109.md",
+ "prereg_commit": "9677a51",
+ "prereg_sha256": "87c1ee6796025cf1dc5a33795a2f715fe05a13768cabc5f4fe33194eeb11ed50",
+ "replacement_commit": "F01-v3 e46ebf1",
+ "replacement_of": "D:\\AI\\CARLA-Funny-Moments.worktrees\\m56-v1\\outputs\\m56_f_sites_20261109.json",
+ "seed": 7319326656988417763,
+ "xodr_sha256": {
+  "Town01": "97a7f6ac67812567e5c8ee0599cd823b23f80f30f3f97c502212e38b72e2b709",
+  "Town02": "953c05f17def231239ffcadba3307628a82d0d335b67b4e29c3098f7aed1dd7d",
+  "Town04": "4dddd1560ab7812b0e89cd4a523d8b6f2b93947eafb496d9eeb83cc772116c85",
+  "Town05": "7edc53b0be840e177598da7a4ed9571146d7b2595ce280d154c90f92e8a48851",
+  "Town06": "a90b613175fa837fdc128ddfaf5ddad25797b128fdbd8cd945974bc21a60496e",
+  "Town07": "be730652769e993e27f748ba5793dba9e49d299205146a7a8db0bcd17af877bf",
+  "Town10HD": "5d883b799f634030af92be1e9d79d107845540ba04338e8c60e095be1aef7be7",
+  "Town11": "52ffa8412425b87394afa6a37bf0b688c0584a24df6ae88fea53866acb91e222",
+  "Town12": "26fa53d4902ac3397d35f948969f0c77c1bf023755ede2c67edf00bef817151f",
+  "Town13": "5354326f2fe4d26f0dcb5c82acf462257e638278363ab7adecb97ec3aa1f426f",
+  "Town15": "8e9c69cfb3e750ace3e5d6b057e46786952a073c3924f319bbabb1a166dc2c17"
+ },
+ "f03_addition": {
+  "source": "m56_f_sites_replace_f01_v3_20261114.json",
+  "commit_prereg": "c9ba62a",
+  "addendum": "7c66cb5"
+ }
+}
