@@ -1001,3 +1001,31 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   0 ngoại lệ cả hai chiều) và cùng kích thước. Mục nào hết file thì ghi `DELETED_E` (gỡ junction nếu có). Bản sao DB bị
   "malformed" thì bỏ qua lần đó (bản trước sẽ chết). Chạy lại vẫn an toàn: kiểm G là tập cha của phần còn lại trên E.
   Chạy detached `m56_offload_cloud_20261117d` (đã dừng bản theo lô 20261117c).
+
+## 18/11: ngoại lệ repo, r17q/r/s/t (successor I), nhóm M (addendum R), F, offload
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent.
+
+- **Ngoại lệ repo:** quyết định 18/11 (skill crfp-project) đưa CARLA-Funny-Moments về chỉ đọc. Người dùng phiên này [chat]
+  18/11 chọn "Ngoại lệ: M56 vẫn ở repo cũ": M56 tiếp tục chạy và commit ở repo này, chỉ riêng M56.
+- **Successor I (addendum Q, io-i-v1.3 a/b + product m56-v17), không A/B nào chạy, không tiêu P5:**
+
+| Cảnh | Prepare | Cổng chặn |
+|---|---|---|
+| I05-S2 (Town13) | PREPARED (r17t) | probe 3 `READINESS_PROBE3` (G1) + `SOURCE_CLEAR_EVENT_LATE` |
+| I06-S2 (Town13) | PREPARED (r17t) | probe 3 `SOURCE_CLEAR_LATE` (G3) |
+| I07-S2 (Town12) | PREPARED (r17q) | probe 3 `SOURCE_CLEAR_LATE` (G3) |
+| I08-S2 (Town12) | PREPARED (r17q) | addendum L `GAP_NOT_REALISED` (22,278 vs 24,158) |
+
+  r17q/r17r/r17s: I05-S2, I06-S2 dừng `SCENE_ERROR` RPC 60 s khi stream Town13 dưới áp lực RAM (CARLA 19 GB / 31,6 GB).
+  Technical fix 4 (`9f49bf7`): timeout RPC 300 s sau khi nạp Town12/13, chỉ là trần chờ. r17t chạy qua prepare.
+  Cùng I01-S1, mọi cảnh I chưa PASS đều dừng ở G3/G1/L. PASS I hiện có: I02-S2 (v17), I03, I04 (v17/v16/v15).
+- **Nhóm M:** addendum R (`825a863`), product m56-v18 (`7fe44e9`, khóa `npc_planner`). Mô phỏng hiệu chỉnh
+  `m-npc-edge-sim.py`: M01-S1, M06-S2, M08-S2 không giữ được NPC trong vùng drivable ở mọi lookahead; không A/B.
+- **F:** F06 `DIVERSITY_DEFICIT`, F04 `BLOCKED_CAPABILITY` (giữ). v18 = v17 + v14 phần 1 (`76e0d90`); test F/lùi/bò/stock
+  trên v18 chạy lại 18/11 (lần 17/11 bị Claude Code dừng vì thiếu RAM). Tooling native F05 chưa viết.
+- **Offload:** máy khởi động lại 18/11 13:36 (guard, uploader chết). Uploader per-file chạy lại (`m56_offload_cloud_20261118b`),
+  mover D → E chạy lại với ngày mới (`m56_offload_d2e_20261118a`: 6 thư mục `m56_io_ab_*` 17/11 + diagnostics + pair dirs,
+  `pair-result.json` vẫn giữ trên D). Đã xóa 10 GB rác C: của Claude (8,1 GB `pytest-of-ADMIN` của lần test bị dừng, 2,7 GB
+  bản sao DB DriveFS của uploader bị dừng); uploader nay dùng một thư mục snapshot cố định.
+
