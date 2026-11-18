@@ -1125,3 +1125,21 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
 - **Offline kit F05** sau bản sửa boundary (`m56_f05kit_offline_r18d`): PASS.
 
 - **18/11 22:35 test v19** (`eb9560c`, 32 file F03/F05/F06/lùi/bò/stock adapter, `m56_v19_ftests_r18`): **426 passed**, 0 failed (2:45:00).
+
+- **19/11 00:40 F03 tooling** (Claude under Duy delegation, [chat] 18/11 "hãy làm luôn f03 native tooling đi"). Chưa có số nào về cảnh F03.
+  - Product m56-v19: `dbd1a38` (A1, thêm hàng NPC_CLEAR 2 m/s sau NPC_STOP_CONFIRMED), rồi `4021c9d` (A1 bổ sung: lệnh ghi đè phanh/trôi của NPC chỉ áp cho phase target 0; trước đó NPC_APPROACH và NPC_CLEAR sẽ thành lệnh giữ phanh). Test F03: 56 passed. Nhóm F v19 đang chạy lại (`m56_v19b_ftests_r19`).
+  - Addendum A (`7c66cb5`, rồi `780e8c2`):
+    - A1: NPC rời làn.
+    - A2: readiness theo mẫu NOMINAL, d0 đo lúc lệnh UNPOWERED, DESTINATION = mũi EGO lúc ready + 6.
+    - A3: probe-A (một episode A trên fixture đóng băng) cộng gate replay. Gate xét verdict, va chạm, destination và cửa sổ.
+    - A4: biên dừng lùi là b lớn nhất trong {1/2, 4/5, 6/5, 8/5} vừa cửa sổ NPC 69/20 − 1/2 s.
+  - Tooling `31418d3`, `780e8c2`:
+    - `prepare_f03`;
+    - recipe và site F03 (`M56_ASEL2_F03=1`, `m56_f_sites_f03_20261118.json`, ứng viên M56-P-F03-S1);
+    - REVERSE_STOP_BOUND v2 trong compile;
+    - `native_f03_kit.py`;
+    - `--probe-a`;
+    - `native-f03-replay.py`;
+    - `run-f03-u.sh`.
+  - Kiểm offline: revision base dựng được F03-S1. Contract NPC, A và B đều đạt dưới v19.
+  - Stage 1 đã khởi chạy: `m56_f03u_r19a`.
