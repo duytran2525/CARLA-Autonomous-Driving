@@ -1143,3 +1143,10 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
     - `run-f03-u.sh`.
   - Kiểm offline: revision base dựng được F03-S1. Contract NPC, A và B đều đạt dưới v19.
   - Stage 1 đã khởi chạy: `m56_f03u_r19a`.
+- **19/11 01:10 F03 stage 1 (probes, not the A/B; P5 untouched)**
+  - r19a: prepare PREPARED, with d0 5.25 m, NPC 0.695 m/s, T_r 3.3 s, reverse boundary 1/2 m (stop confirmed 9/4 s, bound 2/25, vmax 63/100). Compile crashed on a tooling KeyError (`8dd9e08`).
+  - r19b: compile and admission passed. The probe-A episode was not sealed: the kit overwrote `Kit.boundary` (`68686b6`; F05 had the same latent bug from `a032cbf` after its A/B; the F05 offline kit check still passes).
+  - r19c: probe-A ran 160 frames.
+    - Natively: TRIGGER at 9319, NPC phases HOLD → APPROACH → UNPOWERED → F03_BRAKE, and kernel B replays REVERSE.
+    - Ended RESPONSE_ACTOR_UNKNOWN: the NPC approached about 2.2 m, then rolled back 2.2 m at up to 1.44 m/s before the brake. It left its route, which was cut at its spawn as in F01.
+    - Tooling fix: the NPC route covers the whole lane window and the NPC spawns at k, as in F02. The stock plan starts 2 m ahead of the actor. Parameters are unchanged. Prepare reruns as r19d.

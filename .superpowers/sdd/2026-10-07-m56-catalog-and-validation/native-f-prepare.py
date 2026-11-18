@@ -306,7 +306,7 @@ def prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane):
     --probe-a) runs it; this preparation never claims rollback."""
     from native_v2_common import RELEASE
     from m56.metrics import _route_observation, _route_ref
-    inp = out['inputs']; out['recipe_rev'] = 'f-v1.3-f03a'
+    inp = out['inputs']; out['recipe_rev'] = 'f-v1.3-f03b'
     out['site'].update(entry_s=F03_WINDOW[0], exit_s=F03_WINDOW[1], window_rule='r18f spawn s - 10 .. grade run end - 5')
     rows = {'EGO': IO.lane_rows(m, road, lane, *F03_WINDOW)}; rows['NPC'] = list(rows['EGO'])
     arc = {k: arcs(v) for k, v in rows.items()}
@@ -317,7 +317,10 @@ def prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane):
     e0 = next(i for i, a in enumerate(arc['EGO']) if float(a) >= F03_EGO_STATION)
 
     def routes_for(k):
-        nr, na = rows['NPC'][k:], [a - arc['NPC'][k] for a in arc['NPC'][k:]]
+        # r19c probe-A: a route cut at the NPC spawn (F01 style) let the rollback (2.2 m before the brake) leave the route
+        # (route_valid False -> RESPONSE_ACTOR_UNKNOWN). The NPC keeps the whole lane window (F02 style) and spawns at k;
+        # the stock plan starts 2 m ahead of the actor (policy_maker), so the rows behind it are never driven.
+        nr, na = rows['NPC'], arc['NPC']
         return ({'EGO': directed(rows['EGO'], arc['EGO'], identity.map, c.town, note, cont, arc['EGO'][-1] - 5),
                  'NPC': directed(nr, na, identity.map, c.town, note, cont, na[-1] - 5)},
                 {'EGO': (rows['EGO'], arc['EGO']), 'NPC': (nr, na)})
@@ -333,7 +336,7 @@ def prepare_f03(c, client, proc, start, world, m, identity, out, L, road, lane):
 
     def approach(label, k):
         routes, prow = routes_for(k)
-        poses = {'EGO': IO.pose_on(world, rows['EGO'], e0), 'NPC': IO.pose_on(world, prow['NPC'][0], 0)}
+        poses = {'EGO': IO.pose_on(world, rows['EGO'], e0), 'NPC': IO.pose_on(world, rows['NPC'], k)}
         npc_r = staged_response('NPC', 'NPC_COMMON', routes['NPC'], {'SETTLE': F(0), 'NOMINAL': F(4, 5), 'STOP': F(0)},
                                 ({'cause': 'NOMINAL', 'after_event': 'CAPTURE_START', 'delay_s': RELEASE, 'requires': ()},
                                  {'cause': 'STOP', 'after_event': 'CAPTURE_START', 'delay_s': F03_RELEASE_S, 'requires': ()}))
