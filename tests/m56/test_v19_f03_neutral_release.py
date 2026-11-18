@@ -76,3 +76,26 @@ def test_unpowered_command_is_neutral_only_with_flag(flag, gear, manual):
     assert out.state.phase == 'UNPOWERED'
     control = out.command.control
     assert (control.throttle, control.brake, control.gear, control.manual_gear_shift, control.reverse) == (0., 0., gear, manual, False)
+
+@pytest.mark.parametrize('phase,simtime,kmh', [('NPC_HOLD', F(2), None), ('NPC_APPROACH', F(3), F(4, 5) * F(18, 5)),
+                                               ('NPC_CLEAR', F(6), F(2) * F(18, 5))])
+def test_stock_phases_are_not_brake_holds(phase, simtime, kmh):
+    """addendum A1: NPC_APPROACH / NPC_CLEAR carry the stock target (control None); only target-0 phases are held."""
+    from m56.model import ControlPacket, EventRecord, ScriptState, SourceRef
+    from m56.response import step_response
+    from tests.m56.response_cases import response_case
+    r, _ = neutral()
+    c = response_case('F', role='NPC', events=(), speed=0.)
+    auto = ControlPacket(0., 0., 0., False, False, False, 1)
+    frame = replace(c.frame, actors=(replace(c.frame.actors[0], readback=auto),), simtime=simtime)
+    capture = EventRecord('CAPTURE_START', 100, F(1), (c.ref,))
+    state = ScriptState('NPC_HOLD' if phase == 'NPC_HOLD' else phase, F(1), (capture,))
+    witness = SourceRef('synthetic://npc', 'a' * 64, 1, '1', 'literal', 'SYNTHETIC_TEST', 100, simtime)
+    frame = replace(frame, integrity={'npc_controls': {'boot': 'boot', 'world': 'world', 'frame': 100, 'actor_id': 1,
+                                                       'status': 'CLEAR', 'witness_refs': (witness,)}})
+    out = step_response(replace(frame, events=()), state, r)
+    assert out.state.phase == phase
+    if kmh is None:
+        assert out.command.control is not None and out.command.control.brake == .3
+    else:
+        assert out.command.control is None and out.command.target_kmh == kmh

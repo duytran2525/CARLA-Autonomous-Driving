@@ -582,7 +582,9 @@ def step_response(frame: FrameRecord, state: ScriptState, response: FrozenRespon
         observed=actor.readback
         if (observed is None or observed.reverse or type(observed.gear) is not int or observed.gear<0):
             raise ValueError('UNPOWERED_ROLLBACK_GEAR_REQUIRED')
-        if control is None:
+        # v19 addendum A1: only the zero-target phases (every v18 F03 phase); the neutral-in-motion NPC_APPROACH and
+        # NPC_CLEAR are stock targets (control None, like NOMINAL), never a brake hold
+        if control is None and response.targets.get(phase)==0:
             # A zero stock target would brake immediately and erase rollback.
             # The admitted recipe coasts without motor torque; no velocity,
             # gravity, reverse-drive or physical-motion override is invented.
