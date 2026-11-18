@@ -1029,3 +1029,36 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   `pair-result.json` vẫn giữ trên D). Đã xóa 10 GB rác C: của Claude (8,1 GB `pytest-of-ADMIN` của lần test bị dừng, 2,7 GB
   bản sao DB DriveFS của uploader bị dừng); uploader nay dùng một thư mục snapshot cố định.
 
+
+### 18/11 (2): M dưới addendum S, F05 dưới addendum T/U
+
+**Nhãn:** CLAUDE_REVIEW_UNDER_DUY_DELEGATION, not independent. Người dùng phiên này [chat] 18/11 "làm hết cho tôi".
+
+- **M (addendum S, `1a9883f`/`31e69fd`):**
+  - Cổng `S_NPC_EDGE` mô phỏng NPC stock trên connector, khớp 6/6 episode đã niêm.
+  - Lap 1 của state 10: cả 8 slot M `EMPTY_NO_ELIGIBLE_CANDIDATE`. Trong 11 town, 277 site M qua B5; biên lớn nhất 0,363 m, dưới ngưỡng 0,45.
+  - Không tiêu B3, không A/B.
+  - Đường còn lại thuộc quyền Duy: controller NPC không stock, hoặc đổi spec §5.2.
+- **F05 addendum T (`1475e9b`, v18 `9d16f43`):**
+  - Luật mới: readback steer của creep |steer| ≤ 1/50.
+  - Lý do: trên F01/F02 đã niêm, 0/401 khung đang chạy có steer đúng 0 (lớn nhất 0,0072).
+  - Luật cũ steer == 0 được giữ và báo song song.
+- **F05 addendum U** (doc `PREREG_M56_F05_ADDENDUM_U_20261118.md`, v18 `1f1d038`, tooling `3f1cefe`/`4b4af86`):
+  - Hai luật đúng-1-m làm B không bao giờ dừng được native: `progress==1 and uncertainty==0` và `reach` ở `progress==1`. Nay thay bằng "dừng trong khoảng dự trữ 1 m sau stopping bound". Luật cũ giữ.
+  - Thêm hook `kit.seal_frame` vào runtime.
+  - Đã kiểm trên dữ liệu niêm:
+    - Xe đứng yên có pose giống từng bit sau khoảng 15 khung. A và B giống nhau, và hai session (prepare với A/B) cũng giống nhau.
+    - Sai số ground ≤ 0,040 m.
+    - Body runtime khác bbox của prepare, nhưng giống nhau giữa probe và A/B. Proof vì vậy bám body quan sát được.
+  - Tooling: prepare F05 (2 lần settle cho gap chính xác, 4 probe creep cho calibration), builder revision F05 (gate env), compile hai lượt cho CREEP_STOP_BOUND, `F05Kit`, `run-f05-u.sh`.
+  - Test v18: 120 test F05 qua; 21 test evaluator chạy lại trên luật U cuối cũng qua.
+- **Guard** stopper/watchdog/cguard chạy lại với hậu tố `r18a`.
+- **F05 stage 1 r18a:** prepare dừng `SCENE_ERROR INVALID_BODY_TRANSFORM` ở settle1.
+  - Nguyên nhân: Town12 là map lớn, nhánh F05 chưa stream site nên actor ngủ và bbox = 0.
+  - Đã sửa (`4b4af86`) rồi chạy lại `r18b`. Prepare chạy lại được; không A/B nào chạy, không tiêu P5.
+- **F03:** grade probe r7 cho 0/6 site lùi được (pitch 3,5–8,8°), tốc độ lùi đúng 0.
+  - Giả thuyết của Claude, chưa kiểm: xe đứng yên bị PhysX cho ngủ, nhả phanh không đánh thức.
+  - Probe v2 (`native-f03-rollback-probe.py`) thả xe khi đang chạy. Chỉ chạy sau F05 stage 1.
+- **Claude Code dừng vì thiếu RAM:** waiter test/mover, waiter stage 1, và lần chạy offline kit check đầu.
+  - Kiểm tay: mover xong (D còn 126 GB trống).
+  - Offline kit check chạy lại detached (`m56_f05kit_offline_r18b`).
