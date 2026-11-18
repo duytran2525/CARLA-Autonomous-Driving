@@ -30,7 +30,7 @@
 - Lệnh `UNPOWERED` sao lại số đọc lại (readback gear).
 - Natively F03 dưới luật cũ không thể xảy ra (theo r18e). Đây là một nhận định, không phải số đo trên cảnh. Mọi kết quả đều báo dưới cả hai luật.
 
-**Luật mới:** thêm một biến thể contract `approach`. Biến thể này chỉ có khi khóa `f_script.release == 'neutral-in-motion'`; không có khóa thì mọi byte giữ như cũ.
+**Luật mới:** thêm một biến thể contract `approach`. Biến thể này chỉ có khi khóa `phases['release'] == 'neutral-in-motion'` (`f_script` vẫn giữ đúng `{mechanism, policy_hash}`); không có khóa thì mọi byte giữ như cũ. Product: m56-v19 `eb9560c`, test `test_v19_f03_neutral_release.py`.
 
 ```
 NPC_HOLD 0 → NPC_APPROACH vA          after CAPTURE_START + d1   (stock LocalPlanner, như NOMINAL)
