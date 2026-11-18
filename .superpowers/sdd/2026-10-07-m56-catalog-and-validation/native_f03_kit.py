@@ -91,9 +91,9 @@ class F03Kit(F05Kit):
             return record
         if ego.id != self.ego_id or (self.rows and record.frame != self.rows[-1].frame + 1):
             self._reset(ego.id)
-            self.boundary = record.frame  # runner boundary: never in its frames, never in the history (a032cbf)
+            self.boundary_frame = record.frame  # runner boundary: never in its frames, never in the history (a032cbf)
             return record
-        if record.frame == getattr(self, 'boundary', None):
+        if record.frame == getattr(self, 'boundary_frame', None):
             return record
         if self.action is None and ego.commands:
             self.action = 'B' if ego.commands[0].response_hash == self.b.hash else 'OTHER'
