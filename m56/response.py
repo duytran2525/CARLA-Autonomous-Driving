@@ -312,6 +312,22 @@ def _reference_response_uncached(response, cause):
     return selected
 
 
+F03_NEUTRAL_RELEASE='neutral-in-motion'
+F03_APPROACH_TARGET,F03_APPROACH_DELAY,F03_RELEASE_AFTER=Number(4,5),Number(21,20),Number(3)
+
+
+def _f03_neutral_release(response,program,rows,brake_row):
+    """v19 (docs/m56/PREREG_M56_F_ASEL2_PART2_F03_20261118.md 2): NPC_HOLD -> NPC_APPROACH 4/5 m/s (stock) after
+    CAPTURE_START + 21/20 s -> UNPOWERED (neutral) after CAPTURE_START + 81/20 s -> F03_BRAKE after TRIGGER + 2 s.
+    Only with phases['release'] == 'neutral-in-motion'. OLD RULE: the held/legacy variants (natively no rollback, r18e)."""
+    return (response.phases.get('release')==F03_NEUTRAL_RELEASE and program['initial']=='NPC_HOLD'
+            and rows==({'cause':'NPC_APPROACH','after_event':'CAPTURE_START','delay_s':F03_APPROACH_DELAY,'requires':()},
+                       {'cause':'UNPOWERED','after_event':'CAPTURE_START','delay_s':F03_APPROACH_DELAY+F03_RELEASE_AFTER,'requires':()},
+                       brake_row)
+            and dict(response.targets)=={'NPC_HOLD':Number(0),'NPC_APPROACH':F03_APPROACH_TARGET,'UNPOWERED':Number(0),
+                                         'F03_BRAKE':Number(0)})
+
+
 def _f_script_contract(response):
     """Fixed common NPC scripts; never runtime actor/frame/Ego-action conditional."""
     from .catalog import _digest
@@ -348,7 +364,8 @@ def _f_script_contract(response):
                   and dict(response.targets)=={'NPC_HOLD':Number(0),'UNPOWERED':Number(0),'F03_BRAKE':Number(0)})
             legacy=(program['initial']=='UNPOWERED' and rows==(brake_row,)
                     and dict(response.targets)=={'UNPOWERED':Number(0),'F03_BRAKE':Number(0)})
-            if response.phases.get('brake')!='F03_BRAKE' or not (held or legacy):
+            approach=_f03_neutral_release(response,program,rows,brake_row)
+            if response.phases.get('brake')!='F03_BRAKE' or not (held or legacy or approach):
                 raise ValueError('F_SCRIPT_POLICY_INVALID')
         elif script['mechanism']=='F05':
             if (program['initial']!='NPC_QUEUE_HOLD'
@@ -566,6 +583,9 @@ def step_response(frame: FrameRecord, state: ScriptState, response: FrozenRespon
             # The admitted recipe coasts without motor torque; no velocity,
             # gravity, reverse-drive or physical-motion override is invented.
             control=replace(observed,throttle=0.,steer=0.,brake=0. if phase=='UNPOWERED' else .3,hand_brake=False)
+            if response.phases.get('release')==F03_NEUTRAL_RELEASE and phase in ('UNPOWERED','F03_BRAKE'):
+                # v19 (PREREG F part 2 F03): neutral, not the observed automatic gear (r18e: an auto gear holds the car)
+                control=ControlPacket(0.,0.,0. if phase=='UNPOWERED' else .3,False,False,True,0)
     if response.actor_role=='NPC' and response.phases.get('f_script',{}).get('mechanism')=='F06-ALT1':
         if phase=='NPC_PREPARATION' and 'TRIGGER' not in events:
             observed=actor.readback
