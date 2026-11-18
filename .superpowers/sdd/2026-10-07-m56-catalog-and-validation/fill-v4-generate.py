@@ -256,6 +256,19 @@ def axis_ok(x, tol=1.):
     return True
 
 
+_EDGE = {}
+
+
+def npc_edge(x, vN):
+    """Addendum S (PREREG_M56_M_ADDENDUM_S_SITE_EDGE_20261118): m-site-edge-gate.py on the NPC connector lane, cached."""
+    key = (x['town'], x['npc']['connecting'], x['npc']['to'], vN)
+    if key not in _EDGE:
+        if 'gate' not in _EDGE:
+            _EDGE['gate'] = mod('sgate', 'm-site-edge-gate.py')
+        _EDGE[key] = _EDGE['gate'].gate_road(cen.lane_centre, v2.trees[x['town']][1][x['npc']['connecting']], x['npc']['to'], vN)
+    return _EDGE[key][1]
+
+
 def section_length(x):
     """Addendum B2: length of the laneSection io_recipe builds on (site road, site section)."""
     roads = v2.trees[x['town']][1]; secs = gen.sections(roads[x['road']])
@@ -312,6 +325,8 @@ def main(out_path, commit, state_path=None):
                     why['B5_AXIS'] += 1
                 elif state and tried(x):
                     why['B3_TRIED'] += 1
+                elif cat == 'M' and state and state.get('npc_edge') and not npc_edge(x, vN):
+                    why['S_NPC_EDGE'] += 1  # addendum S (18/11): replayed stock NPC must stay 0.45 m inside its lane
                 else:
                     out.append((x, d))
             return out, why
