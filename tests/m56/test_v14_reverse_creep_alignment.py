@@ -45,6 +45,13 @@ def test_non_axis_or_reversing_route_blocked():
     assert _v14_axis_route(route([(0., 0.), (10., 0.), (5., 0.)], 0.)) is None
 
 
+@pytest.mark.parametrize('steer,ok', [(0., True), (0.0072, True), (-0.0199, True), (0.0201, False), (-0.5, False), (True, False)])
+def test_v18_creep_steer_tolerance(steer, ok):
+    from m56.response import _creep_steer_ok, _creep_steer_old_rule
+    assert _creep_steer_ok(steer) is ok
+    assert _creep_steer_old_rule(0.) and not _creep_steer_old_rule(0.0072)  # old rule kept: exact zero only
+
+
 def test_v13_synthetic_shape_still_aligned():
     r = route([(0., 0.), (50., 0.)], 0.)
     zero = Transform6(10., 0., 0., 0., 0., 0.)

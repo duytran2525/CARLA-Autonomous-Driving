@@ -842,6 +842,21 @@ def _queue_path(frame,fixture,response):
     return proof
 
 
+CREEP_STEER_LIMIT=Number(1,50)
+
+
+def _creep_steer_ok(steer):
+    """v18 addendum T (PREREG_M56_F05_ADDENDUM_T_20261118, post-number w.r.t. F01/F02 steer readbacks, before any F05
+    number): the stock BasicAgent creeping on a straight axis route reads back |steer| <= 0.0072 (sealed F01/F02 EGO, 0 of
+    401 moving frames exactly 0); |steer| <= 1/50 admits that, lateral drift stays bounded by the 0.15 m alignment rule.
+    OLD RULE: steer == 0 exactly (_creep_steer_old_rule)."""
+    return isinstance(steer,(int,float)) and not isinstance(steer,bool) and abs(Number(steer))<=CREEP_STEER_LIMIT
+
+
+def _creep_steer_old_rule(steer):
+    return steer==0
+
+
 def _creep_guard(frame,state,response,target):
     """No stock-creep torque without exact current frozen/source admission.
 
@@ -880,7 +895,8 @@ def _creep_guard(frame,state,response,target):
     if _queue_path(frame,fixture,response) is None:raise ValueError('CREEP_CURRENT_CORRIDOR_UNPROVEN')
     observed=actor.readback
     if (observed is None or observed.reverse is not False or observed.manual_gear_shift is not False
-            or type(observed.gear) is not int or observed.gear<0 or observed.steer!=0 or observed.hand_brake is not False):
+            or type(observed.gear) is not int or observed.gear<0 or not _creep_steer_ok(observed.steer)
+            or observed.hand_brake is not False):
         raise ValueError('CREEP_CONTROL_UNPROVEN')
     actual=detect_events(history,fixture)
     known={e.name:e for e in state.events}
