@@ -314,18 +314,22 @@ def _reference_response_uncached(response, cause):
 
 F03_NEUTRAL_RELEASE='neutral-in-motion'
 F03_APPROACH_TARGET,F03_APPROACH_DELAY,F03_RELEASE_AFTER=Number(4,5),Number(21,20),Number(3)
+F03_CLEAR_TARGET=Number(2)
 
 
 def _f03_neutral_release(response,program,rows,brake_row):
     """v19 (docs/m56/PREREG_M56_F_ASEL2_PART2_F03_20261118.md 2): NPC_HOLD -> NPC_APPROACH 4/5 m/s (stock) after
-    CAPTURE_START + 21/20 s -> UNPOWERED (neutral) after CAPTURE_START + 81/20 s -> F03_BRAKE after TRIGGER + 2 s.
+    CAPTURE_START + 21/20 s -> UNPOWERED (neutral) after CAPTURE_START + 81/20 s -> F03_BRAKE after TRIGGER + 2 s
+    -> NPC_CLEAR 2 m/s (stock) after NPC_STOP_CONFIRMED (addendum A, after the metric window).
     Only with phases['release'] == 'neutral-in-motion'. OLD RULE: the held/legacy variants (natively no rollback, r18e)."""
     return (response.phases.get('release')==F03_NEUTRAL_RELEASE and program['initial']=='NPC_HOLD'
             and rows==({'cause':'NPC_APPROACH','after_event':'CAPTURE_START','delay_s':F03_APPROACH_DELAY,'requires':()},
                        {'cause':'UNPOWERED','after_event':'CAPTURE_START','delay_s':F03_APPROACH_DELAY+F03_RELEASE_AFTER,'requires':()},
-                       brake_row)
+                       brake_row,
+                       # addendum A (same-lane DESTINATION): the NPC clears after its stop, as F05 NPC_QUEUE_FORWARD
+                       {'cause':'NPC_CLEAR','after_event':'NPC_STOP_CONFIRMED','delay_s':Number(0),'requires':()})
             and dict(response.targets)=={'NPC_HOLD':Number(0),'NPC_APPROACH':F03_APPROACH_TARGET,'UNPOWERED':Number(0),
-                                         'F03_BRAKE':Number(0)})
+                                         'F03_BRAKE':Number(0),'NPC_CLEAR':F03_CLEAR_TARGET})
 
 
 def _f_script_contract(response):

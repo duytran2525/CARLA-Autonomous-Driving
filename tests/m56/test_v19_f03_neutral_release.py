@@ -12,10 +12,11 @@ def neutral():
     r, fixture = f03_response()
     rows = ({'cause': 'NPC_APPROACH', 'after_event': 'CAPTURE_START', 'delay_s': F(21, 20), 'requires': ()},
             {'cause': 'UNPOWERED', 'after_event': 'CAPTURE_START', 'delay_s': F(81, 20), 'requires': ()},
-            {'cause': 'F03_BRAKE', 'after_event': 'TRIGGER', 'delay_s': F(2), 'requires': ()})
+            {'cause': 'F03_BRAKE', 'after_event': 'TRIGGER', 'delay_s': F(2), 'requires': ()},
+            {'cause': 'NPC_CLEAR', 'after_event': 'NPC_STOP_CONFIRMED', 'delay_s': F(0), 'requires': ()})  # addendum A
     phases = {**r.phases, 'release': 'neutral-in-motion',
               'program': {'method': 'ordered-event-program-v1', 'initial': 'NPC_HOLD', 'transitions': rows}}
-    targets = {'NPC_HOLD': F(0), 'NPC_APPROACH': F(4, 5), 'UNPOWERED': F(0), 'F03_BRAKE': F(0)}
+    targets = {'NPC_HOLD': F(0), 'NPC_APPROACH': F(4, 5), 'UNPOWERED': F(0), 'F03_BRAKE': F(0), 'NPC_CLEAR': F(2)}
     return reseal(replace(r, targets=targets, phases=phases)), fixture
 
 
@@ -26,7 +27,8 @@ def test_neutral_release_admitted():
     assert _forward_contract(r, fixture) is None
 
 
-@pytest.mark.parametrize('fault', ['no_flag', 'fast_approach', 'early_release', 'powered_unpowered'])
+@pytest.mark.parametrize('fault', ['no_flag', 'fast_approach', 'early_release', 'powered_unpowered',
+                                   'clear_before_stop', 'fast_clear', 'no_clear'])
 def test_neutral_release_faults_blocked(fault):
     from m56.response import _f_script_contract
     r, _ = neutral(); phases = dict(r.phases); targets = dict(r.targets); rows = list(phases['program']['transitions'])
@@ -36,8 +38,14 @@ def test_neutral_release_faults_blocked(fault):
         targets['NPC_APPROACH'] = F(2)
     elif fault == 'early_release':
         rows[1] = {**rows[1], 'delay_s': F(41, 20)}
-    else:
+    elif fault == 'powered_unpowered':
         targets['UNPOWERED'] = F(1, 5)
+    elif fault == 'clear_before_stop':
+        rows[3] = {**rows[3], 'after_event': 'TRIGGER'}
+    elif fault == 'fast_clear':
+        targets['NPC_CLEAR'] = F(3)
+    else:  # the 3-row v19 eb9560c variant, superseded by addendum A
+        rows.pop(); targets.pop('NPC_CLEAR')
     phases['program'] = {**phases['program'], 'transitions': tuple(rows)}
     with pytest.raises(ValueError):
         _f_script_contract(reseal(replace(r, phases=phases, targets=targets)))
