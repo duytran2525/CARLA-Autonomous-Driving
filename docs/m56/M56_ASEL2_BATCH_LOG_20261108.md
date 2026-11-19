@@ -1150,3 +1150,15 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
     - Natively: TRIGGER at 9319, NPC phases HOLD → APPROACH → UNPOWERED → F03_BRAKE, and kernel B replays REVERSE.
     - Ended RESPONSE_ACTOR_UNKNOWN: the NPC approached about 2.2 m, then rolled back 2.2 m at up to 1.44 m/s before the brake. It left its route, which was cut at its spawn as in F01.
     - Tooling fix: the NPC route covers the whole lane window and the NPC spawns at k, as in F02. The stock plan starts 2 m ahead of the actor. Parameters are unchanged. Prepare reruns as r19d.
+- **19/11 02:25–06:30 F03 one-shot A/B under m56-v19 (P5 spent for F03-S1 under v19)**
+  - r19d: probe-A completed (NPC stop and destination proofs confirmed); replay gate passed; reverse calibration chose boundary 1/2 m.
+  - r19e: the single F03 A/B ran (`m56_f_ab_Town12_20261118T192541Z/M56-P-F03-S1`). Arm A was complete. Arm B never selected the reverse gear (REVERSE_CONTROL_MISMATCH, FORWARD_RESCUE_BEFORE_RELEASE, d_reverse 0). Pair under v19 (`m56_v6_pair_20261118T194532Z`): FAILED, comparisons null. Pair under the v18 rule (`...T200402Z`): FAILED, arm A physical UNKNOWN, arm B NORMATIVE_RESPONSE_INVALID. Both are reported as measured.
+- **19/11 23:30–23:45 root cause, v20, new gates (no CARLA)**
+  - Root cause: `runtime._bounded` tests `isinstance(meta, dict)`; decoded and frozen `phases` are `mappingproxy`, so the runner never dispatched `reverse_intent`. The consumer uses `Mapping`. Product defect, not tooling.
+  - m56-v20 `22c57cf` = v19 + `Mapping` in `_bounded` only (diff: `m56/runtime.py`, `tests/m56/f03_cases.py`, `tests/m56/test_v20_bounded_dispatch.py`). Red before, green after. Prereg addendum A5 discloses this and why a new version is legitimate under P5 (advisor reviewed, delegation label CLAUDE_REVIEW_UNDER_DUY_DELEGATION).
+  - Tooling `33d0c89`: replay gate calls the real `runtime._commands` for every frame from TRIGGER to +2 s. On the r19d probe-A episode: v19 FAIL (`bounded_B=false`), v20 PASS (REVERSE from frame 8353, 41 commands).
+  - Disk gate (Duy 19/11: D free > 80 GB and E free > 150 GB before anything runs on): `asel2-cguard.py --wait-commit-gb` waits for both, and `own_server` refuses to start CARLA below them. At that time D 18 GB, E 123 GB: no CARLA start.
+  - F03 stage 1 under v20 (compile, probe-A, full gate), then the single v20 A/B, wait for the disk gate. The r19d artifacts are reused byte for byte.
+- **19/11 23:50 space work (no result touched)**
+  - The cloud uploader was slow because E held 1.67 M files (99 percent under 1 MB; DriveFS about 1 GB/h). `offload-pack-20261119.py` packs each E item that has not started on Drive into one verified tar (entry-by-entry name/kind/size check, tree deleted only after), and `offload-e-to-drive-20261119.py` uploads tars. `pair-result.json` handling is unchanged (D keeps them; the pair dirs on E were copies).
+  - D: 71.6 GB of finished pytest/kit scratch under `D:\tmp` and `outputs\pytest-tmp-v18` deleted by `clean-scratch-20261119.py` (explicit list; `pyt-v20` kept).

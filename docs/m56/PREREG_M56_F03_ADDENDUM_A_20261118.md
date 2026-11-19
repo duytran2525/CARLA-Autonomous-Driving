@@ -78,3 +78,30 @@ Hai lỗi thiết kế lộ ra khi bắt đầu viết tooling F03, trước khi
 ## A1 (bổ sung, m56-v19 `4021c9d`)
 
 Code NPC F03 của v18 ghi đè mọi lệnh stock bằng phanh 0,3 hoặc trôi. Với biến thể mới, ghi đè này sẽ biến NPC_APPROACH và NPC_CLEAR thành lệnh giữ phanh. Giờ ghi đè chỉ áp cho các phase có target 0. Mọi phase của F03 v18 đều có target 0, nên luật cũ giữ nguyên từng byte. Test `test_stock_phases_are_not_brake_holds`; 56 passed.
+
+
+## A5. v20: sửa điều phối lùi của runner (viết SAU khi đã thấy kết quả A/B v19; công bố theo nguyên tắc 6)
+
+Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION (advisor đã xem trước khi viết).
+
+**Đã xảy ra.** A/B F03 của v19 chạy một lần duy nhất (P5 đã tiêu thụ), thư mục `outputs/m56_f_ab_Town12_20261118T192541Z/M56-P-F03-S1`.
+- Nhánh A chạy đủ: NPC HOLD → APPROACH → UNPOWERED → F03_BRAKE → CLEAR; EGO giữ rồi tiến.
+- Nhánh B: EGO **không vào số lùi**, xe chạy tiến (REVERSE_CONTROL_MISMATCH, FORWARD_RESCUE_BEFORE_RELEASE, d_reverse 0).
+- Cặp dưới v19: FAILED, so sánh null (metric nhánh B UNKNOWN, khung rỗng). Cặp dưới luật v18 (`m56_v6_pair_20261118T200402Z`): FAILED, nhánh A physical UNKNOWN, nhánh B có NORMATIVE_RESPONSE_INVALID. Đánh giá offline: cả hai nhánh INVALID.
+- Hai kết quả này được báo đúng như đo, dưới cả luật v19 (`m56_v6_pair_20261118T194532Z`) lẫn v18. Không có cặp PASS cho F03-S1.
+
+**Nguyên nhân (tái hiện offline trên episode probe-A r19d, không cần CARLA).** `runtime._bounded` kiểm `isinstance(meta, dict)`. Sau khi đáp ứng được giải mã và đóng băng (`FrozenResponse`), `phases` là `mappingproxy`, nên `_bounded` luôn False và runner gửi `step_response` thay vì `reverse_intent`. Consumer (`evidence._phase_integrity`) dùng `Mapping`. Runner lệch chính luật điều phối của consumer: đây là **lỗi sản phẩm**, không phải lỗi tooling.
+
+**Sửa (m56-v20 `22c57cf` = v19 + một thay đổi: `_bounded` dùng `Mapping`).**
+- Không đổi spec, ngưỡng Tag, tham số, fixture, evidence, metrics. `git diff v19..v20` chỉ gồm `m56/runtime.py` và test.
+- `test_v20_bounded_dispatch.py`: 3 test, đỏ trước sửa, xanh sau (190 s). Bộ giả lập F03 giờ có `dispatch='runtime'`: giải mã fixture rồi gọi `runtime._commands` thật.
+
+**Vì sao v20 là phiên bản mới hợp lệ theo P5.** F05 trước đó hỏng do tooling (cùng phiên bản chạy lại được). Ở đây runner của sản phẩm lệch consumer của sản phẩm, nên đổi sản phẩm là phải và cần một phiên bản mới; A/B v19 giữ nguyên như đã đo, không bị xóa hay viết lại.
+
+**Công bố các điều đã thấy.**
+- Số của nhánh A v19 đã thấy (g_front_min ≈ 3,06 m, d_reverse 0) trước khi viết v20. Không có dòng code, tham số, hay fixture nào của v20 phụ thuộc vào chúng.
+- Không diễn tập nhánh B. Dùng lại nguyên byte artifact r19d (REVF, prepare, probe-A, `m56_f_sites_f03_20261118.json`); không prepare lại. d0 5,25 m, NPC 0,695 m/s, T_r 3,3 s, biên dừng 1/2 m như cũ.
+
+**Cổng mới trước A/B v20 (tooling).** `native-f03-replay.py` giờ kiểm `runtime._bounded(B)` và gọi `runtime._commands` thật cho mỗi khung từ TRIGGER tới +2 s: phải ra REVERSE, `reverse`, `manual_gear_shift`, gear −1, steer 0, throttle trong [0; 0,4]. Chế độ đầy đủ chạy thêm evaluator (không FAILED, không COLLISION_OBSERVED, có DESTINATION_CONFIRMED) và đòi TRIGGER → NPC_STOP_CONFIRMED đo được ≥ `stop_confirmed_s` + 1/20. Trên probe-A r19d (TRIGGER 8353, NPC_STOP 8413, DESTINATION 8541): dưới v19 **FAIL** (`bounded_B=false`, kernel đầu ra CONTROL), dưới v20 **PASS** (REVERSE từ 8353, 41 lệnh, throttle ≤ 0,39).
+
+**Cổng đĩa (yêu cầu của Duy 19/11).** Không khởi động CARLA nếu D: trống < 80 GB hoặc E: trống < 150 GB: `asel2-cguard.py --wait-commit-gb` chờ cả hai ngưỡng, và `native_v2_common.own_server` từ chối khởi động. Không đổi luật guard khi đang chạy (không ghi STOP vì D/E).
