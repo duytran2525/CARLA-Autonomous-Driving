@@ -24,7 +24,13 @@ def sample():
     except OSError:
         pf = None
     g = lambda b: None if b is None else round(b / 2**30, 2)
+    def free(d):  # an offline drive counts as 0 GB free: the wait gate then holds
+        try:
+            return g(shutil.disk_usage(d).free)
+        except OSError:
+            return 0.
     return {'utc': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'c_free_gb': g(shutil.disk_usage('C:/').free),
+            'd_free_gb': free('D:/'), 'e_free_gb': free('E:/'),
             'pagefile_gb': g(pf), 'commit_limit_gb': g(m.commit_limit), 'commit_avail_gb': g(m.commit_avail),
             'phys_avail_gb': g(m.avail_phys)}
 
@@ -34,15 +40,20 @@ if __name__ == '__main__':
     ap.add_argument('--once', action='store_true')
     # --wait-commit-gb N: block (CARLA down) until commit headroom >= N and C: free >= --min-gb, then exit 0. 16/11: Town12
     # CARLA + prepare took ~14.7 GB commit on a ~30 GB baseline of other apps (limit 48.2) -> tripped at 3.4 GB left.
-    ap.add_argument('--wait-commit-gb', type=float); a = ap.parse_args()
+    ap.add_argument('--wait-commit-gb', type=float)
+    # 19/11 (user: "o D phai tren 80gb va o E tren 150gb moi cho chay tiep"): the WAIT gate (every chain start) also needs
+    # D: >= --min-d-gb and E: >= --min-e-gb free. Wait mode only: the guard loop below must not write a STOP into a running A/B.
+    ap.add_argument('--min-d-gb', type=float, default=80); ap.add_argument('--min-e-gb', type=float, default=150)
+    a = ap.parse_args()
     if a.wait_commit_gb is not None:
         t = 0
         while True:
             s = sample()
-            if s['commit_avail_gb'] >= a.wait_commit_gb and s['c_free_gb'] >= a.min_gb:
+            if (s['commit_avail_gb'] >= a.wait_commit_gb and s['c_free_gb'] >= a.min_gb
+                    and s['d_free_gb'] >= a.min_d_gb and s['e_free_gb'] >= a.min_e_gb):
                 print('ROOM_OK', json.dumps(s), flush=True); raise SystemExit(0)
             if t % 300 == 0:
-                print('ROOM_WAIT need', a.wait_commit_gb, json.dumps(s), flush=True)
+                print('ROOM_WAIT need commit', a.wait_commit_gb, 'D', a.min_d_gb, 'E', a.min_e_gb, json.dumps(s), flush=True)
             time.sleep(30); t += 30
     log = OUT / f"m56_cguard_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
     fired = False

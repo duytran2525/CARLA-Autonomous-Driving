@@ -75,6 +75,10 @@ def own_server(log):
     running = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq CarlaUE4*'], capture_output=True, text=True).stdout
     assert 'CarlaUE4' not in running, 'another CarlaUE4 is running: refuse'
     assert not port_open(), 'port 2610 busy: refuse'
+    import shutil  # 19/11 user gate: no CARLA start unless D: >= 80 GB and E: >= 150 GB free (asel2-cguard.py waits first)
+    for drive, need in (('D:/', 80), ('E:/', 150)):
+        free = shutil.disk_usage(drive).free / 2**30
+        assert free >= need, f'{drive} free {free:.1f} GB < {need} GB: refuse'
     proc = subprocess.Popen([str(EXE), f'-carla-rpc-port={RPC}', '-RenderOffScreen', '-quality-level=Low', '-nosound'],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     start = datetime.now(timezone.utc).isoformat()
