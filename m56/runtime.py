@@ -788,9 +788,11 @@ def _ref(store, relative):
 
 
 def _bounded(response):
-    """Same dispatch rule the consumer replays (_phase_integrity): bounded reverse producers."""
+    """Same dispatch rule the consumer replays (_phase_integrity): bounded reverse producers. v20: Mapping, as the consumer:
+    a FrozenResponse freezes phases to mappingproxy, so the v19 `dict` test was never true and the reverse kernel never ran."""
+    from collections.abc import Mapping
     meta = response.phases.get('reverse', response.phases.get('f_script', {}))
-    return isinstance(meta, dict) and (
+    return isinstance(meta, Mapping) and (
         (response.actor_role == 'EGO' and response.action_id == 'B' and meta.get('mechanism') in ('F03', 'F06-ALT1'))
         or (response.actor_role == 'NPC' and response.action_id == 'NPC_COMMON' and meta.get('mechanism') == 'F06-ALT1'))
 

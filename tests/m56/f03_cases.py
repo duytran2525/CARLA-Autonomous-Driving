@@ -95,15 +95,21 @@ def npc_literal(issue):
     return 'F03_BRAKE', HOLD
 
 
-def joint_f03_producer(root, action='B', shared=None, last=None):
+def joint_f03_producer(root, action='B', shared=None, last=None, dispatch='direct'):
     """Closed loop: the command issued at frame n is applied/read back at n+1 (as on a real server); events are
     detected online on the observed prefix. NPC and Ego-A commands must equal the hand-written literal schedule;
-    Ego-B (bounded reverse kernel) is checked by properties in the tests, not by a copied schedule."""
+    Ego-B (bounded reverse kernel) is checked by properties in the tests, not by a copied schedule.
+    dispatch='runtime' (v20): the commands come from the runner's own runtime._commands on a fixture DECODED from its
+    encoding (as a native frozen fixture: phases are mappingproxy), not from a re-implementation of its dispatch rule."""
     from tests.m56.reverse_cases import ground_actor
     from m56.model import EventRecord
     from m56.runtime import _known_events
     from m56.response import _reverse_recipe_hash, reverse_intent, step_response
     s = Sources(root); frozen = f03_fixture(s, shared); fixture = frozen.fixture
+    if dispatch == 'runtime':
+        from m56.model import decode_record, encode_record
+        fixture = decode_record('CompiledFixture', encode_record(fixture))
+        assert not isinstance(fixture.responses[0].phases, dict), 'the native situation: decoded phases are not dicts'
     ego = next(r for r in fixture.responses if r.actor_role == 'EGO' and r.action_id == action)
     npc = next(r for r in fixture.responses if r.actor_role == 'NPC'); responses = (ego, npc)
     last = last if last is not None else (333 if action == 'A' else 357)
@@ -185,22 +191,30 @@ def joint_f03_producer(root, action='B', shared=None, last=None):
         produced.append(replace(observed, events=()))
         if n == last:
             break
+        if dispatch == 'runtime':
+            from m56.runtime import _commands
+            sent = {c.actor: c for c in _commands((observed,), observed, states, responses, {'EGO': 1, 'NPC': 2}, fixture,
+                                                  (capture, *events))}
         for response in responses:
             role = response.actor_role
-            admitted = tuple(e for e in events if e.frame <= n)
-            bounded = role == 'EGO' and action == 'B' and any(e.name == 'TRIGGER' for e in admitted)
-            # As the consumer replays: CAPTURE_START is a timer anchor for programs, never passed to the bounded kernel.
-            state = replace(states[role], events=admitted if bounded else (capture, *admitted))
-            out = reverse_intent(observed, state, response, fixture) if bounded else step_response(observed, state, response)
-            assert out.command.kind != 'BLOCKED', (n, role, out.command)
-            states[role] = replace(out.state, events=tuple(e for e in out.state.events if e.name != 'CAPTURE_START'))
-            commands[role] = out.command
-            issued[(role, n)] = out.command
+            if dispatch == 'runtime':
+                command = sent[{'EGO': 1, 'NPC': 2}[role]]
+            else:
+                admitted = tuple(e for e in events if e.frame <= n)
+                bounded = role == 'EGO' and action == 'B' and any(e.name == 'TRIGGER' for e in admitted)
+                # As the consumer replays: CAPTURE_START is a timer anchor for programs, never passed to the bounded kernel.
+                state = replace(states[role], events=admitted if bounded else (capture, *admitted))
+                out = reverse_intent(observed, state, response, fixture) if bounded else step_response(observed, state, response)
+                states[role] = replace(out.state, events=tuple(e for e in out.state.events if e.name != 'CAPTURE_START'))
+                command = out.command
+            assert command.kind != 'BLOCKED', (n, role, command)
+            commands[role] = command
+            issued[(role, n)] = command
             if role == 'NPC':
-                assert (out.command.cause, out.command.control) == npc_literal(n), (n, out.command)
+                assert (command.cause, command.control) == npc_literal(n), (n, command)
             if role == 'EGO' and action == 'A':
                 expect = ('HOLD', F(0)) if n < NPC_STOP_FRAME else ('FORWARD', F(36, 5))
-                assert (out.command.cause, out.command.target_kmh) == expect, (n, out.command)
+                assert (command.cause, command.target_kmh) == expect, (n, command)
     final = _known_events(tuple(raw[1:]), fixture)
     assert seen <= set(final), sorted((e.name, e.frame) for e in seen - set(final))  # no online event revised later
     by = {e.name: e.frame for e in final}
