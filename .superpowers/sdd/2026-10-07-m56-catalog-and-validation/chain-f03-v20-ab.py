@@ -3,7 +3,9 @@ delegation. Preconditions, checked in this order, any miss writes outputs/m56_f0
   1. the v20 F+runtime test run (pid TESTS_PID, stdout TESTS_OUT) has ended and its last line is "N passed ..." with no failed/error;
   2. outputs/m56_f03_gate_v20_full.stdout.txt ends F03_REPLAY_PASS (full offline gate on the r19d probe-A episode under v20);
   3. m56-v20 is at 22c57cf with a clean tree; the r19d revision file has sha256 REVF_SHA;
-  4. outputs/m56_f03_v20_ab_LAUNCHED does not exist (written just before the launch: one A/B, never a second).
+  4. outputs/m56_f03_v20_ab_LAUNCHED does not exist (written just before the launch: one A/B, never a second). It is written
+     BEFORE room() waits, so if the chain dies while waiting, look for a new outputs/m56_f_ab_Town12_202611* dir before
+     treating P5 as spent (no dir = not spent: delete the marker).
 Then run-f03-u20.sh ab: its room() waits until no CARLA runs and cguard says commit >= 25 GB, C >= 10, D >= 80, E >= 150 GB
 (Duy 19/11), and own_server asserts D/E again. usage: python -I chain-f03-v20-ab.py [--check]"""
 import hashlib, re, subprocess, sys, time

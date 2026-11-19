@@ -1161,4 +1161,4 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - F03 stage 1 under v20 (compile, probe-A, full gate), then the single v20 A/B, wait for the disk gate. The r19d artifacts are reused byte for byte.
 - **19/11 23:50 space work (no result touched)**
   - The cloud uploader was slow because E held 1.67 M files (99 percent under 1 MB; DriveFS about 1 GB/h). `offload-pack-20261119.py` packs each E item that has not started on Drive into one verified tar (entry-by-entry name/kind/size check, tree deleted only after), and `offload-e-to-drive-20261119.py` uploads tars. `pair-result.json` handling is unchanged (D keeps them; the pair dirs on E were copies).
-  - D: 71.6 GB of finished pytest/kit scratch under `D:\tmp` and `outputs\pytest-tmp-v18` deleted by `clean-scratch-20261119.py` (explicit list; `pyt-v20` kept).
+  - D: finished pytest/kit scratch under `D:\tmp` (71.6 GB) and `outputs\pytest-tmp-v18` (21.9 GB) deleted by `clean-scratch-20261119.py` (explicit list; `pyt-v20` kept): D free 13.9 -> 106.2 GB. E stays at about 122 GB until Drive confirms uploads, so the E >= 150 GB gate still blocks CARLA.

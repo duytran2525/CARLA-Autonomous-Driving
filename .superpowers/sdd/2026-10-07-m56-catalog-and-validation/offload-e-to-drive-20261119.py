@@ -24,6 +24,11 @@ def now():
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 
+def carla_up():
+    """19/11 advisor: C: has ~16 GB; the uploader must not feed it while a CARLA episode runs (cguard never stops an A/B window)."""
+    return 'carlaue4' in subprocess.run(['tasklist', '/NH'], capture_output=True, text=True).stdout.lower()
+
+
 def say(**k):
     k['utc'] = now()
     with LOCK:
@@ -155,7 +160,7 @@ def copier(live, state):
             while True:
                 with LOCK:
                     inflight = sum(b for _, _, b in live.values())
-                if inflight < INFLIGHT_GB * 2**30 and shutil.disk_usage('C:/').free / 2**30 >= MIN_C_GB:
+                if inflight < INFLIGHT_GB * 2**30 and shutil.disk_usage('C:/').free / 2**30 >= MIN_C_GB and not carla_up():
                     break
                 time.sleep(POLL_S)
             if not (E / rel).exists():
@@ -172,6 +177,8 @@ def run():
     threading.Thread(target=copier, args=(live, state), daemon=True).start()
     while True:
         time.sleep(POLL_S)
+        if carla_up():  # an A/B window: no new G: copies (DriveFS cache) and no 0.5 GB DB snapshot on C:
+            continue
         snap = snapshot()
         if snap is not None:
             with LOCK:
