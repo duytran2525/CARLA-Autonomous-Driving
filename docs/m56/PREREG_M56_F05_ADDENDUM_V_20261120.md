@@ -77,3 +77,15 @@ chạy native quá khung TRIGGER. Vì vậy:
   có hai thư mục A/B F05 (v18 đã tiêu và v20 bị cắt); `room()` đòi commit trống ≥ 32 GB thay vì 25 GB (lượt bị cắt đã ăn ~17,5 GB). Chuỗi kiểm
   kết quả test thay vì PID (PID cũ từ trước khi khởi động lại). Chuỗi authority của A/B ghi thêm quyết định chạy lại.
 - Nếu lượt chạy lại cũng bị hạ tầng cắt, nó được ghi y như vậy và chờ Duy; không tự chạy lại.
+## V7. Kết quả lượt chạy lại (viết SAU khi có số; công bố theo nguyên tắc 6; P5 của F05 dưới v20 đã tiêu)
+
+- Chạy `outputs/m56_f_ab_Town12_20261120T143048Z/M56-P-F05` (14:30:48Z, commit trống 33,5 GB lúc bắt đầu, máy không sập). Biên dịch thử
+  FROZEN/ADMITTED. **Arm A** seal sạch (CLEANED). **Arm B** dừng `RESPONSE_BLOCKED` `CREEP_DIRECTION_INVALID` sau 31 khung: lệnh CREEP đầu tiên
+  (khung 3770, throttle đọc lại 0,75) đi cùng một bước lùi **−1,164e-7 m** của vị trí EGO trên tuyến (đo bằng `_metric_station` của kernel, chỉ đọc),
+  và kernel (`response.py:948`, `if step<0`, dung sai 0) chặn ở khung kế tiếp. Ba lần chấm cặp (v20, v18, v13): `BLOCKED_WITNESS`, `comparisons` null.
+- **Verdict theo luật hiện hành:** F05 nhánh B BLOCKED, không có số đo F05. Không chạy lại.
+- Sửa của kit (`a032cbf`) có hiệu lực: TRIGGER không còn bị chặn và B phát được CREEP (v18 dừng ở `CREEP_ORIGIN_UNBOUND` ngay khung TRIGGER).
+- **Cùng một lớp lỗi với F03 v20 (addendum A6):** kernel kiểm hướng chuyển động với dung sai 0, trong khi bound đã công bố có `uncertainty` 1/100 m;
+  ở F03 là +2,19e-4 m, ở F05 là −1,16e-7 m (dưới một micromet, nhiễu float của pose).
+- Đề xuất để Duy quyết (một phiên bản v21 chung cho F03 và F05, chưa làm): các kiểm hướng trong kernel lùi/bò dùng đúng `proof.uncertainty` đã công bố
+  làm dung sai (không khớp theo số đã thấy), ghi là luật đặt sau khi thấy số, kết quả v20 của F03 và F05 giữ là FAILED/BLOCKED, BLOCKED kết thúc episode.
