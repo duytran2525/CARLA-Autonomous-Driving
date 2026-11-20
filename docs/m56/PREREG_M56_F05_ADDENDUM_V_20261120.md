@@ -62,3 +62,18 @@ chạy native quá khung TRIGGER. Vì vậy:
   Arm A của F05 dưới v18 chạy khoảng 9 phút. Nếu B chạm `OUTER_TIMEOUT` thì đó là kết quả được báo như đã đo.
 - Một A/B, một lần. Marker `outputs/m56_f05_v20_ab_LAUNCHED` ghi **trước** khi `room()` chờ. Nếu chuỗi chết trong lúc chờ, kiểm tra xem có
   thư mục `outputs/m56_f_ab_Town12_*` mới chứa `M56-P-F05` (ngoài `20261118T093346Z`) trước khi coi P5 là đã tiêu; nếu không có thì xóa marker.
+
+## V6. Chạy lại sau khi máy tắt đột ngột (viết 20/11 14:15Z, trước lần chạy lại và trước mọi số đo F05)
+
+- **Chuyện đã xảy ra.** Lượt A/B của V1–V5 (`outputs/m56_f_ab_Town12_20261120T070548Z/M56-P-F05`, bắt đầu 07:05:48Z) bị cắt lúc ~07:26Z:
+  Windows tắt không sạch (sự kiện 41, 07:26:46Z) khi commit trống còn 7,8 GB và RAM trống 1,5 GB. Arm A đã seal (07:18:48Z, cleanup CLEANED);
+  **arm B chưa bắt đầu** (không có thư mục B). Lượt đó giữ nguyên, được báo là INFRA_INTERRUPTED, không xóa.
+- **Không ai nhìn số.** Arm A của lượt bị cắt chưa từng được chấm: không evaluator, không pair, không metric nào được đọc. Chỉ đọc `runner/stop.json`
+  (CLEANED) và thời gian ghi file. Nó sẽ không được chấm trước khi lượt chạy lại xong.
+- **Quyết định.** Claude báo Duy rằng P5 được coi là đã tiêu và đưa hai lựa chọn: một phiên bản mới, hoặc xác nhận rằng một A/B bị ngắt trước khi
+  arm B bắt đầu thì không tiêu P5. Duy trả lời [chat] 20/11: **"chạy tiếp f05"**. Ghi nhận là lựa chọn thứ hai (ít thay đổi nhất): chạy lại đúng một
+  lần dưới cùng v20 `22c57cf`, cùng REVF (sha `e1b578...`), cùng luật T/U, cùng cổng; không đổi product, không đổi luật.
+- **Tooling (không phải luật).** `chain-f05-v20-ab2.py`: marker mới `m56_f05_v20_ab2_LAUNCHED` (marker cũ giữ làm hồ sơ); trước khi chạy chỉ được
+  có hai thư mục A/B F05 (v18 đã tiêu và v20 bị cắt); `room()` đòi commit trống ≥ 32 GB thay vì 25 GB (lượt bị cắt đã ăn ~17,5 GB). Chuỗi kiểm
+  kết quả test thay vì PID (PID cũ từ trước khi khởi động lại). Chuỗi authority của A/B ghi thêm quyết định chạy lại.
+- Nếu lượt chạy lại cũng bị hạ tầng cắt, nó được ghi y như vậy và chờ Duy; không tự chạy lại.

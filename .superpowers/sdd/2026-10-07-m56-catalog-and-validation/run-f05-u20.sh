@@ -26,7 +26,7 @@ echo "REVF $REVF"; echo F05V_COMPILE_END
 stage2() {
 REVF=$1; LOG=$A/m56_f05vab_$(date -u +%Y%m%dT%H%M%SZ); mkdir -p $LOG
 room
-M56_F_PREREG="$2" M56_AB_AUTHORITY='Claude under Duy delegation: [chat] 2026-11-20 Duy chose "F05 dưới v20" (which CARLA run); Duy 2026-11-10 autonomy (decide per own recommendations); PREREG F part 1 3fb9865 + addenda T/U 20261118 + V 20261120' \
+M56_F_PREREG="$2" M56_AB_AUTHORITY='Claude under Duy delegation: [chat] 2026-11-20 Duy chose "F05 dưới v20" (which CARLA run); Duy 2026-11-10 autonomy (decide per own recommendations); PREREG F part 1 3fb9865 + addenda T/U 20261118 + V 20261120'"${M56_F05V_AUTHORITY_EXTRA:-}" \
   $PY -I -X utf8 native-f-ab.py $REVF Town12 $S --ab > $LOG/ab.log 2>&1
 grep -a '"event": "\(FIXTURE\|ADMISSION\|AB\|SCENE_ERROR\|CREEP_BOUND\)"\|^DONE\|^Traceback' $LOG/ab.log | cut -c1-600
 D=$(done_path $LOG/ab.log)
