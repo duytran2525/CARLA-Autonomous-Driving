@@ -58,6 +58,9 @@ def preconditions():
     g5 = subprocess.run([PY, '-I', '-X', 'utf8', str(HERE / 'native-f05-v20-gate.py'), str(F05_RERUN_B)], capture_output=True, text=True, env=env)
     if 'F05_V20_GATE PASS' not in g5.stdout:
         c1.blocked('F05 real-data gate under v21: ' + (g5.stdout[-300:] or g5.stderr[-300:]).replace('\n', ' '))
+    full = (OUT / 'm56_f03_gate_v21_full.stdout.txt').read_text(encoding='utf-8', errors='replace')
+    if not full.rstrip().endswith('F03_REPLAY_PASS'):  # A5's registered F03 gate, rerun under v21 (advisor 20/11)
+        c1.blocked('full F03 replay gate under v21 is not F03_REPLAY_PASS')
     if not c1.git(V21, 'rev-parse', 'HEAD').startswith(V21_HEAD) or c1.git(V21, 'status', '--porcelain'):
         c1.blocked(f'm56-v21 is not clean at {V21_HEAD}')
     rel = str(HERE.relative_to(W)).replace('\\', '/')

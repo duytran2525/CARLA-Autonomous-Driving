@@ -38,12 +38,26 @@ luật cũ. Kết quả v20 của F03-S1 (FAILED) và F05 (BLOCKED) giữ nguyê
 2. `native-v21-f03-gate.py`: điều phối thật của runner trên các khung 7557–7559 của F03 v20 B: dưới v20 BLOCKED (đối chứng âm), dưới v21 REVERSE.
 3. `native-f05-v20-gate.py` trên 31 khung của F05 v20 (chạy lại) B: dưới v20 `CREEP_DIRECTION_INVALID` ở 3770 (đối chứng âm), dưới v21 không lỗi.
 4. Bộ test F03/F05/F06/lùi/bò của product dưới v21 (chọn `-k`), kết quả ghi ở batch log.
+4b. Cổng F03 đầy đủ đã đăng ký ở A5 (`native-f03-replay.py` trên episode probe-A r19d: điều phối REVERSE 2 s, evaluator không FAILED,
+   DESTINATION_CONFIRMED) chạy lại dưới v21, phải ra `F03_REPLAY_PASS` (`outputs/m56_f03_gate_v21_full.stdout.txt`).
+4c. Phía consumer (`metrics._f_action_window`: `:781` mỗi bước lùi phải có readback lùi; `:795` `last_retreat` rồi dừng 0,5 s) **giữ dung sai 0,
+   không đổi**, sau khi kiểm (`native-v21-f03-consumer-proxy.py`) trên proxy vật lý: các khung F03 v20 B, nơi lệnh BLOCKED sau 7558 giữ readback
+   lùi với phanh 0,3, đúng vật lý của STOPPING dưới v21. Cửa sổ TRIGGER 7519 → NPC_STOP_CONFIRMED 7579: 40 bước lùi, gồm nhiễu −2,3e-4 m (7560) và
+   −4,8e-4 m (7562), tất cả có readback lùi hợp lệ (0 vi phạm `:781`); `last_retreat` = 7562, dừng quan sát được 0,5 s ở 7572, trong cửa sổ.
+   Chỉ tính việc luật có kích hay không; không tính d_reverse, g_front_min hay cặp nào. Rủi ro còn lại: nếu chuyển sang số tới rơi vào trong
+   cửa sổ và trùng một bước lùi nhiễu thì `:781` sẽ kích; việc chuyển số chờ sự kiện của xe NPC nên khả năng thấp, nhưng chưa được chứng minh.
 5. Cổng đĩa (D > 80, E > 150, C ≥ 10 GB) và commit trống ≥ 32 GB trước mỗi lần bật CARLA; chạy lần lượt, một CARLA một lúc.
 
 ## W4. Artifact dùng lại nguyên byte
 
 F03-S1: prepare r19d và REVF `m56_c0_partial_io_asel2f03prep_20261118T181450Z` (sha `fd6243...`). F05: prepare r18c và REVF
 `m56_c0_partial_io_asel2f05prep_20261118T092923Z` (sha `e1b578...`). Không prepare lại, không diễn tập B.
+
+## W4b. Số lần thử (để người đọc tự cân nhắc forking paths)
+
+- F03-S1: đây là A/B **thứ ba** (v19 FAILED do lỗi điều phối, v20 FAILED do dung sai 0, v21).
+- F05: đây là A/B **thứ tư** về số lần chạy nhưng **thứ hai** có số đo khả dĩ (v18 BLOCKED do lỗi kit; v20 bị máy sập trước arm B; v20 chạy lại
+  BLOCKED do dung sai 0; v21). Mọi lần trước được báo như đã đo, không lần nào bị xóa.
 
 ## W5. Một A/B mỗi cảnh
 
