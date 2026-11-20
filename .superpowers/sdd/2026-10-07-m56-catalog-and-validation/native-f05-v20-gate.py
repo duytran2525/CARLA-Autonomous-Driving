@@ -111,4 +111,11 @@ def main(b_dir):
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else B_DIR))
+    import shutil
+    before = set(Path('D:/tmp').glob('f05v20gate-*'))
+    try:
+        rc = main(sys.argv[1] if len(sys.argv) > 1 else B_DIR)
+    finally:  # 20/11: each run left ~2.4 GB of scratch on D (D fell under the 80 GB gate)
+        for p in set(Path('D:/tmp').glob('f05v20gate-*')) - before:
+            shutil.rmtree(p, ignore_errors=True)
+    sys.exit(rc)
