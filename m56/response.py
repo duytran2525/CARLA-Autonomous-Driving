@@ -935,7 +935,7 @@ def _creep_guard(frame,state,response,target):
     # Own calibrated creep remains bounded through the actual issuing release;
     # later verified stock-forward speed is NOT reverse/creep calibration.
     selected=tuple(f for f in history if origin.frame<=f.frame and (release is None or f.frame<=release.frame))
-    progress=Number(0);previous=None
+    progress=Number(0);stations=[]
     for f in selected:
         a=next(a for a in f.actors if a.role=='EGO');station=_metric_station((a.pose.x,a.pose.y,a.pose.z),response.route)
         if station is None or not _v14_aligned(response.route,a.pose,fixture.poses.get('EGO')):  # v14
@@ -943,12 +943,11 @@ def _creep_guard(frame,state,response,target):
         speed=sqrt(sum(v*v for v in a.velocity))
         if not isfinite(speed) or speed>proof.limits['maximum_forward_speed_mps']:
             raise ValueError('CREEP_SPEED_OUTSIDE_CALIBRATION')
-        if previous is not None:
-            step=station-previous
-            if step<0:raise ValueError('CREEP_DIRECTION_INVALID')
-            progress+=step
+        stations.append(station)
+        # v21: within the declared uncertainty of the running max; progress = max reached (>= the v20 net sum)
+        if _envelope_violation(stations,1,proof.uncertainty) is not None:raise ValueError('CREEP_DIRECTION_INVALID')
+        progress=max(stations)-stations[0]
         if progress+proof.uncertainty>1:raise ValueError('CREEP_RESERVATION_EXCEEDED')
-        previous=station
     gap=_route_observation(frame,{'directed_route':response.route},'route:'+_digest(response.route),'min_front_gap')
     if gap is None or gap<Number(1,5):raise ValueError('CREEP_CURRENT_GAP_UNPROVEN')
     if state.phase=='FORWARD':
@@ -962,6 +961,20 @@ def _creep_guard(frame,state,response,target):
     elif target>0 and (progress+proof.uncertainty+proof.limits['maximum_forward_speed_mps']*frame.dt
                       >=proof.limits['stopping_boundary_m']):
         raise ValueError('CREEP_STOPPING_BOUND_REQUIRED')
+
+
+def _envelope_violation(stations,direction,tolerance):
+    """v21 (addendum W, Duy [chat] 20/11 "làm v21 cho tôi"; rule set AFTER seeing F03 +2.19e-4 m and F05 -1.16e-7 m):
+    index of the first station more than `tolerance` (the proof's declared uncertainty) against `direction` (+1 forward,
+    -1 reverse) from the best station so far (running max / running min), else None. A running envelope, not a per-step
+    tolerance, so slow wrong-way drift still accumulates and fails. OLD RULE (v20): tolerance 0 = any step against direction."""
+    best=None
+    for i,s in enumerate(stations):
+        if best is not None and direction*(best-s)>tolerance:
+            return i
+        if best is None or direction*(s-best)>0:
+            best=s
+    return None
 
 
 def _reverse_stop_tail(history,role,route):
@@ -1097,7 +1110,7 @@ def _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof
             gear_index=i;break
     if gear_index is None or not _reverse_stop_tail(selected[:gear_index],role,response.route):
         raise ValueError('REVERSE_TERMINAL_GEAR_UNPROVEN')
-    if any(b>a for a,b in zip(positions[:gear_index],positions[1:gear_index+1])):
+    if _envelope_violation(positions[:gear_index+1],-1,proof.uncertainty) is not None:  # v21 (v20: any b>a)
         raise ValueError('REVERSE_RESERVATION_NOT_MAINTAINED')
     for f in selected[last_reverse:gear_index]:
         control=next(a for a in f.actors if a.role==role).readback
@@ -1107,7 +1120,7 @@ def _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof
         control=next(a for a in f.actors if a.role==role).readback
         if control is None or control.reverse or control.manual_gear_shift:
             raise ValueError('REVERSE_FORWARD_READBACK_UNPROVEN')
-    if any(b<a for a,b in zip(positions[gear_index:],positions[gear_index+1:])):
+    if _envelope_violation(positions[gear_index:],1,proof.uncertainty) is not None:  # v21 (v20: any b<a)
         raise ValueError('REVERSE_FORWARD_DIRECTION_INVALID')
     if role=='EGO' and not _reverse_peer_event(frame,state,fixture,history,before=selected[gear_index]):
         raise ValueError('REVERSE_HAZARD_RESOLUTION_UNPROVEN')
@@ -1175,7 +1188,7 @@ def reverse_intent(frame:FrameRecord,state:ScriptState,response:FrozenResponse,f
             return _blocked_response(frame,state,response,'FAILED','RESERVATION_STOP_NOT_CONFIRMED')
         if forward:
             return _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof,history)
-        if any(b>a for a,b in zip(positions,positions[1:])):
+        if _envelope_violation(positions,-1,proof.uncertainty) is not None:  # v21 (v20: any b>a)
             return _blocked_response(frame,state,response,'FAILED','REVERSE_RESERVATION_NOT_MAINTAINED')
         speed=_speed(actor.velocity)
         if speed is None or speed>proof.limits['maximum_reverse_speed_mps']:

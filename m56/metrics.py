@@ -1997,7 +1997,7 @@ def _f05_creep_events(frames,fixture,events):
             or not any(row.get('after_event')=='EGO_CREEP_STOPPING_BOUND'
                        for row in response.phases.get('program',{}).get('transitions',()))):
         return ()
-    from .response import _creep_stop_proof,_queue_path
+    from .response import _creep_stop_proof,_queue_path,_envelope_violation
     origin=next((f for f in frames if f.frame==trigger.frame),None)
     ego=next((a for a in origin.actors if a.role=='EGO'),None) if origin else None
     if ego is None:return ()
@@ -2005,7 +2005,7 @@ def _f05_creep_events(frames,fixture,events):
     except (ValueError,TypeError,KeyError,AttributeError):return ()
     initial=_metric_station((ego.pose.x,ego.pose.y,ego.pose.z),response.route)
     if initial is None:return ()
-    move=next((e for e in events if e.name=='N_MOVE'),None);result=[];stopping=False;stopped=False;hold=[];progress=Fraction(0);previous_station=initial
+    move=next((e for e in events if e.name=='N_MOVE'),None);result=[];stopping=False;stopped=False;hold=[];progress=Fraction(0);previous_station=initial;peak=initial
     for i,frame in enumerate(frames):
         if frame.frame<=trigger.frame:continue
         actors=tuple(a for a in frame.actors if a.role=='EGO')
@@ -2013,11 +2013,15 @@ def _f05_creep_events(frames,fixture,events):
         if (len(actors)!=1 or continuous is None or actors[0].id!=ego.id or _digest(actors[0].body)!=_digest(ego.body)
                 or actors[0].route_valid is not True):return tuple(result)
         actor=actors[0];station=_metric_station((actor.pose.x,actor.pose.y,actor.pose.z),response.route)
-        if station is None or station<previous_station:return tuple(result)
+        # v21 (addendum W): the producer's envelope rule (response._envelope_violation) with the creep proof's declared
+        # uncertainty; v20 returned at any station decrease. Progress = max reached before release (>= the v20 net sum).
+        if station is None:return tuple(result)
+        peak=max(peak,previous_station)
+        if _envelope_violation((peak,station),1,proof.uncertainty) is not None:return tuple(result)
         # Once actually released, later forward progress is not additional creep.
         before_release=move is None or frame.frame<=move.frame
         if before_release:
-            progress+=station-previous_station
+            progress=max(progress,station-initial)
             if progress+continuous.uncertainty>1:return tuple(result)
             if (not stopping and progress+continuous.uncertainty+proof.uncertainty
                     +proof.limits['maximum_forward_speed_mps']*frame.dt>=proof.limits['stopping_boundary_m']):
