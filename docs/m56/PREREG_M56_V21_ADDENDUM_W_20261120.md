@@ -63,3 +63,13 @@ F03-S1: prepare r19d và REVF `m56_c0_partial_io_asel2f03prep_20261118T181450Z` 
 
 Thứ tự: F05 trước (B ngắn hơn), rồi F03-S1. Mỗi cảnh một marker riêng ghi trước khi `room()` chờ. Bất kể B ra sao, báo như đã đo, không chạy lại.
 Nếu hạ tầng cắt một A/B thì ghi lại và chờ Duy.
+
+## W6. Kết quả F05 dưới v21 (ghi sau A/B, 20/11 19:20Z), như đã đo
+
+- Run `outputs/m56_f_ab_Town12_20261120T181039Z/M56-P-F05` (marker `m56_v21_ab_F05_LAUNCHED`, chain `chain-v21-ab2.py`). Compile preview FROZEN/ADMITTED. A/B `sealed: true`, `blocked: []`, cả hai arm CLEANED. Kernel v21 không chặn lần nào (v20: chặn ở khung CREEP đầu tiên).
+- Cặp: **FAILED** dưới cả bốn luật, `comparisons [null, null]`, không có số đo so sánh nào.
+  - Arm A (cả bốn luật): physical INCOMPLETE, witness UNCERTAIN: `F05_END_MISSING`, `DESTINATION_CONFIRMED_MISSING`. **Giống hệt arm A của v18 (18/11) và v20 chạy lại**: arm A của F05 chưa lần nào tới F05_END, nên cảnh này hiện không thể ra cặp hợp lệ dù B đúng.
+  - Arm B dưới v21: physical FAILED: `UNPLANNED_REVERSE` (luật `_reverse_beyond_jitter` có sẵn, không phải luật W), `FORWARD_COMMAND_REPLAY_UNPROVEN`. N_MOVE và queue release lần này có (v20: thiếu).
+  - Arm B dưới v20/v18/v13 (luật cũ): thêm `PHASE_PROGRAM_MISMATCH`, `CREEP_STOP_NOT_CONFIRMED`, witness INVALID.
+- Pair dirs `outputs/m56_v6_pair_20261120T184828Z` (v21), `185842Z` (v20), `190755Z` (v18), `191705Z` (v13).
+- **P5 F05 dưới v21 đã dùng.** Không chạy lại. Chẩn đoán `UNPLANNED_REVERSE` và arm A làm offline sau F03 (không bật CARLA).
