@@ -105,3 +105,24 @@ Nhãn: CLAUDE_REVIEW_UNDER_DUY_DELEGATION (advisor đã xem trước khi viết)
 **Cổng mới trước A/B v20 (tooling).** `native-f03-replay.py` giờ kiểm `runtime._bounded(B)` và gọi `runtime._commands` thật cho mỗi khung từ TRIGGER tới +2 s: phải ra REVERSE, `reverse`, `manual_gear_shift`, gear −1, steer 0, throttle trong [0; 0,4]. Chế độ đầy đủ chạy thêm evaluator (không FAILED, không COLLISION_OBSERVED, có DESTINATION_CONFIRMED) và đòi TRIGGER → NPC_STOP_CONFIRMED đo được ≥ `stop_confirmed_s` + 1/20. Trên probe-A r19d (TRIGGER 8353, NPC_STOP 8413, DESTINATION 8541): dưới v19 **FAIL** (`bounded_B=false`, kernel đầu ra CONTROL), dưới v20 **PASS** (REVERSE từ 8353, 41 lệnh, throttle ≤ 0,39).
 
 **Cổng đĩa (yêu cầu của Duy 19/11).** Không khởi động CARLA nếu D: trống < 80 GB hoặc E: trống < 150 GB: `asel2-cguard.py --wait-commit-gb` chờ cả hai ngưỡng, và `native_v2_common.own_server` từ chối khởi động. Không đổi luật guard khi đang chạy (không ghi STOP vì D/E).
+
+
+## A6. Kết quả A/B v20 (viết SAU khi có số; công bố theo nguyên tắc 6; P5 của F03-S1 dưới v20 đã tiêu)
+
+**Chạy.** Chuỗi `m56_f03uab_r20_20261119T190845Z`, A/B `outputs/m56_f_ab_Town12_20261119T191948Z/M56-P-F03-S1`, 19/11 19:19:48Z → ~19:51Z, product m56-v20 `22c57cf`, tooling `71f4cb3`. Cổng đĩa đạt lúc khởi động (D 98,75; E 153,86; C 15,79 GB). Cả hai lệnh chấm cặp (v20, v18) dừng ở `EPISODE_NOT_SEALED:B`: **không có cặp, không có verdict Tag.**
+
+**Số đã đo (đọc từ trajectory.json của nhánh B, không chạy lại gì).**
+- Nhánh A đã seal (305 khung).
+- Nhánh B (793 khung, khung 7403–8195): EGO `HOLD` tới t=6,32 s; **`REVERSE` từ khung 7520** (số lùi −1, steer 0, throttle 0,29–0,39) trong 37 khung; `STOPPING` ở 7557–7558 (brake 0,3); **sửa của v20 có hiệu lực** (v19: không bao giờ vào REVERSE).
+- Khung 7558: vị trí dọc tuyến (trường `arc` của actor) nhích **+2,19e-4 m** về phía trước (quãng lùi 8,0371 → 7,5601 = 0,477 m, biên dừng 1/2 m, trần 2 m). Khung 7559: `reverse_intent` gặp `any(b>a)` (response.py:1178, dung sai 0) và trả `BLOCKED` / `FAILED` / `REVERSE_RESERVATION_NOT_MAINTAINED`, rồi giữ BLOCKED tới khung 8195 (t=40,12 s). Số 2,19e-4 là theo `arc`; kernel dùng `_metric_station`, chưa đo lại bằng hàm đó.
+- Runner kết thúc bằng `OUTER_TIMEOUT` (tường 25 phút, 793 khung): BLOCKED không bao giờ kết thúc episode. Chi phí mỗi khung của B tăng từ ~0,2 s (đầu) lên ~1,1 s (khung 150, ngay sau khi lùi bắt đầu) và 2–3 s (khung 600+); nhánh A ~0,14 s/khung. Chưa đo được một B khoẻ có kịp trong tường hay không.
+
+**Verdict theo luật hiện hành (không đổi luật):** F03-S1 nhánh B **FAILED** (kernel của product tự chặn). Không tính được d_reverse, g_front_min, ΔD.
+
+**Lỗi tooling phụ.** `native_v2_kit.active_target` ném `KeyError('REVERSE_RESERVATION_NOT_MAINTAINED')` khi seal nhánh B vì cause của lệnh BLOCKED không phải một pha. Đã sửa ngày 20/11 (BLOCKED → target 0; thêm assert vào `native-v6-selfcheck.py`; không kết quả đã seal nào đổi vì trước đây mọi cause BLOCKED đều ném lỗi). Sửa này **không** làm đổi verdict: B vẫn là FAILED.
+
+**Điều cổng phát hiện thiếu.** Cổng replay của v20 (`native-f03-replay.py`) chỉ kiểm điều phối `_bounded`/`_commands` trên các khung probe-A (EGO không lùi) từ TRIGGER tới +2 s; nó không thể thấy bước chuyển lùi → dừng với một xe thật đang lùi, cũng không chạy `kit.finish`.
+
+**Phía consumer và prereg.** `metrics.py:795` dùng `b<a` (dung sai 0) để tìm lần lùi cuối, một ngữ nghĩa khác (không kiểm bước tiến). PREREG F phần 2 (`c9ba62a`) chỉ nói "B: lùi theo luật `bounded-reverse-stop-v2`, trần 2 m, không đổi"; không có câu nào về bước tiến trong lúc lùi. Điều kiện `b>a` dung sai 0 nằm trong code của kernel từ các phiên bản trước, trong khi `REVERSE_BOUND` công bố độ bất định 1/100 m.
+
+**Không quyết định gì thêm ở đây.** Không v21, không seal lại B offline, không chạy lại A/B v20. Đề xuất để Duy quyết (giống F05): nếu có v21 thì dung sai phải là độ bất định đã công bố 1/100 m (không khớp theo 2,19e-4), phải công bố là luật đặt sau khi thấy số, kết quả v20 vẫn giữ là FAILED, và phải xử lý BLOCKED kết thúc episode/chi phí mỗi khung trước khi tiêu thêm một A/B.

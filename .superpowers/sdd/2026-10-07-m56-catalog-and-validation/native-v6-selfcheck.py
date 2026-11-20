@@ -69,6 +69,14 @@ assert c.v6_npc_program(early, F(4), region, 3.7, cut=False)['reason'] == 'NPC_T
 # d: the kit's bound uses the active phase's target
 resp = SimpleNamespace(targets={'NOMINAL': F(4), 'TURN': F(29, 8), 'SETTLE': F(0)})
 assert kit.active_target(resp, 'TURN') == F(29, 8) and kit.active_target(resp, 'NPC_TRAFFIC_HOLD') == 0
+# 20/11: a BLOCKED command's cause is a block reason, not a phase (v20 F03 B sealed with REVERSE_RESERVATION_NOT_MAINTAINED)
+assert kit.active_target(resp, 'REVERSE_RESERVATION_NOT_MAINTAINED', 'BLOCKED') == 0
+assert kit.active_target(resp, 'TURN', 'CONTROL') == F(29, 8)
+try:
+    kit.active_target(resp, 'REVERSE_RESERVATION_NOT_MAINTAINED', 'CONTROL')
+    raise SystemExit('a non-BLOCKED unknown cause must still raise')
+except KeyError:
+    pass
 
 # c: multi-ray ground error drops NONE hits (a ray through a mesh seam) when a labelled hit exists
 class World:

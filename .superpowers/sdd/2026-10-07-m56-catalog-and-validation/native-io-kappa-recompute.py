@@ -19,7 +19,7 @@ for sd in map(Path, sys.argv[1:]):
                 if not y.commands:
                     continue
                 r = next(r for r in fixture.responses if r.hash == y.commands[0].response_hash)
-                v2 = float(active_target(r, y.commands[0].cause)) ** 2
+                v2 = float(active_target(r, y.commands[0].cause, y.commands[0].kind)) ** 2
                 o, n = v2 * (kit.kappa(y.role, y) + profile_kappa(r, y)), v2 * kit.lateral_kappa(y.role, r, y)
                 old, new = max(old, (o, (y.role, b.frame))), max(new, (n, (y.role, b.frame)))
         print(f'{sd.name} {action}: window-max-sum {old[0]:.4f} at {old[1]}; pointwise {new[0]:.4f} at {new[1]}', flush=True)

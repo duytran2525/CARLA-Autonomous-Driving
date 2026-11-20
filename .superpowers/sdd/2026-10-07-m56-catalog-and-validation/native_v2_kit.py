@@ -271,7 +271,7 @@ class Kit:
             high = tuple(float(q_up(max(p[k] for p in pts) + pad)) for k in range(3))
             box = tuple(tuple(high[k] if s[k] else low[k] for k in range(3)) for s in product((0, 1), repeat=3))
             response = next(r for r in self.fixture.responses if r.hash == y.commands[0].response_hash)
-            target = (active_target(response, y.commands[0].cause) if V6 else max(v for v in response.targets.values()))
+            target = (active_target(response, y.commands[0].cause, y.commands[0].kind) if V6 else max(v for v in response.targets.values()))
             kap = (self.lateral_kappa(x.role, response, y) if KAPPA_POINTWISE
                    else self.kappa(x.role, y) + profile_kappa(response, y))
             actors[x.role] = {'actor_id': x.id, 'response_hash': y.commands[0].response_hash, 'envelope': box,
@@ -327,9 +327,12 @@ def profile_kappa(response, actor, window=10.):
     return k
 
 
-def active_target(response, cause):
-    """v6 d: the reference speed of the phase that issued this interval's command (NPC_TRAFFIC_HOLD = 0)."""
-    return 0 if cause == 'NPC_TRAFFIC_HOLD' else response.targets[cause]
+def active_target(response, cause, kind=None):
+    """v6 d: the reference speed of the phase that issued this interval's command (NPC_TRAFFIC_HOLD = 0).
+    20/11: a BLOCKED command (cause = the block reason, not a phase) holds still: target 0. The v20 F03 B arm sealed with
+    cause REVERSE_RESERVATION_NOT_MAINTAINED and this raised KeyError (it raised for every BLOCKED cause before; no sealed
+    result changes)."""
+    return 0 if cause == 'NPC_TRAFFIC_HOLD' or kind == 'BLOCKED' else response.targets[cause]
 
 
 def decode_ref(packet):
