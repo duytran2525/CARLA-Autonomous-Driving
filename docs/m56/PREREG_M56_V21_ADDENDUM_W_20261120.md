@@ -73,3 +73,13 @@ Nếu hạ tầng cắt một A/B thì ghi lại và chờ Duy.
   - Arm B dưới v20/v18/v13 (luật cũ): thêm `PHASE_PROGRAM_MISMATCH`, `CREEP_STOP_NOT_CONFIRMED`, witness INVALID.
 - Pair dirs `outputs/m56_v6_pair_20261120T184828Z` (v21), `185842Z` (v20), `190755Z` (v18), `191705Z` (v13).
 - **P5 F05 dưới v21 đã dùng.** Không chạy lại. Chẩn đoán `UNPLANNED_REVERSE` và arm A làm offline sau F03 (không bật CARLA).
+
+## W7. Kết quả F03-S1 dưới v21 (ghi sau A/B, 21/11 00:45Z), như đã đo
+
+- Run `outputs/m56_f_ab_Town12_20261120T192818Z/M56-P-F03-S1` (marker `m56_v21_ab_F03_LAUNCHED`). Compile preview FROZEN/ADMITTED. A/B `sealed: true`, `blocked: []`, cả hai arm CLEANED.
+- **Arm B dừng do `OUTER_TIMEOUT` (runner failure.json: "outer wall deadline", frames_seen 875)**, giống v20 (793 khung). Lý do: hết giờ tường, không phải kernel chặn.
+- Cặp: **BLOCKED_WITNESS** dưới v21, v20 và v18, `comparisons [null, null]`, không có số so sánh.
+  - Arm A dưới v21 và v20: COMPLETE/VALID (lần đầu F03-S1 có arm A hợp lệ). Dưới v18: UNKNOWN/INVALID (`NORMATIVE_RESPONSE_INVALID`, `FORWARD_COMMAND_REPLAY_UNPROVEN`).
+  - Arm B (cả ba luật): INCOMPLETE/INVALID: `TARGET_PROGRAM_MISMATCH`, `GROUND_PROOF_INVALID`, `CONTACT_PROOF_INVALID`, `REVERSE_COMMAND_REPLAY_UNPROVEN`, `DESTINATION_CONFIRMED_MISSING` (+ `NORMATIVE_RESPONSE_INVALID`, `FORWARD_COMMAND_REPLAY_UNPROVEN` dưới v18).
+- Pair dirs `outputs/m56_v6_pair_20261120T200956Z` (v21), `203237Z` (v20), `205508Z` (v18).
+- **P5 F03-S1 dưới v21 đã dùng.** Không chạy lại. Đây là lần thứ ba F03-S1 không ra số (W4b).
