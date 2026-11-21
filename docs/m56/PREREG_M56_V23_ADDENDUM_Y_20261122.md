@@ -94,3 +94,15 @@ của chính F03-S1**. Không có lần thử nào bị xóa.
 
 Chỉ F03-S1, một marker `m56_v23_ab_F03_LAUNCHED` ghi trước khi `room()` chờ. Bất kể B ra sao, báo như đã đo, không chạy lại.
 Nếu hạ tầng cắt A/B thì ghi lại và chờ Duy.
+
+## Y7. Kết quả F03-S1 dưới v23 (ghi sau A/B, 21/11 18:55Z), như đã đo
+
+- Chain `chain-v23-ab.py` (pid 22108) qua mọi điều kiện trước, kể cả hai cổng chạy lại tại chỗ. ROOM_OK 18:31:50Z (commit trống 34,0 GB, C 17,8, D 111,1, E 200,1 GB). Compile preview: FIXTURE FROZEN (sha `b15bf196...`; khác v22 vì hash response của kernel đổi), ADMISSION ADMITTED.
+- Marker `m56_v23_ab_F03_LAUNCHED` 18:33:26Z. **P5 dưới v23 đã tiêu.** Run `outputs/m56_f_ab_Town12_20261121T183328Z/M56-P-F03-S1`: `sealed: true`, `blocked: []`, cả hai arm CLEANED. Cả A/B mất khoảng 6 phút.
+- Arm B (321 khung, 9490-9810): TRIGGER 9606, NPC_STOP_CONFIRMED 9666, **DESTINATION_CONFIRMED 9810**. Lệnh EGO: HOLD 117, REVERSE 37, STOPPING 23, FORWARD_GEAR 1, FORWARD 143; **0 BLOCKED**. Sau NPC_STOP_CONFIRMED có 3 bước giảm station tâm EGO, cả 3 nằm trong dung sai 1e-3 m, 0 bước vượt; `metrics._forward_tail` rỗng (`outputs/m56_v23_f03_b_diag.stdout.txt`, chỉ đọc). Giữ phanh khi khởi hành đã chặn được lăn ngược.
+- Cặp dưới v23 (`m56_v6_pair_20261121T183908Z`) và dưới v22 (`184622Z`): **NUMERIC_FAILED**, cùng số.
+  - A: CONFIRMED / COMPLETE / VALID, reasons rỗng. B: CONFIRMED / COMPLETE / VALID, reasons rỗng. W05 cả hai INTEGRITY_VALID, D09 INTEGRITY_VALID và binds. Đây là cặp F03-S1 **đầu tiên** có số đo so sánh hợp lệ. `REVERSE_COMMAND_REPLAY_UNPROVEN` không còn (sửa admit có tác dụng); hai lý do pending cũng được giải.
+  - Số đo (cửa sổ TRIGGER -> NPC_STOP_CONFIRMED): `d_reverse_m` A = 0, B = 10284982887109/21549764500000 ≈ 0,4773 m. `g_front_min_m` A = 7091198184926325431323/2319519905218560000000 ≈ 3,0572 m, B = 160566606582239183463600378869/45441007009565717299200000000 ≈ 3,5335 m.
+  - So sánh `delta = |a-b| / max(a,b)` (`catalog.delta`): d_reverse 1, g_front_min 21645105756793944467808039384/160566606582239183463600378869 ≈ 0,1348. Luật đã đông cứng (`metrics.compare_ab`): mọi delta phải >= 1/5. g_front_min chỉ tăng 0,476 m (13,5 %), nên **NUMERIC_FAILED**.
+- Dưới v22 cặp cho cùng kết quả: khi kernel replay ra control None (lệnh tiếp nối gốc), consumer chỉ so kind và cause (`evidence.py:1077`), nên các lệnh giữ không bị xem là lệch. Đây là luật cũ được báo theo Y2.
+- Kết quả được báo như đã đo. Không chạy lại, không đổi ngưỡng, không đổi luật consumer. Với F03-S1, một lần lùi 0,48 m chỉ mở thêm 0,48 m khoảng trống phía trước trên nền 3,06 m, dưới ngưỡng tương đối 20 % đã đăng ký trước.
