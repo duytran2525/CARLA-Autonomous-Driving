@@ -1225,3 +1225,4 @@ Nguồn [chat] 15/11/2026, trả lời ba câu hỏi của Claude:
   - Recorded in addendum Y7. Nothing rerun, thresholds and consumer unchanged.
   - The waiter shell that watched the chain was killed for memory pressure at ~18:31Z. It was not restarted; the detached chain ran on, and its state was checked by hand.
   - Drive offload of 21/11 ended CLOUD_END at 18:17Z: all 19 tars cloud-verified on Drive and deleted from E (E free 200 GB).
+- **21/11 18:56Z Drive offload of the two v23 pair bundles** (same pipeline and precedent as 16:28Z): `m56_v6_pair_20261121T183908Z` and `184622Z` (1.28 GB each; `pair-result.json` stays on D) were moved to E, packed into verified tars, and copied to `G:\My Drive\m56-offload-20261116\`. Uploader label `m56_cloud_20261122` (pid 36260) deletes each E tar only after DriveFS shows a cloud id with the same size.
