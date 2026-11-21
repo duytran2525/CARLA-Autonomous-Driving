@@ -168,6 +168,8 @@ class Kit:
     def finish(self, store, fixture, frames, boundary, pointers, context):
         from m56.evidence import _source_bytes
         extra = [self.authority, self.qualification, self.drivable_ref]
+        if os.environ.get('M56_KIT_ADMIT_STOP_BOUND') == '1':  # 2026-11-22 addendum Y (flag: earlier A/Bs keep their exact kit)
+            extra += stop_bound_sources(fixture)
         added = {}
         why = 'Claude review under Duy delegation (A-G45), automated checks only, not independent'
         # W01
@@ -311,6 +313,18 @@ class Kit:
                 dyaw = math.radians((t[i + 1].yaw - t[i - 1].yaw + 180) % 360 - 180)
                 k = max(k, abs(dyaw) / (arc[i + 1] - arc[i - 1]))
         return k
+
+
+def stop_bound_sources(fixture):
+    """2026-11-22 addendum Y: the raw and review refs of the fixture's REVERSE_STOP_BOUND / CREEP_STOP_BOUND proofs. The consumer's
+    command replay admits these proofs (evidence.py:1061 _admitted_source + _verified_review), but the runner snapshots only
+    observed refs + kit extras, so every F03 v21/v22 and F05 v20/v21 replay was REVERSE/FORWARD_COMMAND_REPLAY_UNPROVEN
+    (ADMITTED_SOURCE_FALSE on reverse-stop-bound.json / creep-stop-bound.json). Snapshotting them admits the same bytes; no rule changes."""
+    out = []
+    for p in fixture.proofs:
+        if p.kind in ('REVERSE_STOP_BOUND', 'CREEP_STOP_BOUND'):
+            out += [*p.raw_refs, *(() if p.review is None else (*p.review.refs, p.review.authority_ref))]
+    return [r for r in dict.fromkeys(out) if r is not None]
 
 
 def profile_kappa(response, actor, window=10.):
