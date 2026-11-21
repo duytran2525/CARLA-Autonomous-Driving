@@ -1105,6 +1105,20 @@ def _reverse_reservation_ready(history,fixture,trigger):
     return positions[0]-positions[-1]>=1
 
 
+# v23 (addendum Y): F03 hill start. Native F03-S1 v22 arm B (frames 8864-8870): the gear was in and the brake released, the
+# automatic transmission gave no drive for ~0.35 s, and the EGO rolled back 1.46-1.71 mm per tick on the 3.75 deg grade (consumer
+# POST_END_UNPLANNED_REVERSE, per-step tolerance 1e-3 m). For the first HILL_HOLD_S of FORWARD the kernel commands the stock
+# controller's own max throttle (0.75, its standstill output) WITH the terminal brake (0.3), so the drive engages while held; then
+# the stock continuation. HILL_HOLD_S = 2 x CARLA's documented default gear_switch_time (0.5 s), not fitted to the 0.35 s seen.
+# Post-seen rule. OLD RULE (v19-v22): stock continuation (brake 0) from the first FORWARD tick. EGO in F03 only (F06-ALT1 unchanged).
+HILL_HOLD_S=Number(1)
+HILL_HOLD_CONTROL=ControlPacket(.75,0.,.3,False,False,False,1)
+
+
+def _hill_hold(response,fixture):
+    return HILL_HOLD_S>0 and response.actor_role=='EGO' and fixture.domain.topology.get('mechanism')=='F03'
+
+
 def _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof,history):
     """Authenticate the past exception; forward motion is not reverse calibration."""
     role=response.actor_role
@@ -1148,6 +1162,10 @@ def _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof
     if role=='NPC':
         traffic=_reverse_priority(frame,actor,require_clear=False)
         frame=replace(frame,integrity={**frame.integrity,'npc_controls':traffic})
+    if _hill_hold(response,fixture) and frame.simtime-state.start<HILL_HOLD_S:  # v23 (addendum Y): see HILL_HOLD_S
+        command=CommandRecord(actor.id,frame.frame,frame.frame+1,'CONTROL',target*Number(18,5),Number(0),HILL_HOLD_CONTROL,
+                              None,state.phase,response.hash)
+        return ResponseState(command,ScriptState(state.phase,state.start,state.events))
     return step_response(frame,state,response)
 
 
@@ -1243,7 +1261,8 @@ def reverse_intent(frame:FrameRecord,state:ScriptState,response:FrozenResponse,f
                 target=response.targets.get(forward_phase)
                 if not isinstance(target,Number) or target<=0:
                     raise ValueError('REVERSE_FORWARD_TARGET_UNBOUND')
-                command=CommandRecord(actor.id,frame.frame,frame.frame+1,'CONTROL',target*Number(18,5),Number(0),None,None,forward_phase,response.hash)
+                hold=HILL_HOLD_CONTROL if _hill_hold(response,fixture) else None  # v23 (addendum Y): the first FORWARD tick
+                command=CommandRecord(actor.id,frame.frame,frame.frame+1,'CONTROL',target*Number(18,5),Number(0),hold,None,forward_phase,response.hash)
                 return ResponseState(command,ScriptState(forward_phase,state.start if state.phase==forward_phase else frame.simtime,state.events))
             control=ControlPacket(0.,0.,.3,False,False,False,1)
             cause='NPC_FORWARD_GEAR' if npc else 'FORWARD_GEAR'

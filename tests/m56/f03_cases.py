@@ -26,6 +26,11 @@ COAST = ControlPacket(0., 0., 0., False, False, False, 1)
 DRIVE = ControlPacket(.2, 0., 0., False, False, False, 1)
 ROLLBACK_AT_FORWARD_START = F(0)  # v22: metres the Ego rolls back on the first forward tick (native uphill release: 2.5e-4 .. 1e-3)
 REVERSE_UNCERTAINTY = F(0)  # uncertainty of the synthetic REVERSE_STOP_BOUND proof (v22 tests set the native F03 value, 1/100 m)
+# v23 (addendum Y): native transmission delay after the forward gear (F03 v22 B: no drive for ~0.35 s, rollback ~1.5 mm per tick).
+# ENGAGE_TICKS > 0: for the first ENGAGE_TICKS FORWARD ticks there is no drive; brake > 0 holds the car, brake 0 rolls it back by
+# ROLLBACK_PER_TICK; after that a held tick (brake > 0) still holds. 0 (default) keeps the old synthetic physics exactly.
+ENGAGE_TICKS = 0
+ROLLBACK_PER_TICK = F(0)
 
 
 def f03_fixture(s, shared=None):
@@ -120,7 +125,7 @@ def joint_f03_producer(root, action='B', shared=None, last=None, dispatch='direc
     recipe = s.source('producer-ground-recipe', {'method': 'recorded-ground-contact-v1', 'version': '1',
                       'limitations': 'synthetic source composition only; no native ground/grade/brake calibration'})
     raw, produced, events, issued, commands, states, seen = [], [], (), {}, {}, {}, set()
-    ego_x, ego_v, stopping_frames, capture, rolled = F(4), F(0), 0, None, False
+    ego_x, ego_v, stopping_frames, capture, rolled, forward_ticks = F(4), F(0), 0, None, False, 0
     for n in range(99, last + 1):
         time = F(n - 100, 20)
         station, npc_v = npc_state(n)
@@ -131,6 +136,15 @@ def joint_f03_producer(root, action='B', shared=None, last=None, dispatch='direc
             elif sent.cause == 'STOPPING':
                 stopping_frames += 1
                 ego_v = -F(1, 2) if stopping_frames <= 4 else F(0)
+            elif sent.cause == 'FORWARD' and ENGAGE_TICKS:
+                forward_ticks += 1
+                held = sent.control is not None and sent.control.brake > 0
+                if held:
+                    ego_v = F(0)
+                elif forward_ticks <= ENGAGE_TICKS:
+                    ego_x -= ROLLBACK_PER_TICK; ego_v = F(0)
+                else:
+                    ego_v = F(2)
             elif sent.cause == 'FORWARD':
                 ego_v = F(2)
                 if not rolled:
