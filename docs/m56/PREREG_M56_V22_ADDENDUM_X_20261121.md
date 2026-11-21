@@ -67,3 +67,15 @@ của kernel (steer, dung sai bước lùi) được tìm thấy **từ dữ li�
 
 Chỉ F03-S1, một marker `m56_v22_ab_F03_LAUNCHED` ghi trước khi `room()` chờ. Bất kể B ra sao, báo như đã đo, không chạy lại.
 Nếu hạ tầng cắt A/B thì ghi lại và chờ Duy.
+
+## X7. Kết quả F03-S1 dưới v22 (ghi sau A/B, 21/11 16:50Z), như đã đo
+
+- Lần chạy chain đầu (06:52Z) chờ ở `room()` vì commit trống 21-25 GB < 32 GB. Lúc 08:23Z máy bị tắt sạch từ menu Start (event 1074). Khi đó chưa bật CARLA, chưa có marker, thư mục A/B F03-S1 vẫn đúng ba thư mục đã tiêu, nên P5 **chưa** tiêu. Sau khi máy bật lại, bộ canh được bật lại với hậu tố `r22b` và chain được chạy lại, không sửa gì.
+- Compile preview `m56_f_compile_Town12_20261121T155050Z`: FROZEN/ADMITTED. Marker `m56_v22_ab_F03_LAUNCHED` 15:53:34Z. Run `outputs/m56_f_ab_Town12_20261121T155336Z/M56-P-F03-S1`: `sealed: true`, `blocked: []`, cả hai arm CLEANED, không OUTER_TIMEOUT. Cả A/B mất khoảng 10 phút (v21: riêng arm B đã chạy hết 1500 s).
+- Arm B (308 khung, 8686-8993): TRIGGER 8802, NPC_STOP_CONFIRMED 8862, **DESTINATION_CONFIRMED 8993**. Lệnh EGO: HOLD 117, REVERSE 37, STOPPING 23, FORWARD_GEAR 1, FORWARD 130; **0 BLOCKED**. Kernel lùi v22 chạy trọn từ đầu tới đích.
+- Cặp: **FAILED** dưới cả ba luật v22 (`m56_v6_pair_20261121T160346Z`), v21 (`161612Z`) và v20 (`163125Z`); `comparisons [null, null]`, không có số đo so sánh nào.
+  - A: CONFIRMED / COMPLETE / VALID.
+  - B: physical FAILED, witness UNCERTAIN, với các lý do `POST_END_UNPLANNED_REVERSE`, `REVERSE_COMMAND_REPLAY_UNPROVEN`, `W01_W05_VALIDATION_PENDING`, `F_FULL_ACTION_REVIEW_PENDING`.
+- Nguyên nhân của FAILED vật lý (`diag-v22-f03-b.py`, chỉ đọc, file `outputs/m56_v22_f03_b_diag.stdout.txt`): sau NPC_STOP_CONFIRMED có ba bước giảm station tâm EGO vượt dung sai CONTINUOUS_GEOMETRY 1e-3 m. Đó là các khung 8865 (1,464 mm), 8869 (1,705 mm) và 8870 (1,464 mm). Cả ba nằm trong CONTROL FORWARD với readback throttle 0,75, phanh 0, số 1: lúc khởi hành lên dốc sau khi vào số tiến, xe lăn ngược. Năm bước giảm khác nằm trong dung sai. Đây đúng là rủi ro đã công bố ở X5 (biên trên v21 B chỉ còn 2,2e-5 m).
+- `REVERSE_COMMAND_REPLAY_UNPROVEN`: đây là lý do UNCERTAIN phía witness (`evidence.py:1071/1073`, việc replay lệnh lùi ném lỗi hoặc ra BLOCKED). v21 B cũng có lý do này. Nó không đổi kết quả FAILED. Nguyên nhân đang được truy offline (`diag-v21-eval-trace.py` trên B, M56_CODE=v22).
+- Kết quả được báo như đã đo. Không chạy lại, không đổi luật consumer. Mọi thay đổi tiếp theo cho F03-S1 (một luật consumer đặt sau khi thấy số, hoặc một producer giữ phanh cho tới khi lực kéo đủ, kiểu hill-start) là phiên bản mới cộng với A/B thứ năm, và chờ Duy quyết.
