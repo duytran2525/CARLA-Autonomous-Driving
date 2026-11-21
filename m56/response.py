@@ -723,13 +723,17 @@ def _reverse_ground(frame,actor,fixture):
         raise ValueError('REVERSE_GROUND_RECIPE_UNPROVEN')
 
 
+_ROW_BOUND={}
+
+
 def _reverse_inputs(frame,response,fixture,forward=False):
     """Source-bound calibration, observed history and current reserved corridor."""
     from .catalog import _digest
     from .evidence import _read_trajectory,_source_bytes,_payload
     from .model import decode_record,encode_record
     from .geometry import _is_box,world_vertices
-    from .metrics import _metric_station,_contiguous,_frame_refs
+    from .metrics import _metric_station,_contiguous,_frame_refs,_frame_memo
+    from .evidence import _V22_FAST
     mechanism=fixture.domain.topology.get('mechanism');role=response.actor_role
     ego=role=='EGO' and response.action_id=='B' and mechanism in ('F03','F06-ALT1')
     npc=role=='NPC' and response.action_id=='NPC_COMMON' and mechanism=='F06-ALT1'
@@ -772,7 +776,7 @@ def _reverse_inputs(frame,response,fixture,forward=False):
             or (history[-1].boot,history[-1].world,history[-1].frame,history[-1].simtime)!=(frame.boot,frame.world,frame.frame,frame.simtime)
             or _digest(history[-1].actors)!=_digest(frame.actors)):
         raise ValueError('REVERSE_HISTORY_UNBOUND')
-    for observed in history:
+    def row_bound(observed):
         own=tuple(a for a in observed.actors if a.role==role)
         refs=_frame_refs(observed)
         payload=_payload({'boot':observed.boot,'world':observed.world,'frame':observed.frame,
@@ -782,6 +786,16 @@ def _reverse_inputs(frame,response,fixture,forward=False):
                 or not _v14_aligned(route,own[0].pose,spawn)
                 or not refs or not any(_source_bytes(r)==payload for r in refs)):
             raise ValueError('REVERSE_HISTORY_OBSERVATION_UNBOUND')
+        return True
+    body_key=_reverse_body_hash(actor.body)
+    for observed in history:
+        if _V22_FAST:
+            # v22 (addendum X): the check is pure in the (frozen) row, this actor/body, the route and the spawn pose, and the
+            # sealed source bytes; the history grows by appending, so every tick re-proved the same k rows (O(n) -> O(n^2) per
+            # episode). Memoized per row object (weak); a failing row raises before anything is stored.
+            _frame_memo(_ROW_BOUND,observed,(role,actor.id,body_key),lambda o=observed:row_bound(o),(route,spawn))
+        else:
+            row_bound(observed)
     if forward:
         return actor,history,proof
     corridors=frame.integrity.get('reverse_corridors')
@@ -1094,7 +1108,11 @@ def _reverse_reservation_ready(history,fixture,trigger):
 def _reverse_forward(frame,state,response,fixture,actor,selected,positions,proof,history):
     """Authenticate the past exception; forward motion is not reverse calibration."""
     role=response.actor_role
-    reverse_indices=tuple(i+1 for i,(a,b) in enumerate(zip(positions,positions[1:])) if b<a)
+    # v22 (addendum X): a reverse step is a backward step beyond the proof's declared uncertainty; the uphill release after the
+    # gear shift rolls back 2.5e-4 .. 1e-3 m (native F03 v21 B frames 8124-8125), noise that must not move last_reverse past the
+    # gear frame. Slow backward drift after the gear is still caught by the cumulative envelope check below (REVERSE_FORWARD_
+    # DIRECTION_INVALID). OLD RULE (v19-v21): every b<a step.
+    reverse_indices=tuple(i+1 for i,(a,b) in enumerate(zip(positions,positions[1:])) if a-b>proof.uncertainty)
     if not reverse_indices:
         raise ValueError('REVERSE_FORWARD_HISTORY_UNPROVEN')
     last_reverse=reverse_indices[-1]
@@ -1163,7 +1181,9 @@ def reverse_intent(frame:FrameRecord,state:ScriptState,response:FrozenResponse,f
             raise ValueError('REVERSE_CLOCK_INVALID')
         forward=state.phase==('NPC_FORWARD' if response.actor_role=='NPC' else 'FORWARD')
         actor,history,proof=_reverse_inputs(frame,response,fixture,forward=forward)
-        if actor.readback is None or actor.readback.steer!=0 or actor.readback.hand_brake:
+        # v22 (addendum X): the steer==0 contract is the reverse control's; the forward continuation is the stock PID, which
+        # steers (native F03 v21 B: -0.002 after every CONTROL FORWARD -> BLOCKED loop). OLD RULE (v19-v21): steer!=0 in every phase.
+        if actor.readback is None or actor.readback.hand_brake or (actor.readback.steer!=0 and not forward):
             raise ValueError('REVERSE_APPLIED_CONTROL_UNPROVEN')
         from .metrics import _metric_station,_speed
         from .evidence import _source_bytes

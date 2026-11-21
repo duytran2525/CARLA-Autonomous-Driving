@@ -24,6 +24,8 @@ DT = F(1, 20)
 HOLD = ControlPacket(0., 0., .3, False, False, False, 1)
 COAST = ControlPacket(0., 0., 0., False, False, False, 1)
 DRIVE = ControlPacket(.2, 0., 0., False, False, False, 1)
+ROLLBACK_AT_FORWARD_START = F(0)  # v22: metres the Ego rolls back on the first forward tick (native uphill release: 2.5e-4 .. 1e-3)
+REVERSE_UNCERTAINTY = F(0)  # uncertainty of the synthetic REVERSE_STOP_BOUND proof (v22 tests set the native F03 value, 1/100 m)
 
 
 def f03_fixture(s, shared=None):
@@ -64,9 +66,11 @@ def f03_fixture(s, shared=None):
                                      'reverse_regions': {'EGO': flat_region},
                                      'driving_regions': {'EGO': (flat_region,), 'NPC': (grade_region,)}}))
     limits = {**ego.stop_proof.limits, 'response_hash': responses[1].hash, 'route_hash': _digest(flat),
-              'body_hash': _reverse_body_hash(body), 'fixture_recipe_hash': _reverse_recipe_hash(fixture)}
+              'body_hash': _reverse_body_hash(body), 'fixture_recipe_hash': _reverse_recipe_hash(fixture),
+              # boundary + distance + uncertainty must not exceed the hard limit (2 m); 0 uncertainty leaves the old 1/5 bound
+              'stopping_distance_bound_m': ego.stop_proof.limits['stopping_distance_bound_m'] - REVERSE_UNCERTAINTY}
     ref = s.source('frozen-stop-EGO', limits)
-    fixture = replace(fixture, proofs=(s.capability('REVERSE_STOP_BOUND', 'bounded-reverse-stop-v1', limits, (ref,), F(0)),))
+    fixture = replace(fixture, proofs=(s.capability('REVERSE_STOP_BOUND', 'bounded-reverse-stop-v1', limits, (ref,), REVERSE_UNCERTAINTY),))
     return SimpleNamespace(fixture=fixture, body=body, refs=tuple(s.refs))
 
 
@@ -116,7 +120,7 @@ def joint_f03_producer(root, action='B', shared=None, last=None, dispatch='direc
     recipe = s.source('producer-ground-recipe', {'method': 'recorded-ground-contact-v1', 'version': '1',
                       'limitations': 'synthetic source composition only; no native ground/grade/brake calibration'})
     raw, produced, events, issued, commands, states, seen = [], [], (), {}, {}, {}, set()
-    ego_x, ego_v, stopping_frames, capture = F(4), F(0), 0, None
+    ego_x, ego_v, stopping_frames, capture, rolled = F(4), F(0), 0, None, False
     for n in range(99, last + 1):
         time = F(n - 100, 20)
         station, npc_v = npc_state(n)
@@ -129,6 +133,11 @@ def joint_f03_producer(root, action='B', shared=None, last=None, dispatch='direc
                 ego_v = -F(1, 2) if stopping_frames <= 4 else F(0)
             elif sent.cause == 'FORWARD':
                 ego_v = F(2)
+                if not rolled:
+                    rolled = True
+                    if ROLLBACK_AT_FORWARD_START:  # a pure backward step this tick (the native release: the car rolls back first)
+                        ego_x -= ROLLBACK_AT_FORWARD_START
+                        ego_v = F(0)
             else:
                 ego_v = F(0)
             if F(4) - (ego_x + ego_v * DT) > 2:  # physical stop at the hard reserve; never pass it

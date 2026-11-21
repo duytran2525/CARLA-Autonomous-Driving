@@ -1491,10 +1491,41 @@ def _read_trajectory(ref):
     return result
 
 
+_V22_FAST=True  # v22 speed: False restores the v21 code path exactly (the equivalence tests run both)
+_TRAJ_GROWTH={}  # parent dir -> (bytes, frames) of the last single-line JSON list read there; the kit's history grows by appending
+
+
+def _read_trajectory_grown(ref,data):
+    """v22 (addendum X): the F03 kit rewrites reverse/history every tick as one JSON list that is the previous list plus new rows
+    (b'[r1,..,rk]\\n' -> b'[r1,..,rk,r(k+1)]\\n'). When `data` begins with the previous file's bytes up to its closing bracket, the first
+    k rows are byte-identical, so they decode to the same records: decode only the appended rows and share the old FrameRecord
+    objects (which also keeps every identity-keyed memo warm). Any doubt (not one line, different head, bad tail) returns None
+    and the caller decodes in full, exactly as v21 did. Result == the full decode by construction (same bytes -> same rows)."""
+    key=str(Path(ref.uri).parent)
+    last=_TRAJ_GROWTH.get(key)
+    if last is None or len(data)>(96<<20) or data.count(b'\n')!=1 or not data.startswith(b'[') or not data.endswith(b']\n'):
+        return None
+    prev,frames=last
+    head=prev[:-2]
+    if not data.startswith(head) or data[len(head):len(head)+1]!=b',':
+        return None
+    try:
+        rows=json.loads(b'['+data[len(head)+1:])
+        added=tuple(decode_record('FrameRecord',row) for row in rows)
+    except (ValueError,TypeError,UnicodeError):
+        return None
+    return (*frames,*added) if added and all(isinstance(f,FrameRecord) for f in added) else None
+
+
 def _read_trajectory_uncached(ref):
     data=_source_bytes(ref)
     if data is None:
         return None
+    if _V22_FAST:
+        grown=_read_trajectory_grown(ref,data)
+        if grown is not None:
+            _TRAJ_GROWTH[str(Path(ref.uri).parent)]=(data,grown)
+            return grown
     try:
         rows=[]
         for line in data.splitlines():
@@ -1502,7 +1533,12 @@ def _read_trajectory_uncached(ref):
             # T02 streams may contain individual frames or a single frozen batch.
             rows.extend(payload if isinstance(payload,list) else [payload])
         frames=tuple(decode_record('FrameRecord',row) for row in rows)
-        return frames if frames and all(isinstance(f,FrameRecord) for f in frames) else None
+        good=bool(frames) and all(isinstance(f,FrameRecord) for f in frames)
+        if good and _V22_FAST and len(data)<=(96<<20) and data.count(b'\n')==1 and data.startswith(b'[') and data.endswith(b']\n'):
+            if len(_TRAJ_GROWTH)>8:
+                _TRAJ_GROWTH.clear()
+            _TRAJ_GROWTH[str(Path(ref.uri).parent)]=(data,frames)
+        return frames if good else None
     except (ValueError,TypeError,UnicodeError):
         return None
 

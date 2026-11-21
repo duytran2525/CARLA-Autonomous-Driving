@@ -1632,7 +1632,20 @@ def _f01_after_trigger(frames,fixture,index,trigger):
     return tuple(result)
 
 
+_FRAME_CAPABILITY_CACHE={}
+
+
 def _frame_capability(frame,fixture,key,kind,method):
+    # v22 speed: pure in the immutable frame and fixture (guard: the very same fixture object); memoized by frame identity
+    # (weak) so the per-tick detectors do not re-decode and re-hash every old frame's proof. A raise stores nothing.
+    from .evidence import _V22_FAST
+    if _V22_FAST:
+        return _frame_memo(_FRAME_CAPABILITY_CACHE,frame,(key,kind,method),
+                           lambda:_frame_capability_uncached(frame,fixture,key,kind,method),(fixture,))
+    return _frame_capability_uncached(frame,fixture,key,kind,method)
+
+
+def _frame_capability_uncached(frame,fixture,key,kind,method):
     packet=frame.integrity.get(key)
     if packet is None:
         return None
@@ -2069,7 +2082,20 @@ def _f05_body_advance(frames,fixture,start,end):
         tuple(dict.fromkeys(r for sample in frames[start:end+1] for r in _frame_refs(sample))))
 
 
+_DIRECTED_SPEED_CACHE={}
+
+
 def _directed_speed(actor,route):
+    # v22 speed: pure in the immutable actor record and the route (guard: the very same route object), memoized by actor
+    # identity (weak) so the per-tick detectors do not rescan every route segment of every old frame. Identical values;
+    # evidence._V22_FAST=False runs the v21 code path.
+    from .evidence import _V22_FAST
+    if _V22_FAST:
+        return _frame_memo(_DIRECTED_SPEED_CACHE,actor,id(route),lambda:_directed_speed_uncached(actor,route),(route,))
+    return _directed_speed_uncached(actor,route)
+
+
+def _directed_speed_uncached(actor,route):
     station=_metric_station((actor.pose.x,actor.pose.y,actor.pose.z),route)
     if station is None or _speed(actor.velocity) is None:
         return None
