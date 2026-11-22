@@ -46,6 +46,7 @@ for p in (*out_files.values(), stop_file, base):
 for p in (PY, WORK / 'tests/m56/pytest.ini', WORK / 'tests/m56', WORK / 'm56'):
     assert p.exists(), f'missing {p}'
 assert all(n.startswith('tests/m56') and '..' not in n for n in a.node)
+RECEIPTS.mkdir(parents=True, exist_ok=True)  # pytest's basetemp mkdir makes no parents (suite 14, 22/11: 625 setup errors)
 
 common = [str(PY), '-u', '-I', '-B', '-X', 'utf8', '-m', 'pytest', '-c', str(WORK / 'tests/m56/pytest.ini'),
           '--confcutdir', str(WORK / 'tests/m56')]
