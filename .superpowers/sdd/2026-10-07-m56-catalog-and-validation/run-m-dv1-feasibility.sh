@@ -6,7 +6,7 @@ export PATH=/usr/bin:$PATH
 cd "$(dirname "$0")"
 R=D:/AI/CARLA-Funny-Moments.worktrees/m56-v1/outputs
 PY=../../../.venv-m56-native-v1/Scripts/python.exe
-Q=$R/m56_oz_queue_20261122b.stdout.txt
+Q=$R/${M56_FEAS_AFTER:-m56_oz_queue_20261122b}.stdout.txt  # the O queue label to wait for
 until grep -q '^OZ_END' $Q 2>/dev/null; do sleep 60; done
 echo "start $(date -u +%FT%TZ) after $(grep '^OZ_END' $Q)"
 room() { while tasklist | grep -qi CarlaUE4; do sleep 15; done; python -I asel2-cguard.py --wait-commit-gb ${M56_COMMIT_START_GB:-32} | tail -1; }
