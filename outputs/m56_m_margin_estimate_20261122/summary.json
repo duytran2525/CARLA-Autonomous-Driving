@@ -1,0 +1,25 @@
+{
+ "keys": 2152,
+ "sites": 393,
+ "gateS": {
+  "max": 0.391,
+  "sites_ge_0.45": 0
+ },
+ "lane_stock": {
+  "max": 0.391,
+  "sites_ge_0.45": 0
+ },
+ "area_stock": {
+  "max": -0.127,
+  "sites_ge_0.45": 0
+ },
+ "lane_ideal": {
+  "max": 0.44,
+  "sites_ge_0.45": 0
+ },
+ "area_ideal": {
+  "max": 0.548,
+  "sites_ge_0.45": 1
+ },
+ "min_centre_in_area": 0.938
+}
