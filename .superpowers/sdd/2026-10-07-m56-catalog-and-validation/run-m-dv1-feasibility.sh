@@ -13,7 +13,7 @@ room() { while tasklist | grep -qi CarlaUE4; do sleep 15; done; python -I asel2-
 for t in Town05 Town12 Town13; do
   [ -f $R/m56_asel2_STOP ] && { echo "STOP file: end"; break; }
   room
-  timeout ${M56_FEAS_TIMEOUT_S:-14400} $PY -I -X utf8 native-m-dv1-feasibility.py $t --validate 2 > $R/m56_m_dv1_feasibility_$t.log 2>&1
+  timeout ${M56_FEAS_TIMEOUT_S:-14400} $PY -I -X utf8 native-m-dv1-feasibility.py $t --validate 2 --min-lane ${M56_FEAS_MIN_LANE:-0} > $R/m56_m_dv1_feasibility_$t.log 2>&1
   echo "$t exit $? $(grep TOWN_DONE $R/m56_m_dv1_feasibility_$t.log | tail -1)"
 done
 echo "FEAS_END $(date -u +%FT%TZ)"

@@ -6,11 +6,12 @@ body 4.90 x 2.12 m). Margin = min signed distance of the body corners to the dv1
 margin >= 0.45 m (0.15 contact proof + 0.30 replay TOL, addendum R/S).
 dv1 = the native_v2_common.drivable_union construction (Driving|Shoulder lane quads every 0.5 m, 0.25 m closing, plus the
 Roads|RoadLines cast_ray raster on 0.25 m cells eroded 0.125 m), on a 4 m corridor around the connector path +16 m each
-side; poses are scored on the connector +12 m each side. Cells deeper than 0.5 m inside the lane union are not cast (they
+side; poses are scored on the connector only (EXT_SCORE). Cells deeper than 0.5 m inside the lane union are not cast (they
 are in dv1 anyway). A scene's real dv1 also covers 12 m around the EGO route, so this margin is a lower bound.
 --validate N: the first N sites of the town are also built with native_v2_common.drivable_union itself (the exact
 function, 12 m corridor around the same path) and both margins are printed.
-  python -I -X utf8 native-m-dv1-feasibility.py TOWN [--validate N] [--limit K]   |   --selftest"""
+--min-lane X: only sites whose offline lane-quad stock margin (LANEQ, a lower bound of dv1) is >= X.
+  python -I -X utf8 native-m-dv1-feasibility.py TOWN [--validate N] [--limit K] [--min-lane X]   |   --selftest"""
 import importlib.util, json, math, os, sys, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,7 +20,11 @@ os.environ.setdefault('M56_RECIPE', 'v6'); os.environ.setdefault('M56_DRIVABLE',
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parents[2] / 'outputs'
 EST = OUT / 'm56_m_margin_estimate_20261122' / 'margins.json'
-MARGIN, CORR, CELL, EXT_RAST, EXT_SCORE = .45, 4., .25, 16., 12.
+LANEQ = OUT / 'm56_m_margin_estimate_20261122' / 'lanequad_connector.jsonl'  # offline lane-quad lower bound per site
+# EXT_SCORE 0: poses are scored on the connector only. The gate's 30 m straight extensions are a shortcut (incoming /
+# outgoing roads assumed straight); against real lanes they put the ideal path off the lane on curved approaches (offline
+# 22/11: 100 of 132 Town12 sites had their ideal-tracking minimum in the +-12 m extensions). They still drive the replay.
+MARGIN, CORR, CELL, EXT_RAST, EXT_SCORE = .45, 4., .25, 16., 0.
 
 
 def _mod(name, file):
@@ -133,7 +138,7 @@ def selftest():
     print('DV1_FEASIBILITY SELFTEST_OK')
 
 
-def main(town, validate=0, limit=None):
+def main(town, validate=0, limit=None, min_lane=None):
     import carla
     from shapely.geometry import LineString, Point
     from shapely.ops import unary_union
@@ -144,6 +149,10 @@ def main(town, validate=0, limit=None):
     sites = {}
     for r in rows:
         sites.setdefault((r['connecting'], r['to']), []).append(float(r['vN']))
+    if min_lane is not None:  # Duy [chat] 22/11: only sites whose offline lane-quad stock margin (lower bound) >= min_lane
+        lq = [json.loads(l) for l in LANEQ.read_text(encoding='utf-8').splitlines() if l.strip()]
+        ok = {(r['connecting'], r['to']) for r in lq if r['town'] == town and r['best_stock'] >= min_lane}
+        sites = {k: v for k, v in sites.items() if k in ok}
     keys = sorted(sites)[:limit]
     out = OUT / f'm56_m_dv1_feasibility_{town}_{now()}.jsonl'
     log = lambda **k: print(json.dumps(k, default=str), flush=True)
@@ -219,4 +228,5 @@ if __name__ == '__main__':
         selftest(); sys.exit(0)
     v = int(a[a.index('--validate') + 1]) if '--validate' in a else 0
     lim = int(a[a.index('--limit') + 1]) if '--limit' in a else None
-    main(a[0], v, lim)
+    ml = float(a[a.index('--min-lane') + 1]) if '--min-lane' in a else None
+    main(a[0], v, lim, ml)

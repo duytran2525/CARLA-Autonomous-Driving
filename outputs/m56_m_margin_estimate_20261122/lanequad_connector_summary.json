@@ -1,0 +1,21 @@
+{
+ "sites": 393,
+ "stock_sites_ge_0.45": 0,
+ "stock_sites_ge_0.30": 4,
+ "ideal_sites_ge_0.45": 133,
+ "best_stock_max": 0.39,
+ "by_town": {
+  "Town05": {
+   "sites": 2,
+   "stock_ge_0.45": 0
+  },
+  "Town12": {
+   "sites": 132,
+   "stock_ge_0.45": 0
+  },
+  "Town13": {
+   "sites": 259,
+   "stock_ge_0.45": 0
+  }
+ }
+}
