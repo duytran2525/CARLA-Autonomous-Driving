@@ -145,19 +145,28 @@ def drop(files, links, dirs, keep):
     return gone, kept, fail
 
 
-def done():
-    return {json.loads(l)['root'] for l in MAN.read_text(encoding='utf-8').splitlines()
-            if l.strip() and '"DONE"' in l} if MAN.exists() else set()
+def records(event):
+    return {r['root']: r for r in (json.loads(l) for l in MAN.read_text(encoding='utf-8').splitlines() if l.strip())
+            if r['event'] == event} if MAN.exists() else {}
+
+
+def resumable(c0, st, gf, nf, nb):
+    """A root copied before a restart: its staged and Drive copies match the COPIED record and the source has not grown.
+    It then goes straight to the cloud check: no repack, so a root interrupted mid-delete never overwrites its full
+    archive on Drive with a partial one."""
+    return bool(c0) and all(p.exists() and p.stat().st_size == c0['archive_bytes'] for p in (st, gf)) \
+        and nf <= c0['files'] and nb <= c0['bytes']
 
 
 def main(dry):
-    keep = tracked()
-    todo = [r for r in roots() if r[0] not in done()]
+    keep = tracked(); copied = records('COPIED')
+    todo = [r for r in roots() if r[0] not in records('DONE')]
     if dry:
         tot = nl = 0
         for name, kind, path in todo:
             fl, ln, _ = inventory(kind, path); b = sum(s for _, s in fl); tot += b; nl += len(ln)
-            print(f'{name} {len(fl)} files {b / 2**20:.0f} MB' + (f' links {ln}' if ln else ''))
+            an = f'{name}.tar.zst'; rs = resumable(copied.get(name), STAGE / an, G / an, len(fl), b)
+            print(f'{name} {len(fl)} files {b / 2**20:.0f} MB' + (' RESUME' if rs else '') + (f' links {ln}' if ln else ''))
         print(len(todo), 'roots', round(tot / 2**30, 2), 'GB', nl, 'links;', len(keep), 'tracked'); return
     assert Path('G:/My Drive').exists(), 'G: not available'
     STAGE.mkdir(exist_ok=True); G.mkdir(exist_ok=True)
@@ -181,9 +190,12 @@ def main(dry):
     for name, kind, path in todo:
         files, links, dirs = inventory(kind, path)
         nf, nb = len(files), sum(s for _, s in files)
+        an = f'{name}.tar.zst'; st = STAGE / an; part = STAGE / (an + '.part'); c0 = copied.get(name)
+        if resumable(c0, st, G / an, nf, nb):
+            pending[an] = (name, files, links, dirs, st, c0['archive_bytes'])
+            say(event='RESUMED', root=name, archive=an, files_now=nf, files_copied=c0['files']); sweep(); continue
         if nf == 0:
             say(event='LINKS', root=name, links=links); finish(name, None, files, links, dirs, note='no files'); continue
-        an = f'{name}.tar.zst'; st = STAGE / an; part = STAGE / (an + '.part')
         sha = pack(path, files, part)
         sha2, ok = verify(part, nf, nb)
         if sha != sha2 or not ok:
@@ -251,6 +263,10 @@ def selftest():
                         "insert into items values (1,'X','TOPX',1,0,0,0),(2,'Y','a.tar.zst',0,10,0,0),(3,'local-9','b.tar.zst',0,7,0,0);"
                         'insert into stable_parents values (2,1),(3,1);'); c.commit(); c.close()
         assert cloud(db, 'TOPX') == {'a.tar.zst': (10, True), 'b.tar.zst': (7, False)} and cloud(db, 'NOPE') == {}
+        s1, s2 = d / 's1', d / 's2'; s1.write_bytes(b'z' * 9); s2.write_bytes(b'z' * 9); c0 = {'archive_bytes': 9, 'files': 3, 'bytes': 50}
+        assert resumable(c0, s1, s2, 2, 40) and resumable(c0, s1, s2, 3, 50)  # unchanged or partly deleted: resume
+        assert not resumable(c0, s1, s2, 4, 50) and not resumable(None, s1, s2, 1, 1) and not resumable(c0, s1, d / 'no', 1, 1)
+        s2.write_bytes(b'z' * 8); assert not resumable(c0, s1, s2, 1, 1)  # Drive copy differs: repack
         print(f'ARCHIVE_FINAL SELFTEST_OK (symlink case {"run" if nsym else "skipped"})')
     finally:
         shutil.rmtree(d, ignore_errors=True)
