@@ -18,7 +18,8 @@ from types import SimpleNamespace
 
 os.environ.setdefault('M56_RECIPE', 'v6'); os.environ.setdefault('M56_DRIVABLE', 'dv1')  # before native_v2_common import
 HERE = Path(__file__).resolve().parent
-OUT = HERE.parents[2] / 'outputs'
+sys.path.insert(0, str(HERE))  # python -I does not put the script dir on sys.path (native_v2_common)
+OUT =HERE.parents[2] / 'outputs'
 EST = OUT / 'm56_m_margin_estimate_20261122' / 'margins.json'
 LANEQ = OUT / 'm56_m_margin_estimate_20261122' / 'lanequad_connector.jsonl'  # offline lane-quad lower bound per site
 # EXT_SCORE 0: poses are scored on the connector only. The gate's 30 m straight extensions are a shortcut (incoming /
