@@ -11,7 +11,8 @@ are in dv1 anyway). A scene's real dv1 also covers 12 m around the EGO route, so
 --validate N: the first N sites of the town are also built with native_v2_common.drivable_union itself (the exact
 function, 12 m corridor around the same path) and both margins are printed.
 --min-lane X: only sites whose offline lane-quad stock margin (LANEQ, a lower bound of dv1) is >= X.
-  python -I -X utf8 native-m-dv1-feasibility.py TOWN [--validate N] [--limit K] [--min-lane X]   |   --selftest"""
+--skip-done: skip sites already in an outputs/m56_m_dv1_feasibility_TOWN_*.jsonl (resume in chunks with --limit).
+  python -I -X utf8 native-m-dv1-feasibility.py TOWN [--validate N] [--limit K] [--min-lane X] [--skip-done]   |   --selftest"""
 import importlib.util, json, math, os, sys, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -139,7 +140,7 @@ def selftest():
     print('DV1_FEASIBILITY SELFTEST_OK')
 
 
-def main(town, validate=0, limit=None, min_lane=None):
+def main(town, validate=0, limit=None, min_lane=None, skip_done=False):
     import carla
     from shapely.geometry import LineString, Point
     from shapely.ops import unary_union
@@ -154,7 +155,17 @@ def main(town, validate=0, limit=None, min_lane=None):
         lq = [json.loads(l) for l in LANEQ.read_text(encoding='utf-8').splitlines() if l.strip()]
         ok = {(r['connecting'], r['to']) for r in lq if r['town'] == town and r['best_stock'] >= min_lane}
         sites = {k: v for k, v in sites.items() if k in ok}
-    keys = sorted(sites)[:limit]
+    if skip_done:  # 23/11: resume in chunks (Town13 server memory grew ~1.5 GB/min across sites); skip sites already scored
+        done = {(r['connecting'], r['to']) for p in OUT.glob(f'm56_m_dv1_feasibility_{town}_*.jsonl')
+                for r in map(json.loads, p.read_text(encoding='utf-8').splitlines()) if r}
+        sites = {k: v for k, v in sites.items() if k not in done}
+    mid = {}
+    for k in sites:
+        p = S.connector_path(cen.lane_centre, roads[k[0]], k[1])[0]; mid[k] = p[len(p) // 2]
+    # 500 m cells, then x: neighbouring sites share streamed tiles (order only; every site is scored the same way)
+    keys = sorted(sites, key=lambda k: (int(mid[k][0] // 500), int(mid[k][1] // 500), mid[k][0]))[:limit]
+    if not keys:
+        print(json.dumps({'event': 'TOWN_DONE', 'town': town, 'sites': 0, 'note': 'nothing left'}), flush=True); return
     out = OUT / f'm56_m_dv1_feasibility_{town}_{now()}.jsonl'
     log = lambda **k: print(json.dumps(k, default=str), flush=True)
     t0 = time.time(); n_pass = n_keys = 0; site_pass = set()
@@ -230,4 +241,4 @@ if __name__ == '__main__':
     v = int(a[a.index('--validate') + 1]) if '--validate' in a else 0
     lim = int(a[a.index('--limit') + 1]) if '--limit' in a else None
     ml = float(a[a.index('--min-lane') + 1]) if '--min-lane' in a else None
-    main(a[0], v, lim, ml)
+    main(a[0], v, lim, ml, '--skip-done' in a)
